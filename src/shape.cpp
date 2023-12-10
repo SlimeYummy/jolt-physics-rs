@@ -118,15 +118,15 @@ XRefShape CreateShapeCylinder(const CylinderSettings& st) {
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
 
-struct IsometrySettings {
+struct RotatedTranslatedSettings {
 	uint64 userData;
 	RefConst<Shape> innerShape;
 	Vec3 position;
 	Quat rotation;
 };
-static_assert(sizeof(IsometrySettings) == 48, "IsometrySettings size");
+static_assert(sizeof(RotatedTranslatedSettings) == 48, "RotatedTranslatedSettings size");
 
-XRefShape CreateShapeIsometry(const IsometrySettings& st) {
+XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
 	RotatedTranslatedShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
@@ -158,16 +158,35 @@ XRefShape CreateShapeScaled(const ScaledSettings& st) {
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
 
+struct OffsetCenterOfMassSettings {
+	uint64 userData;
+	RefConst<Shape> innerShape;
+	Vec3 offset;
+};
+static_assert(sizeof(OffsetCenterOfMassSettings) == 32, "OffsetCenterOfMassSettings size");
+
+XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
+	OffsetCenterOfMassShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mOffset = st.offset;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
 struct ConvexHullSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
-	rust::Vec<Vec3> points;
+	rust::Slice<Vec3> points;
 	float maxConvexRadius;
 	float maxErrorConvexRadius;
 	float hullTolerance;
 };
-static_assert(sizeof(ConvexHullSettings) == 64, "ConvexHullSettings size");
+static_assert(sizeof(ConvexHullSettings) == 56, "ConvexHullSettings size");
 
 XRefShape CreateShapeConvexHull(const ConvexHullSettings& st) {
 	ConvexHullShapeSettings settings;
@@ -187,13 +206,13 @@ XRefShape CreateShapeConvexHull(const ConvexHullSettings& st) {
 
 struct MeshSettings {
 	uint64 userData;
-	rust::Vec<Float3> triangleVertices;
-	rust::Vec<IndexedTriangle> indexedTriangles;
-	rust::Vec<XRefPhysicsMaterial> materials;
+	rust::Slice<Float3> triangleVertices;
+	rust::Slice<IndexedTriangle> indexedTriangles;
+	rust::Slice<XRefPhysicsMaterial> materials;
 	uint32 maxTrianglesPerLeaf;
 	float activeEdgeCosThresholdAngle;
 };
-static_assert(sizeof(MeshSettings) == 88, "MeshSettings size");
+static_assert(sizeof(MeshSettings) == 64, "MeshSettings size");
 
 XRefShape CreateShapeMesh(const MeshSettings& st) {
 	MeshShapeSettings settings;
@@ -222,12 +241,12 @@ struct HeightFieldSettings {
 	float maxHeightValue;
 	uint32 blockSize;
 	uint32 bitsPerSample;
-	rust::Vec<float> heightSamples;
-	rust::Vec<uint8_t> materialIndices;
-	rust::Vec<XRefPhysicsMaterial> materials;
+	rust::Slice<float> heightSamples;
+	rust::Slice<uint8_t> materialIndices;
+	rust::Slice<XRefPhysicsMaterial> materials;
 	float activeEdgeCosThresholdAngle;
 };
-static_assert(sizeof(HeightFieldSettings) == 160, "HeightFieldSettings size");
+static_assert(sizeof(HeightFieldSettings) == 128, "HeightFieldSettings size");
 
 XRefShape CreateShapeHeightField(const HeightFieldSettings& st) {
 	if (st.heightSamples.size() != st.sampleCount * st.sampleCount) {

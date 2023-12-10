@@ -110,11 +110,18 @@ pub(crate) mod ffi {
         type BodyCreationSettings;
         fn CreateBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings) -> BodyID;
         fn CreateAddBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings, active: Activation) -> BodyID;
+        fn AddBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID, active: Activation);
         fn SetObjectLayer(self: Pin<&mut XBodyInterface>, body_id: &BodyID, layer: u16);
         fn GetObjectLayer(self: &XBodyInterface, body_id: &BodyID) -> u16;
-        fn SetIsometry(self: Pin<&mut XBodyInterface>, body_id: &BodyID, isometry: Isometry, active: Activation);
-        fn SetIsometryWhenChanged(self: Pin<&mut XBodyInterface>, body_id: &BodyID, isometry: Isometry, active: Activation);
-        fn GetIsometry(self: &XBodyInterface, body_id: &BodyID) -> Isometry;
+        fn SetPositionAndRotation(self: Pin<&mut XBodyInterface>, body_id: &BodyID, position: Vec3, rotation: Quat, active: Activation);
+        fn SetPositionAndRotationWhenChanged(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            position: Vec3,
+            rotation: Quat,
+            active: Activation,
+        );
+        fn GetPositionAndRotation(self: &XBodyInterface, body_id: &BodyID) -> Isometry;
         fn SetPosition(self: Pin<&mut XBodyInterface>, body_id: &BodyID, position: Vec3, active: Activation);
         fn GetPosition(self: &XBodyInterface, body_id: &BodyID) -> Vec3;
         fn GetCenterOfMassPosition(self: &XBodyInterface, body_id: &BodyID) -> Vec3;
@@ -132,7 +139,11 @@ pub type OverrideMassProperties = ffi::OverrideMassProperties;
 
 impl From<bool> for ffi::Activation {
     fn from(value: bool) -> ffi::Activation {
-        return if value { ffi::Activation::Activate } else { ffi::Activation::DontActivate };
+        return if value {
+            ffi::Activation::Activate
+        } else {
+            ffi::Activation::DontActivate
+        };
     }
 }
 
@@ -392,6 +403,7 @@ impl XContactCollector {
 // BodyInterface
 //
 
+#[derive(Debug, Clone)]
 pub struct BodyInterface {
     body_itf: *mut ffi::XBodyInterface,
     _system: RefPhysicsSystem,
@@ -429,6 +441,10 @@ impl BodyInterface {
         return Some(body_id);
     }
 
+    pub fn add_body(&mut self, body_id: BodyID, active: bool) {
+        return self.as_mut().AddBody(&body_id, active.into());
+    }
+
     pub fn set_object_layer(&mut self, body_id: BodyID, layer: u16) {
         return self.as_mut().SetObjectLayer(&body_id, layer);
     }
@@ -437,16 +453,21 @@ impl BodyInterface {
         return self.as_ref().GetObjectLayer(&body_id);
     }
 
-    pub fn set_isometry(&mut self, body_id: BodyID, isometry: Isometry, active: bool) {
-        return self.as_mut().SetIsometry(&body_id, isometry, active.into());
+    pub fn set_position_rotation(&mut self, body_id: BodyID, position: Vec3A, rotation: Quat, active: bool) {
+        return self
+            .as_mut()
+            .SetPositionAndRotation(&body_id, position.into(), rotation.into(), active.into());
     }
 
-    pub fn set_isometry_when_changed(&mut self, body_id: BodyID, isometry: Isometry, active: bool) {
-        return self.as_mut().SetIsometryWhenChanged(&body_id, isometry, active.into());
+    pub fn set_position_rotation_when_changed(&mut self, body_id: BodyID, position: Vec3A, rotation: Quat, active: bool) {
+        return self
+            .as_mut()
+            .SetPositionAndRotationWhenChanged(&body_id, position.into(), rotation.into(), active.into());
     }
 
-    pub fn get_isometry(&self, body_id: BodyID) -> Isometry {
-        return self.as_ref().GetIsometry(&body_id);
+    pub fn get_position_rotation(&self, body_id: BodyID) -> (Vec3A, Quat) {
+        let isometry = self.as_ref().GetPositionAndRotation(&body_id);
+        return (isometry.position, isometry.rotation);
     }
 
     pub fn set_position(&mut self, body_id: BodyID, position: Vec3A, active: bool) {

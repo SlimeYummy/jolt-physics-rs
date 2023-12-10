@@ -152,18 +152,10 @@ BodyID XBodyInterface::CreateAddBody(const BodyCreationSettings& settings, EActi
 	return BodyInterface::CreateAndAddBody(settings, activation);
 }
 
-void XBodyInterface::SetIsometry(const BodyID& bodyId, Isometry isometry, EActivation activation) {
-	SetPositionAndRotation(bodyId, isometry.position, isometry.rotation, activation);
-}
-
-void XBodyInterface::SetIsometryWhenChanged(const BodyID& bodyId, Isometry isometry, EActivation activation) {
-	SetPositionAndRotationWhenChanged(bodyId, isometry.position, isometry.rotation, activation);
-}
-
-Isometry XBodyInterface::GetIsometry(const BodyID& bodyId) const {
+Isometry XBodyInterface::GetPositionAndRotation(const BodyID& bodyId) const {
 	Vec3 position = Vec3::sZero();
 	Quat rotation = Quat::sIdentity();
-	GetPositionAndRotation(bodyId, position, rotation);
+	BodyInterface::GetPositionAndRotation(bodyId, position, rotation);
 	return Isometry{position, rotation};
 }
 

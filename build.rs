@@ -11,8 +11,8 @@ fn main() {
     let target = env::var("TARGET").unwrap();
     let windows = target.contains("windows");
 
-    let include_path = env::var("JOLT_PHYSICS_INCLUDE").expect("Env var JOLT_PHYSICS_INCLUDE not set");
-    let library_path = env::var("JOLT_PHYSICS_LIBRARY").expect("Env var JOLT_PHYSICS_LIBRARY not set");
+    let include_path = env::var("JOLT_PHYSICS_INCLUDE").unwrap_or("./JoltPhysics".into());
+    let library_path = env::var("JOLT_PHYSICS_LIBRARY").unwrap_or("./JoltPhysics/Build/VS2022_CL/Release".into());
 
     let mut cxx = cxx_build::bridges([
         "src/base.rs",
@@ -47,7 +47,7 @@ fn main() {
 
     println!("cargo:rustc-link-lib={}/Jolt", library_path);
     println!("cargo:rustc-link-lib={}/TestFramework", library_path);
-    
+
     if windows {
         println!("cargo:rustc-link-lib=User32");
         println!("cargo:rustc-link-lib=gdi32");
@@ -59,5 +59,5 @@ fn main() {
         println!("cargo:rustc-link-lib=dxguid");
     }
 
-    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed=src/*");
 }

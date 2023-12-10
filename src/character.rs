@@ -33,7 +33,6 @@ pub(crate) mod ffi {
         type Quat = crate::base::ffi::Quat;
         type Mat44 = crate::base::ffi::Mat44;
         type Isometry = crate::base::ffi::Isometry;
-        type Plane = crate::base::ffi::Plane;
         type BodyID = crate::base::ffi::BodyID;
         type XRefShape = crate::base::ffi::XRefShape;
         type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
@@ -49,13 +48,15 @@ pub(crate) mod ffi {
         unsafe fn CreateCharacterCommon(
             system: *mut XPhysicsSystem,
             settings: &XCharacterCommonSettings,
-            isometry: Isometry,
+            position: Vec3,
+            rotation: Quat,
             user_data: u64,
         ) -> UniquePtr<XCharacterCommon>;
         unsafe fn CreateAddCharacterCommon(
             system: *mut XPhysicsSystem,
             settings: &XCharacterCommonSettings,
-            isometry: Isometry,
+            position: Vec3,
+            rotation: Quat,
             user_data: u64,
             activation: Activation,
             lock: bool,
@@ -82,8 +83,8 @@ pub(crate) mod ffi {
         fn SetLinearVelocity(self: Pin<&mut XCharacterCommon>, velocity: Vec3, lock: bool);
         fn AddLinearVelocity(self: Pin<&mut XCharacterCommon>, velocity: Vec3, lock: bool);
         fn AddImpulse(self: Pin<&mut XCharacterCommon>, impulse: Vec3, lock: bool);
-        fn GetIsometry(self: &XCharacterCommon, lock: bool) -> Isometry;
-        fn SetIsometry(self: Pin<&mut XCharacterCommon>, isometry: Isometry, activation: Activation, lock: bool);
+        fn GetPositionAndRotation(self: &XCharacterCommon, lock: bool) -> Isometry;
+        fn SetPositionAndRotation(self: &XCharacterCommon, position: Vec3, rotation: Quat, activation: Activation, lock: bool);
         fn GetPosition(self: &XCharacterCommon, lock: bool) -> Vec3;
         fn SetPosition(self: Pin<&mut XCharacterCommon>, position: Vec3, activation: Activation, lock: bool);
         fn GetRotation(self: &XCharacterCommon, lock: bool) -> Quat;
@@ -94,8 +95,12 @@ pub(crate) mod ffi {
         fn SetShape(self: Pin<&mut XCharacterCommon>, shape: XRefShape, max_penetration_depth: f32, lock: bool) -> bool;
 
         type XCharacterVirtual;
-        unsafe fn CreateCharacterVirtual(system: *mut XPhysicsSystem, settings: &XCharacterVirtualSettings, isometry: Isometry)
-            -> UniquePtr<XCharacterVirtual>;
+        unsafe fn CreateCharacterVirtual(
+            system: *mut XPhysicsSystem,
+            settings: &XCharacterVirtualSettings,
+            position: Vec3,
+            rotation: Quat,
+        ) -> UniquePtr<XCharacterVirtual>;
         fn SetMaxSlopeAngle(self: Pin<&mut XCharacterVirtual>, angle: f32);
         fn GetCosMaxSlopeAngle(self: &XCharacterVirtual) -> f32;
         fn SetUp(self: Pin<&mut XCharacterVirtual>, up: Vec3);
@@ -143,7 +148,13 @@ pub(crate) mod ffi {
             step_down_extra: Vec3,
         ) -> bool;
         fn StickToFloor(self: Pin<&mut XCharacterVirtual>, chara_layer: u16, step_down: Vec3) -> bool;
-        fn ExtendedUpdate(self: Pin<&mut XCharacterVirtual>, chara_layer: u16, delta_time: f32, gravity: Vec3, settings: &ExtendedUpdateSettings);
+        fn ExtendedUpdate(
+            self: Pin<&mut XCharacterVirtual>,
+            chara_layer: u16,
+            delta_time: f32,
+            gravity: Vec3,
+            settings: &ExtendedUpdateSettings,
+        );
         fn RefreshContacts(self: Pin<&mut XCharacterVirtual>, chara_layer: u16);
         fn UpdateGroundVelocity(self: Pin<&mut XCharacterVirtual>);
         fn SetShape(self: Pin<&mut XCharacterVirtual>, chara_layer: u16, shape: XRefShape, max_penetration_depth: f32) -> bool;
@@ -241,7 +252,10 @@ impl Default for CharacterVirtualSettings {
 
 impl CharacterVirtualSettings {
     pub fn new(shape: RefShape) -> CharacterVirtualSettings {
-        return CharacterVirtualSettings { shape, ..Default::default() };
+        return CharacterVirtualSettings {
+            shape,
+            ..Default::default()
+        };
     }
 }
 
@@ -282,8 +296,22 @@ impl Drop for CharacterCommon {
 }
 
 impl CharacterCommon {
-    pub fn new(system: &mut PhysicsSystem, settings: &CharacterCommonSettings, isometry: Isometry, user_data: u64) -> CharacterCommon {
-        let chara = unsafe { ffi::CreateCharacterCommon(system.system_ptr(), mem::transmute(settings), isometry, user_data) };
+    pub fn new(
+        system: &mut PhysicsSystem,
+        settings: &CharacterCommonSettings,
+        position: Vec3A,
+        rotation: Quat,
+        user_data: u64,
+    ) -> CharacterCommon {
+        let chara = unsafe {
+            ffi::CreateCharacterCommon(
+                system.system_ptr(),
+                mem::transmute(settings),
+                position.into(),
+                rotation.into(),
+                user_data,
+            )
+        };
         return CharacterCommon {
             chara,
             _system: system.inner_ref().clone(),
@@ -293,12 +321,23 @@ impl CharacterCommon {
     pub fn new_ex(
         system: &mut PhysicsSystem,
         settings: &CharacterCommonSettings,
-        isometry: Isometry,
+        position: Vec3A,
+        rotation: Quat,
         user_data: u64,
         active: bool,
         lock: bool,
     ) -> CharacterCommon {
-        let chara = unsafe { ffi::CreateAddCharacterCommon(system.system_ptr(), mem::transmute(settings), isometry, user_data, active.into(), lock) };
+        let chara = unsafe {
+            ffi::CreateAddCharacterCommon(
+                system.system_ptr(),
+                mem::transmute(settings),
+                position.into(),
+                rotation.into(),
+                user_data,
+                active.into(),
+                lock,
+            )
+        };
         return CharacterCommon {
             chara,
             _system: system.inner_ref().clone(),
@@ -397,12 +436,13 @@ impl CharacterCommon {
         self.as_mut().AddImpulse(impulse.into(), lock);
     }
 
-    pub fn get_isometry(&self, lock: bool) -> Isometry {
-        return self.as_ref().GetIsometry(lock);
+    pub fn get_position_and_rotation(&self, lock: bool) -> (Vec3A, Quat) {
+        let isometry = self.as_ref().GetPositionAndRotation(lock);
+        return (isometry.position, isometry.rotation);
     }
 
-    pub fn set_isometry(&mut self, isometry: Isometry, active: bool, lock: bool) {
-        self.as_mut().SetIsometry(isometry, active.into(), lock);
+    pub fn set_position_and_rotation(&mut self, position: Vec3A, rotation: Quat, active: bool, lock: bool) {
+        self.as_mut().SetPositionAndRotation(position.into(), rotation.into(), active.into(), lock);
     }
 
     pub fn get_position(&self, lock: bool) -> Vec3A {
@@ -454,8 +494,8 @@ impl Drop for CharacterVirtual {
 }
 
 impl CharacterVirtual {
-    pub fn new(system: &mut PhysicsSystem, settings: &CharacterVirtualSettings, isometry: Isometry) -> CharacterVirtual {
-        let chara = unsafe { ffi::CreateCharacterVirtual(system.system_ptr(), mem::transmute(settings), isometry) };
+    pub fn new(system: &mut PhysicsSystem, settings: &CharacterVirtualSettings, position: Vec3A, rotation: Quat) -> CharacterVirtual {
+        let chara = unsafe { ffi::CreateCharacterVirtual(system.system_ptr(), mem::transmute(settings), position.into(), rotation.into()) };
         return CharacterVirtual {
             chara,
             _system: system.inner_ref().clone(),

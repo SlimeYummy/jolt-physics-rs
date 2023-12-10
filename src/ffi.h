@@ -28,8 +28,9 @@
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/HeightFieldShape.h>
-#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyActivationListener.h>
 #include <Jolt/Physics/Character/Character.h>
@@ -135,10 +136,12 @@ struct TaperedCapsuleSettings;
 XRefShape CreateShapeTaperedCapsule(const TaperedCapsuleSettings& settings);
 struct CylinderSettings;
 XRefShape CreateShapeCylinder(const CylinderSettings& settings);
-struct IsometrySettings;
-XRefShape CreateShapeIsometry(const IsometrySettings& settings);
+struct RotatedTranslatedSettings;
+XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
 struct ScaledSettings;
 XRefShape CreateShapeScaled(const ScaledSettings& settings);
+struct OffsetCenterOfMassSettings;
+XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
 struct ConvexHullSettings;
 XRefShape CreateShapeConvexHull(const ConvexHullSettings& settings);
 struct MeshSettings;
@@ -236,9 +239,7 @@ public:
 	~XBodyInterface() { printf("~XBodyInterface\n"); }
 	BodyID CreateBody(const BodyCreationSettings& settings);
 	BodyID CreateAddBody(const BodyCreationSettings& settings, EActivation activation);
-	void SetIsometry(const BodyID& bodyId, Isometry isometry, EActivation activation);
-	void SetIsometryWhenChanged(const BodyID& bodyId, Isometry isometry, EActivation activation);
-	Isometry GetIsometry(const BodyID& bodyId) const;
+	Isometry GetPositionAndRotation(const BodyID& bodyId) const;
 };
 
 XBodyInterface* CreateBodyInterface(XPhysicsSystem* system, bool lock);
@@ -255,22 +256,28 @@ class XCharacterCommon: public Character, public DebugRenderable {
 private:
 	XPhysicsSystem* _system;
 public:
-	XCharacterCommon(XPhysicsSystem* system, const CharacterSettings* settings, Isometry isometry, uint64 userData);
+	XCharacterCommon(XPhysicsSystem* system, const CharacterSettings* settings, Vec3 position, Quat rotation, uint64 userData);
 	~XCharacterCommon() override;
 	XRefShape GetShape() const { return CreateRefT<Shape, XRefShape>(const_cast<Shape*>(Character::GetShape())); }
-	Isometry GetIsometry(const bool lock) const { return Isometry{Character::GetPosition(lock), Character::GetRotation(lock)}; }
-	void SetIsometry(Isometry isometry, EActivation activation, bool lock);
+	Isometry GetPositionAndRotation(bool lock) const;
 	bool SetShape(XRefShape shape, float maxPenetrationDepth, bool lock);
 	// TODO: CheckCollision()
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
 };
 
 struct XCharacterCommonSettings;
-unique_ptr<XCharacterCommon> CreateCharacterCommon(XPhysicsSystem* system, const XCharacterCommonSettings& settings, Isometry isometry, uint64 userData);
+unique_ptr<XCharacterCommon> CreateCharacterCommon(
+	XPhysicsSystem* system,
+	const XCharacterCommonSettings& settings,
+	Vec3 position,
+	Quat rotation,
+	uint64 userData
+);
 unique_ptr<XCharacterCommon> CreateAddCharacterCommon(
 	XPhysicsSystem* system,
 	const XCharacterCommonSettings& settings,
-	Isometry isometry,
+	Vec3 position,
+	Quat rotation,
 	uint64 userData,
 	EActivation activation,
 	bool lock
@@ -280,7 +287,7 @@ class XCharacterVirtual: public CharacterVirtual, public CharacterContactListene
 private:
 	XPhysicsSystem* _system;
 public:
-	XCharacterVirtual(XPhysicsSystem* system, const CharacterVirtualSettings* settings, Isometry isometry);
+	XCharacterVirtual(XPhysicsSystem* system, const CharacterVirtualSettings* settings, Vec3 position, Quat rotation);
 	~XCharacterVirtual() override;
 	XRefShape GetShape() const { return CreateRefT<Shape, XRefShape>(const_cast<Shape*>(CharacterVirtual::GetShape())); }
 	void Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity);
@@ -318,7 +325,12 @@ public:
 };
 
 struct XCharacterVirtualSettings;
-unique_ptr<XCharacterVirtual> CreateCharacterVirtual(XPhysicsSystem* system, const XCharacterVirtualSettings& settings, Isometry isometry);
+unique_ptr<XCharacterVirtual> CreateCharacterVirtual(
+	XPhysicsSystem* system,
+	const XCharacterVirtualSettings& settings,
+	Vec3 position,
+	Quat rotation
+);
 
 //
 // Debug

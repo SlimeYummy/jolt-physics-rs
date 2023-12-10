@@ -9,8 +9,14 @@ static_assert(sizeof(CharacterVirtual::ExtendedUpdateSettings) == 64, "ExtendedU
 // XCharacterCommon
 //
 
-XCharacterCommon::XCharacterCommon(XPhysicsSystem* system, const CharacterSettings* settings, Isometry isometry, uint64 userData):
-	Character(settings, isometry.position, isometry.rotation, userData, &system->PhySys()),
+XCharacterCommon::XCharacterCommon(
+	XPhysicsSystem* system,
+	const CharacterSettings* settings,
+	Vec3 position,
+	Quat rotation,
+	uint64 userData
+):
+	Character(settings, position, rotation, userData, &system->PhySys()),
 	_system(system) {
 	RENDERER_ONLY(_system->AddRenderable(this));
 }
@@ -21,8 +27,11 @@ XCharacterCommon::~XCharacterCommon() {
 	printf("~XCharacterCommon\n");
 }
 
-void XCharacterCommon::SetIsometry(Isometry isometry, EActivation activation, bool lock) {
-	Character::SetPositionAndRotation(isometry.position, isometry.rotation, activation, lock);
+Isometry XCharacterCommon::GetPositionAndRotation(bool lock) const {
+	Vec3 position = Vec3::sZero();
+	Quat rotation = Quat::sIdentity();
+	Character::GetPositionAndRotation(position, rotation, lock);
+	return Isometry{position, rotation};
 }
 
 bool XCharacterCommon::SetShape(XRefShape shape, float maxPenetrationDepth, bool lock) {
@@ -45,7 +54,13 @@ struct XCharacterCommonSettings {
 };
 static_assert(sizeof(XCharacterCommonSettings) == 64, "XCharacterCommonSettings size");
 
-unique_ptr<XCharacterCommon> CreateCharacterCommon(XPhysicsSystem* system, const XCharacterCommonSettings& st, Isometry isometry, uint64 userData) {
+unique_ptr<XCharacterCommon> CreateCharacterCommon(
+	XPhysicsSystem* system,
+	const XCharacterCommonSettings& st,
+	Vec3 position,
+	Quat rotation,
+	uint64 userData
+) {
 	JPH::CharacterSettings settings;
 	settings.mUp = st.up;
 	settings.mSupportingVolume = st.supportingVolume;
@@ -55,18 +70,19 @@ unique_ptr<XCharacterCommon> CreateCharacterCommon(XPhysicsSystem* system, const
 	settings.mMass = st.mass;
 	settings.mFriction = st.friction;
 	settings.mGravityFactor = st.gravityFactor;
-	return make_unique<XCharacterCommon>(system, &settings, isometry, userData);
+	return make_unique<XCharacterCommon>(system, &settings, position, rotation, userData);
 }
 
 unique_ptr<XCharacterCommon> CreateAddCharacterCommon(
 	XPhysicsSystem* system,
 	const XCharacterCommonSettings& settings,
-	Isometry isometry,
+	Vec3 position,
+	Quat rotation,
 	uint64 userData,
 	EActivation activation,
 	bool lock
 ) {
-	auto chara = CreateCharacterCommon(system, settings, isometry, userData);
+	auto chara = CreateCharacterCommon(system, settings, position, rotation, userData);
 	chara->AddToPhysicsSystem(activation, lock);
 	return chara;
 }
@@ -75,8 +91,13 @@ unique_ptr<XCharacterCommon> CreateAddCharacterCommon(
 // XCharacterVirtual
 //
 
-XCharacterVirtual::XCharacterVirtual(XPhysicsSystem* system, const CharacterVirtualSettings *settings, Isometry isometry):
-	CharacterVirtual(settings, isometry.position, isometry.rotation, &system->PhySys()),
+XCharacterVirtual::XCharacterVirtual(
+	XPhysicsSystem* system,
+	const CharacterVirtualSettings* settings,
+	Vec3 position,
+	Quat rotation
+):
+	CharacterVirtual(settings, position, rotation, &system->PhySys()),
 	_system(system) {
 	RENDERER_ONLY(_system->AddRenderable(this));
 }
@@ -248,7 +269,12 @@ struct XCharacterVirtualSettings {
 };
 static_assert(sizeof(XCharacterVirtualSettings) == 128, "XCharacterVirtualSettings size");
 
-unique_ptr<XCharacterVirtual> CreateCharacterVirtual(XPhysicsSystem* system, const XCharacterVirtualSettings& st, Isometry isometry) {
+unique_ptr<XCharacterVirtual> CreateCharacterVirtual(
+	XPhysicsSystem* system,
+	const XCharacterVirtualSettings& st,
+	Vec3 position,
+	Quat rotation
+) {
 	JPH::CharacterVirtualSettings settings;
 	settings.mUp = st.up;
 	settings.mSupportingVolume = st.supportingVolume;
@@ -267,7 +293,7 @@ unique_ptr<XCharacterVirtual> CreateCharacterVirtual(XPhysicsSystem* system, con
 	settings.mMaxNumHits = st.maxNumHits;
 	settings.mHitReductionCosMaxAngle = st.hitReductionCosMaxAngle;
 	settings.mPenetrationRecoverySpeed = st.penetrationRecoverySpeed;
-	auto chara = make_unique<XCharacterVirtual>(system, &settings, isometry);
+	auto chara = make_unique<XCharacterVirtual>(system, &settings, position, rotation);
 	chara->SetListener(chara.get());
 	return chara;
 }

@@ -1,24 +1,26 @@
+#![allow(dead_code)]
+
 use cxx::{type_id, ExternType};
-use glam::{IVec3, Mat4, Quat, Vec3, Vec3A, Vec4};
+use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
+use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
 use std::mem;
-use serde::{Deserialize, Serialize};
 
 #[cxx::bridge()]
 pub mod ffi {
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct XRefShape {
         ptr: *mut u8,
     }
     impl Vec<XRefShape> {}
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct XRefPhysicsMaterial {
         ptr: *mut u8,
     }
     impl Vec<XRefPhysicsMaterial> {}
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct XRefPhysicsSystem {
         ptr: *mut u8,
     }
@@ -198,7 +200,7 @@ impl Plane {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexedTriangle {
     pub idx: [u32; 3],
     pub material_index: u32,
@@ -216,6 +218,31 @@ impl IndexedTriangle {
             idx: [idx1, idx2, idx3],
             material_index,
         };
+    }
+}
+
+impl Serialize for IndexedTriangle {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        return IVec4::new(
+            self.idx[0] as i32,
+            self.idx[1] as i32,
+            self.idx[2] as i32,
+            self.material_index as i32,
+        )
+        .serialize(serializer);
+    }
+}
+
+impl<'de> Deserialize<'de> for IndexedTriangle {
+    fn deserialize<D>(deserializer: D) -> Result<IndexedTriangle, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let v = IVec4::deserialize(deserializer)?;
+        return Ok(IndexedTriangle::new(v.x as u32, v.y as u32, v.z as u32, v.w as u32));
     }
 }
 
@@ -244,7 +271,7 @@ impl BodyID {
 
 const_assert_eq!(mem::size_of::<ffi::XRefShape>(), mem::size_of::<usize>());
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefShape(pub(crate) ffi::XRefShape);
 
 impl Default for RefShape {
@@ -288,6 +315,10 @@ impl RefShape {
         return Some(unsafe { &mut *(self.0.ptr as *mut ffi::Shape) });
     }
 
+    pub fn as_usize(&self) -> usize {
+        return self.0.ptr as usize;
+    }
+
     pub unsafe fn ptr(&mut self) -> *mut ffi::Shape {
         return self.0.ptr as *mut ffi::Shape;
     }
@@ -295,7 +326,7 @@ impl RefShape {
 
 const_assert_eq!(mem::size_of::<ffi::XRefPhysicsMaterial>(), mem::size_of::<usize>());
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefPhysicsMaterial(pub(crate) ffi::XRefPhysicsMaterial);
 
 impl Default for RefPhysicsMaterial {
@@ -339,12 +370,16 @@ impl RefPhysicsMaterial {
         return Some(unsafe { &mut *(self.0.ptr as *mut ffi::PhysicsMaterial) });
     }
 
+    pub fn as_usize(&self) -> usize {
+        return self.0.ptr as usize;
+    }
+
     pub unsafe fn ptr(&mut self) -> *mut ffi::PhysicsMaterial {
         return self.0.ptr as *mut ffi::PhysicsMaterial;
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefPhysicsSystem(pub(crate) ffi::XRefPhysicsSystem);
 
 impl Default for RefPhysicsSystem {

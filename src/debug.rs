@@ -24,7 +24,6 @@ pub(crate) mod ffi {
 
         type Vec3 = crate::base::ffi::Vec3;
 
-        type XRefPhysicsSystem = crate::system::ffi::XRefPhysicsSystem;
         type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
 
         type CameraState = crate::debug::CameraState;

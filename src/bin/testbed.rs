@@ -47,32 +47,24 @@ impl DebugApplication for DebugApplicationImpl {
 
 impl DebugApplicationImpl {
     fn create_floor(&mut self) -> BodyID {
-        let floor = create_shape_box(
-            &BoxSettings::new(100.0, 2.0, 50.0),
-            Some(&Transform::new(
-                Vec3A::new(0.0, -1.0, 0.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                Vec3A::new(1.0, 1.0, 1.0),
-            )),
-        );
+        let floor = create_shape_box(&BoxSettings::new(100.0, 2.0, 50.0));
+        let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(floor, Vec3A::new(0.0, -1.0, 0.0), Quat::IDENTITY));
         return self
             .body_itf
             .create_add_body(
-                &BodySettings::new_static(floor, PHY_LAYER_STATIC, Vec3A::new(0.0, 0.0, 50.0), Quat::from_xyzw(0.0, 0.0, 0.0, 1.0)),
+                &BodySettings::new_static(
+                    floor,
+                    PHY_LAYER_STATIC,
+                    Vec3A::new(0.0, 0.0, 50.0),
+                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                ),
                 false,
             )
             .unwrap();
     }
 
     fn create_dynamic_cube(&mut self) -> BodyID {
-        let boxx = create_shape_box(
-            &BoxSettings::new(0.5, 0.5, 0.5),
-            Some(&&Transform::new(
-                Vec3A::new(0.0, -1.0, 0.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                Vec3A::new(1.0, 1.0, 1.0),
-            )),
-        );
+        let boxx = create_shape_box(&BoxSettings::new(0.5, 0.5, 0.5));
         let mut bs = BodySettings::new(
             boxx,
             PHY_LAYER_DYNAMIC,
@@ -86,7 +78,7 @@ impl DebugApplicationImpl {
     }
 
     fn create_dynamic_sphere(&mut self) -> BodyID {
-        let sphere = create_shape_sphere(&SphereSettings::new(0.8), None);
+        let sphere = create_shape_sphere(&SphereSettings::new(0.8));
         let mut bs = BodySettings::new(
             sphere,
             PHY_LAYER_DYNAMIC,
@@ -100,7 +92,7 @@ impl DebugApplicationImpl {
     }
 
     fn create_dynamic_box(&mut self) -> BodyID {
-        let long_box = create_shape_box(&BoxSettings::new(0.5, 1.0, 0.5), None);
+        let long_box = create_shape_box(&BoxSettings::new(0.5, 1.0, 0.5));
         let mut bs = BodySettings::new(
             long_box,
             PHY_LAYER_DYNAMIC,
@@ -114,15 +106,12 @@ impl DebugApplicationImpl {
     }
 
     fn create_dynamic_convex_hull(&mut self) -> BodyID {
-        let convex = create_shape_convex_hull(
-            &ConvexHullSettings::new(vec![
-                Vec3A::new(1.0, 1.0, 1.0),
-                Vec3A::new(1.0, -1.0, -1.0),
-                Vec3A::new(-1.0, -1.0, 1.0),
-                Vec3A::new(-1.0, 1.0, -1.0),
-            ]),
-            None,
-        );
+        let convex = create_shape_convex_hull(&ConvexHullSettings::new(&[
+            Vec3A::new(1.0, 1.0, 1.0),
+            Vec3A::new(1.0, -1.0, -1.0),
+            Vec3A::new(-1.0, -1.0, 1.0),
+            Vec3A::new(-1.0, 1.0, -1.0),
+        ]));
         return self
             .body_itf
             .create_add_body(
@@ -139,7 +128,8 @@ impl DebugApplicationImpl {
     }
 
     fn create_mesh_steps(&mut self) -> BodyID {
-        let mut mesh = MeshSettings::default();
+        let mut vertices = Vec::new();
+        let mut indexes = Vec::new();
         for idx in 0..15 {
             let step_height = 0.2;
             let near_z = 15.0 * step_height;
@@ -155,49 +145,53 @@ impl DebugApplicationImpl {
             let b2 = b1 + width;
             let s2 = s1 + width;
             let p2 = p1 + width;
-            mesh.triangle_vertices.extend_from_slice(&[s1, b1, s2]);
-            mesh.indexed_triangles.push(IndexedTriangle::new(idx * 18 + 0, idx * 18 + 1, idx * 18 + 2, 0));
-            mesh.triangle_vertices.extend_from_slice(&[b1, b2, s2]);
-            mesh.indexed_triangles.push(IndexedTriangle::new(idx * 18 + 3, idx * 18 + 4, idx * 18 + 5, 0));
-            mesh.triangle_vertices.extend_from_slice(&[s1, p2, p1]);
-            mesh.indexed_triangles.push(IndexedTriangle::new(idx * 18 + 6, idx * 18 + 7, idx * 18 + 8, 0));
-            mesh.triangle_vertices.extend_from_slice(&[s1, s2, p2]);
-            mesh.indexed_triangles.push(IndexedTriangle::new(idx * 18 + 9, idx * 18 + 10, idx * 18 + 11, 0));
+            vertices.extend_from_slice(&[s1, b1, s2]);
+            indexes.push(IndexedTriangle::new(idx * 18 + 0, idx * 18 + 1, idx * 18 + 2, 0));
+            vertices.extend_from_slice(&[b1, b2, s2]);
+            indexes.push(IndexedTriangle::new(idx * 18 + 3, idx * 18 + 4, idx * 18 + 5, 0));
+            vertices.extend_from_slice(&[s1, p2, p1]);
+            indexes.push(IndexedTriangle::new(idx * 18 + 6, idx * 18 + 7, idx * 18 + 8, 0));
+            vertices.extend_from_slice(&[s1, s2, p2]);
+            indexes.push(IndexedTriangle::new(idx * 18 + 9, idx * 18 + 10, idx * 18 + 11, 0));
 
             // side of stairs
             let mut rb2 = b2;
             rb2.z = near_z;
             let mut rs2 = p2;
             rs2.z = near_z;
-            mesh.triangle_vertices.extend_from_slice(&[s2, b2, rs2]);
-            mesh.indexed_triangles
-                .push(IndexedTriangle::new(idx * 18 + 12, idx * 18 + 13, idx * 18 + 14, 0));
-            mesh.triangle_vertices.extend_from_slice(&[rs2, b2, rb2]);
-            mesh.indexed_triangles
-                .push(IndexedTriangle::new(idx * 18 + 15, idx * 18 + 16, idx * 18 + 17, 0));
+            vertices.extend_from_slice(&[s2, b2, rs2]);
+            indexes.push(IndexedTriangle::new(idx * 18 + 12, idx * 18 + 13, idx * 18 + 14, 0));
+            vertices.extend_from_slice(&[rs2, b2, rb2]);
+            indexes.push(IndexedTriangle::new(idx * 18 + 15, idx * 18 + 16, idx * 18 + 17, 0));
         }
-        let mesh = create_shape_mesh(&mesh, None);
+        let settings = MeshSettings::new(&vertices, &indexes);
+        let mesh = create_shape_mesh(&settings);
         return self
             .body_itf
             .create_add_body(
-                &BodySettings::new_static(mesh, PHY_LAYER_STATIC, Vec3A::new(2.0, 1.0, 15.0), Quat::from_xyzw(0.0, 0.0, 0.0, 1.0)),
+                &BodySettings::new_static(
+                    mesh,
+                    PHY_LAYER_STATIC,
+                    Vec3A::new(2.0, 1.0, 15.0),
+                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                ),
                 false,
             )
             .unwrap();
     }
 
     fn create_height_field(&mut self) -> BodyID {
-        let mut height_field = HeightFieldSettings::default();
-        height_field.sample_count = 32;
-        for x in 0..height_field.sample_count {
-            for y in 0..height_field.sample_count {
+        let mut samples = Vec::new();
+        for x in 0..32 {
+            for y in 0..32 {
                 let z = ((x as f32) % 16.0 - 8.0).abs();
-                height_field.height_samples.push(z);
+                samples.push(z);
             }
         }
-        height_field.offset = Vec3A::new(0.0, 0.0, 0.0);
-        height_field.scale = Vec3A::new(1.0, 1.0, 1.0);
-        let height_field = create_shape_height_field(&height_field, None);
+        let mut settings = HeightFieldSettings::new(&samples, 32);
+        settings.offset = Vec3A::new(0.0, 0.0, 0.0);
+        settings.scale = Vec3A::new(1.0, 1.0, 1.0);
+        let height_field = create_shape_height_field(&settings);
         return self
             .body_itf
             .create_add_body(
@@ -213,7 +207,7 @@ impl DebugApplicationImpl {
     }
 
     fn create_sensor_sphere(&mut self) -> BodyID {
-        let sphere = create_shape_sphere(&SphereSettings::new(4.0), None);
+        let sphere = create_shape_sphere(&SphereSettings::new(4.0));
         return self
             .body_itf
             .create_add_body(
@@ -252,20 +246,19 @@ impl DebugApplicationImpl {
 
         app.create_sensor_sphere();
 
-        let chara_shape = create_shape_capsule(
-            &CapsuleSettings::new(0.5 * 1.35, 0.3),
-            Some(&Transform::new(
-                Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                Vec3A::new(1.0, 1.0, 1.0),
-            )),
-        );
+        let chara_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.35, 0.3));
+        let chara_shape = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
+            chara_shape,
+            Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
+            Quat::IDENTITY,
+        ));
 
         // common character
         let mut chara_common = CharacterCommon::new_ex(
             app.system.as_mut(),
             &CharacterCommonSettings::new(chara_shape.clone(), PHY_LAYER_BODY_PLAYER),
-            Isometry::new(Vec3A::new(0.0, 5.0, 1.0), Quat::from_xyzw(0.0, 0.0, 0.0, 1.0)),
+            Vec3A::new(0.0, 5.0, 1.0),
+            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
             0,
             true,
             true,
@@ -275,17 +268,16 @@ impl DebugApplicationImpl {
         let chara_virtual = CharacterVirtual::new(
             app.system.as_mut(),
             &CharacterVirtualSettings::new(chara_shape),
-            Isometry::new(Vec3A::new(4.0, 5.0, 4.0), Quat::from_xyzw(0.0, 0.0, 0.0, 1.0)),
+            Vec3A::new(4.0, 5.0, 4.0),
+            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
         );
 
-        let target_shape = create_shape_capsule(
-            &CapsuleSettings::new(0.5 * 1.2, 0.25),
-            Some(&Transform::new(
-                Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                Vec3A::new(1.0, 1.0, 1.0),
-            )),
-        );
+        let target_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.2, 0.25));
+        let target_shape = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
+            target_shape,
+            Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
+            Quat::IDENTITY,
+        ));
         app.cv_player_body_id = app
             .body_itf
             .create_add_body(
@@ -370,7 +362,12 @@ impl DebugApplicationImpl {
             }
             chara.set_linear_velocity(new_velocity);
 
-            chara.extended_update(PHY_LAYER_BODY_PLAYER, 1.0 / FPS, self.system.get_gravity(), &ExtendedUpdateSettings::default());
+            chara.extended_update(
+                PHY_LAYER_BODY_PLAYER,
+                1.0 / FPS,
+                self.system.get_gravity(),
+                &ExtendedUpdateSettings::default(),
+            );
 
             self.body_itf.set_position(self.cv_player_body_id, chara.get_position(), true);
         }
