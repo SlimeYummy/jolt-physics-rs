@@ -442,7 +442,8 @@ impl CharacterCommon {
     }
 
     pub fn set_position_and_rotation(&mut self, position: Vec3A, rotation: Quat, active: bool, lock: bool) {
-        self.as_mut().SetPositionAndRotation(position.into(), rotation.into(), active.into(), lock);
+        self.as_mut()
+            .SetPositionAndRotation(position.into(), rotation.into(), active.into(), lock);
     }
 
     pub fn get_position(&self, lock: bool) -> Vec3A {
