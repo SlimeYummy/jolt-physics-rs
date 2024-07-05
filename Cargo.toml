@@ -15,4 +15,11 @@ cxx-build = "1.0"
 vcvars = "0.1.6"
 
 [features]
+default = ["deterministic"]
 deterministic = []
+profile = []
+debug-renderer = []
+
+[[bin]]
+name = "testbed"
+required-features = ["debug-renderer"]

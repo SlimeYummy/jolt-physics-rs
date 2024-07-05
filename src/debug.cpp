@@ -1,8 +1,8 @@
+#if defined(JPH_DEBUG_RENDERER)
+
 #include "jolt-physics-rs/src/ffi.h"
 #include "jolt-physics-rs/src/system.rs.h"
 #include "jolt-physics-rs/src/debug.rs.h"
-
-#if defined(JPH_DEBUG_RENDERER)
 
 static_assert(sizeof(CameraState) == 64, "CameraState size");
 
