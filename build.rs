@@ -1,31 +1,30 @@
 use std::path::Path;
 use std::{env, fs};
-use vcvars::Vcvars;
 
 fn main() {
-    let debug = match env::var("PROFILE").unwrap().as_str() {
-        "debug" => true,
-        "release" => false,
-        _ => unreachable!(),
-    };
+    let is_windows = env::var_os("CARGO_CFG_WINDOWS").is_some();
+    let is_unix = env::var_os("CARGO_CFG_UNIX").is_some();
+    let is_deterministic = env::var("CARGO_FEATURE_DETERMINISTIC").is_ok();
+    let is_debug_renderer = env::var("CARGO_FEATURE_DEBUG_RENDERER").is_ok();
+    let is_profile = env::var("CARGO_FEATURE_PROFILE").is_ok();
 
-    let mut cxx = cxx_build::bridges([
-        "src/base.rs",
-        "src/layer.rs",
-        "src/shape.rs",
-        "src/system.rs",
-        "src/character.rs",
-        "src/debug.rs",
-    ]);
+    let mut rs_file = vec!["src/base.rs", "src/layer.rs", "src/shape.rs", "src/system.rs", "src/character.rs"];
+    if is_windows && is_debug_renderer {
+        rs_file.push("src/debug.rs");
+    }
 
+    let mut cpp_file = vec!["src/shape.cpp", "src/system.cpp", "src/character.cpp"];
+    if is_windows && is_debug_renderer {
+        cpp_file.push("src/debug.cpp");
+    }
+
+    let mut cxx = cxx_build::bridges(&rs_file);
     cxx.cpp(true)
         .std("c++17")
         .static_crt(false)
-        .files(&["src/shape.cpp", "src/system.cpp", "src/character.cpp", "src/debug.cpp"])
+        .files(&cpp_file)
         .include("./JoltPhysics")
         .files(&list_source_files("./JoltPhysics/Jolt"))
-        .include("./JoltPhysics/TestFramework")
-        .files(&list_source_files("./JoltPhysics/TestFramework"))
         .define("JPH_DISABLE_CUSTOM_ALLOCATOR", "1")
         .define("NDEBUG", "1")
         .define("JPH_USE_AVX2", "1")
@@ -37,28 +36,31 @@ fn main() {
         .define("JPH_USE_F16C", "1")
         .flag_if_supported("-march=native");
 
-    let target = env::var("TARGET").unwrap();
-    let windows = target.contains("windows");
-    if windows {
-        cxx.includes(Vcvars::new().get("INCLUDE").unwrap().split(';'))
-            .define("JPH_COMPILER_MSVC", "1");
-    }
-
-    if env::var("CARGO_FEATURE_DETERMINISTIC").is_ok() {
+    if is_deterministic {
         cxx.flag_if_supported("/fp:precise")
             .flag_if_supported("-ffp-model=precise")
             .flag_if_supported("-ffp-contract=off")
             .define("JPH_CROSS_PLATFORM_DETERMINISTIC", "1");
     }
 
-    if debug {
-        cxx.define("JPH_PROFILE_ENABLED", "1").define("JPH_DEBUG_RENDERER", "1");
-    } else {
-        cxx.define("CRITICAL_POINT_RELEASE", "1");
+    if is_profile {
+        cxx.define("JPH_PROFILE_ENABLED", "1");
     }
-    cxx.compile("jolt-physics-rs");
 
-    if windows {
+    if is_windows && is_debug_renderer {
+        cxx.include("./JoltPhysics/TestFramework")
+            .files(&list_source_files("./JoltPhysics/TestFramework"))
+            .define("JPH_DEBUG_RENDERER", "1");
+    }
+
+    if is_windows {
+        #[cfg(windows)]
+        cxx.includes(vcvars::Vcvars::new().get("INCLUDE").unwrap().split(';'))
+            .define("JPH_COMPILER_MSVC", "1")
+            .flag_if_supported("/arch:AVX512")
+            .flag_if_supported("/arch:AVX2")
+            .flag_if_supported("/arch:AVX");
+
         println!("cargo:rustc-link-lib=User32");
         println!("cargo:rustc-link-lib=gdi32");
         println!("cargo:rustc-link-lib=Shcore");
@@ -69,7 +71,18 @@ fn main() {
         println!("cargo:rustc-link-lib=dxguid");
     }
 
-    // println!("cargo:rerun-if-changed=src/*");
+    if is_unix {
+        cxx.flag_if_supported("-mavx2")
+            .flag_if_supported("-mbmi")
+            .flag_if_supported("-mpopcnt")
+            .flag_if_supported("-mlzcnt")
+            .flag_if_supported("-mf16c")
+            .flag_if_supported("-msse4.2")
+            .flag_if_supported("-msse4.1")
+            .flag_if_supported("-msse2");
+    }
+
+    cxx.compile("jolt-physics-rs");
 }
 
 fn list_source_files<P: AsRef<Path>>(dir: P) -> Vec<String> {
