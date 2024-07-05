@@ -1,11 +1,8 @@
 #pragma once
 
-#ifndef CRITICAL_POINT_RELEASE
-#define JPH_PROFILE_ENABLED 1
-#define JPH_DEBUG_RENDERER 1
-#endif
-
+#ifdef WIN32
 #include <Windows.h>
+#endif
 #include <stdarg.h>
 #include <thread>
 #include <iostream>

@@ -1,11 +1,8 @@
 #pragma once
 
-// #ifndef CRITICAL_POINT_RELEASE
-#define JPH_PROFILE_ENABLED 1
-#define JPH_DEBUG_RENDERER 1
-// #endif
-
+#ifdef WIN32
 #include <Windows.h>
+#endif
 #include <stdarg.h>
 #include <thread>
 #include <iostream>
@@ -47,7 +44,7 @@ JPH_SUPPRESS_WARNINGS
 
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
 #define PROFILE_ONLY(code) code
-#elif
+#else
 #define PROFILE_ONLY(code) ;
 #endif
 
