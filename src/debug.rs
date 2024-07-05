@@ -1,9 +1,11 @@
 use cxx::{type_id, ExternType};
 use glam::Vec3A;
-use static_assertions::const_assert_eq;
+use static_assertions::{assert_cfg, const_assert_eq};
 use std::mem;
 
 use crate::base::*;
+
+assert_cfg!(windows, "Debug rendering is only supported on Windows");
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
