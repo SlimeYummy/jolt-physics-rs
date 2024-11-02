@@ -5,8 +5,9 @@ fn main() {
     let is_windows = env::var_os("CARGO_CFG_WINDOWS").is_some();
     let is_unix = env::var_os("CARGO_CFG_UNIX").is_some();
     let is_deterministic = env::var("CARGO_FEATURE_DETERMINISTIC").is_ok();
-    let is_debug_renderer = env::var("CARGO_FEATURE_DEBUG_RENDERER").is_ok();
     let is_profile = env::var("CARGO_FEATURE_PROFILE").is_ok();
+    let is_debug_renderer = env::var("CARGO_FEATURE_DEBUG_RENDERER").is_ok();
+    let is_debug_print = env::var("CARGO_FEATURE_DEBUG_PRINT").is_ok();
 
     let mut rs_file = vec!["src/base.rs", "src/layer.rs", "src/shape.rs", "src/system.rs", "src/character.rs"];
     if is_windows && is_debug_renderer {
@@ -27,8 +28,6 @@ fn main() {
         .files(&list_source_files("./JoltPhysics/Jolt"))
         .define("JPH_DISABLE_CUSTOM_ALLOCATOR", "1")
         .define("NDEBUG", "1")
-        .define("JPH_USE_AVX2", "1")
-        .define("JPH_USE_AVX", "1")
         .define("JPH_USE_SSE4_1", "1")
         .define("JPH_USE_SSE4_2", "1")
         .define("JPH_USE_LZCNT", "1")
@@ -47,6 +46,10 @@ fn main() {
         cxx.define("JPH_PROFILE_ENABLED", "1");
     }
 
+    if is_debug_print {
+        cxx.define("JPH_DEBUG_PRINT", "1");
+    }
+
     if is_windows && is_debug_renderer {
         cxx.include("./JoltPhysics/TestFramework")
             .files(&list_source_files("./JoltPhysics/TestFramework"))
@@ -57,9 +60,8 @@ fn main() {
         #[cfg(windows)]
         cxx.includes(vcvars::Vcvars::new().get("INCLUDE").unwrap().split(';'))
             .define("JPH_COMPILER_MSVC", "1")
-            .flag_if_supported("/arch:AVX512")
-            .flag_if_supported("/arch:AVX2")
-            .flag_if_supported("/arch:AVX");
+            .flag_if_supported("/arch:SSE2")
+            .flag_if_supported("/arch:SSE4.2");
 
         println!("cargo:rustc-link-lib=User32");
         println!("cargo:rustc-link-lib=gdi32");
@@ -72,14 +74,13 @@ fn main() {
     }
 
     if is_unix {
-        cxx.flag_if_supported("-mavx2")
-            .flag_if_supported("-mbmi")
+        cxx.flag_if_supported("-mbmi")
             .flag_if_supported("-mpopcnt")
             .flag_if_supported("-mlzcnt")
             .flag_if_supported("-mf16c")
-            .flag_if_supported("-msse4.2")
+            .flag_if_supported("-msse2")
             .flag_if_supported("-msse4.1")
-            .flag_if_supported("-msse2");
+            .flag_if_supported("-msse4.2");
     }
 
     cxx.compile("jolt-physics-rs");

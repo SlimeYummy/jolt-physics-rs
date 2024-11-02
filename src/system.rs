@@ -336,6 +336,14 @@ impl PhysicsSystem {
     pub fn get_gravity(&self) -> Vec3A {
         return self.system().GetGravity().0;
     }
+
+    pub fn hit_events(&self) -> &Vec<HitEvent> {
+        return &self.contacts.hit_events;
+    }
+
+    pub fn sensor_events(&self) -> &Vec<SensorEvent> {
+        return &self.contacts.sensor_events;
+    }
 }
 
 //
@@ -365,7 +373,7 @@ impl XContactCollector {
     }
 
     fn start_hit_event(&mut self, body_id: BodyID, hit_id: BodyID) {
-        println!("start_hit_event: {:?} {:?}", body_id, hit_id);
+        // println!("start_hit_event: {:?} {:?}", body_id, hit_id);
         self.hit_events.push(HitEvent {
             event: EventType::Start,
             body_id,
@@ -374,7 +382,7 @@ impl XContactCollector {
     }
 
     fn stop_hit_event(&mut self, body_id: BodyID, hit_id: BodyID) {
-        println!("stop_hit_event: {:?} {:?}", body_id, hit_id);
+        // println!("stop_hit_event: {:?} {:?}", body_id, hit_id);
         self.hit_events.push(HitEvent {
             event: EventType::Stop,
             body_id,
