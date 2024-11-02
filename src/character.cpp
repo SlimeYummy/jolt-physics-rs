@@ -24,7 +24,7 @@ XCharacterCommon::XCharacterCommon(
 XCharacterCommon::~XCharacterCommon() {
 	RENDERER_ONLY(_system->RemoveRenderable(this));
 	Character::RemoveFromPhysicsSystem();
-	printf("~XCharacterCommon\n");
+	PRINT_ONLY(printf("~XCharacterCommon %d\n", _system->GetRefCount()));
 }
 
 Isometry XCharacterCommon::GetPositionAndRotation(bool lock) const {
@@ -104,7 +104,7 @@ XCharacterVirtual::XCharacterVirtual(
 
 XCharacterVirtual::~XCharacterVirtual() {
 	RENDERER_ONLY(_system->RemoveRenderable(this));
-	printf("~XCharacterVirtual %d\n", _system->GetRefCount());
+	PRINT_ONLY(printf("~XCharacterVirtual %d\n", _system->GetRefCount()));
 }
 
 void XCharacterVirtual::Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity) {
