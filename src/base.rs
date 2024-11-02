@@ -288,9 +288,10 @@ impl Clone for RefShape {
 
 impl Drop for RefShape {
     fn drop(&mut self) {
-        // if !self.0.ptr.is_null() {
-        //     println!("DropRefShape::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
-        // }
+        #[cfg(feature = "debug-print")]
+        if !self.0.ptr.is_null() {
+            println!("DropRefShape::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
+        }
         ffi::DropRefShape(self.0);
         self.0.ptr = std::ptr::null_mut();
     }
@@ -343,9 +344,10 @@ impl Clone for RefPhysicsMaterial {
 
 impl Drop for RefPhysicsMaterial {
     fn drop(&mut self) {
-        // if !self.0.ptr.is_null() {
-        //     println!("DropRefPhysicsMaterial::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
-        // }
+        #[cfg(feature = "debug-print")]
+        if !self.0.ptr.is_null() {
+            println!("DropRefPhysicsMaterial::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
+        }
         ffi::DropRefPhysicsMaterial(self.0);
         self.0.ptr = std::ptr::null_mut();
     }
@@ -396,6 +398,7 @@ impl Clone for RefPhysicsSystem {
 
 impl Drop for RefPhysicsSystem {
     fn drop(&mut self) {
+        #[cfg(feature = "debug-print")]
         if !self.0.ptr.is_null() {
             println!("DropRefPhysicsSystem::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
         }

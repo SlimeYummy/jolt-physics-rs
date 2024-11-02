@@ -16,13 +16,13 @@ private:
 public:
 	DebugApplication(rust::Box<XDebugApplication> rs_app): _rs_app(move(rs_app)) {
 		auto system = this->_rs_app->Initialize();
-		printf("DebugApplication %d\n", system->GetRefCount());
+		PRINT_ONLY(printf("DebugApplication %d\n", system->GetRefCount()));
 		this->_system = Ref(system);
-		printf("DebugApplication %d\n", this->_system->GetRefCount());
+		PRINT_ONLY(printf("DebugApplication %d\n", this->_system->GetRefCount()));
 	}
 
 	~DebugApplication() {
-		printf("~DebugApplication %d\n", this->_system->GetRefCount());
+		PRINT_ONLY(printf("~DebugApplication %d\n", this->_system->GetRefCount()));
 	}
 
 	virtual void GetInitialCamera(CameraState& state) const override {

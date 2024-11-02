@@ -54,6 +54,12 @@ JPH_SUPPRESS_WARNINGS
 #define RENDERER_ONLY(code) ;
 #endif
 
+#if defined(JPH_DEBUG_PRINT)
+#define PRINT_ONLY(code) code
+#else
+#define PRINT_ONLY(code) ;
+#endif
+
 using namespace JPH;
 using namespace std;
 
@@ -209,7 +215,7 @@ private:
 	XPhysicsSystem(XContactCollector* contacts);
 
 public:
-	~XPhysicsSystem() { printf("~XPhysicsSystem\n"); }
+	~XPhysicsSystem() { PRINT_ONLY(printf("~XPhysicsSystem\n")); }
 	static Ref<XPhysicsSystem> Create(XContactCollector* contacts);
 	PhysicsSystem& PhySys() { return this->_phySys; }
 	JobSystemThreadPool& JobSys() { return this->_jobSys; }
@@ -233,7 +239,7 @@ inline uint32 CountRefPhysicsSystem(XRefPhysicsSystem ref) { return CountRefT<XP
 
 class XBodyInterface: public BodyInterface {
 public:
-	~XBodyInterface() { printf("~XBodyInterface\n"); }
+	~XBodyInterface() { PRINT_ONLY(printf("~XBodyInterface\n")); }
 	BodyID CreateBody(const BodyCreationSettings& settings);
 	BodyID CreateAddBody(const BodyCreationSettings& settings, EActivation activation);
 	Isometry GetPositionAndRotation(const BodyID& bodyId) const;
