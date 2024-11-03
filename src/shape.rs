@@ -53,7 +53,7 @@ const_assert_eq!(std::mem::size_of::<BoxSettings>(), 40);
 
 impl Default for BoxSettings {
     fn default() -> BoxSettings {
-        return BoxSettings {
+        BoxSettings {
             user_data: 0,
             material: RefPhysicsMaterial::default(),
             density: 1000.0,
@@ -61,18 +61,18 @@ impl Default for BoxSettings {
             half_y: 0.0,
             half_z: 0.0,
             convex_radius: 0.05,
-        };
+        }
     }
 }
 
 impl BoxSettings {
     pub fn new(half_x: f32, half_y: f32, half_z: f32) -> BoxSettings {
-        return BoxSettings {
+        BoxSettings {
             half_x,
             half_y,
             half_z,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -88,21 +88,21 @@ const_assert_eq!(std::mem::size_of::<SphereSettings>(), 24);
 
 impl Default for SphereSettings {
     fn default() -> SphereSettings {
-        return SphereSettings {
+        SphereSettings {
             user_data: 0,
             material: RefPhysicsMaterial::default(),
             density: 1000.0,
             radius: 0.5,
-        };
+        }
     }
 }
 
 impl SphereSettings {
     pub fn new(radius: f32) -> SphereSettings {
-        return SphereSettings {
+        SphereSettings {
             radius,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -119,23 +119,23 @@ const_assert_eq!(std::mem::size_of::<CapsuleSettings>(), 32);
 
 impl Default for CapsuleSettings {
     fn default() -> CapsuleSettings {
-        return CapsuleSettings {
+        CapsuleSettings {
             user_data: 0,
             material: RefPhysicsMaterial::default(),
             density: 1000.0,
             radius: 0.0,
             half_height: 0.0,
-        };
+        }
     }
 }
 
 impl CapsuleSettings {
     pub fn new(half_height: f32, radius: f32) -> CapsuleSettings {
-        return CapsuleSettings {
+        CapsuleSettings {
             half_height,
             radius,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -153,25 +153,25 @@ const_assert_eq!(std::mem::size_of::<TaperedCapsuleSettings>(), 32);
 
 impl Default for TaperedCapsuleSettings {
     fn default() -> TaperedCapsuleSettings {
-        return TaperedCapsuleSettings {
+        TaperedCapsuleSettings {
             user_data: 0,
             material: RefPhysicsMaterial::default(),
             density: 1000.0,
             half_height: 0.0,
             top_radius: 0.0,
             bottom_radius: 0.0,
-        };
+        }
     }
 }
 
 impl TaperedCapsuleSettings {
     pub fn new(half_height: f32, top_radius: f32, bottom_radius: f32) -> TaperedCapsuleSettings {
-        return TaperedCapsuleSettings {
+        TaperedCapsuleSettings {
             top_radius,
             bottom_radius,
             half_height,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -189,24 +189,24 @@ const_assert_eq!(std::mem::size_of::<CylinderSettings>(), 32);
 
 impl Default for CylinderSettings {
     fn default() -> CylinderSettings {
-        return CylinderSettings {
+        CylinderSettings {
             user_data: 0,
             material: RefPhysicsMaterial::default(),
             density: 1000.0,
             half_height: 0.0,
             radius: 0.0,
             convex_radius: 0.05,
-        };
+        }
     }
 }
 
 impl CylinderSettings {
     pub fn new(half_height: f32, radius: f32) -> CylinderSettings {
-        return CylinderSettings {
+        CylinderSettings {
             half_height,
             radius,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -222,23 +222,23 @@ const_assert_eq!(std::mem::size_of::<RotatedTranslatedSettings>(), 48);
 
 impl Default for RotatedTranslatedSettings {
     fn default() -> RotatedTranslatedSettings {
-        return RotatedTranslatedSettings {
+        RotatedTranslatedSettings {
             user_data: 0,
             inner_shape: RefShape::default(),
             position: Vec3A::ZERO,
             rotation: Quat::IDENTITY,
-        };
+        }
     }
 }
 
 impl RotatedTranslatedSettings {
     pub fn new(inner_shape: RefShape, position: Vec3A, rotation: Quat) -> RotatedTranslatedSettings {
-        return RotatedTranslatedSettings {
+        RotatedTranslatedSettings {
             user_data: 0,
-            inner_shape: inner_shape,
+            inner_shape,
             position,
             rotation,
-        };
+        }
     }
 }
 
@@ -253,21 +253,21 @@ const_assert_eq!(std::mem::size_of::<ScaledSettings>(), 32);
 
 impl Default for ScaledSettings {
     fn default() -> ScaledSettings {
-        return ScaledSettings {
+        ScaledSettings {
             user_data: 0,
             inner_shape: RefShape::default(),
             scale: Vec3A::ONE,
-        };
+        }
     }
 }
 
 impl ScaledSettings {
     pub fn new(inner_shape: RefShape, scale: Vec3A) -> ScaledSettings {
-        return ScaledSettings {
+        ScaledSettings {
             user_data: 0,
-            inner_shape: inner_shape,
+            inner_shape,
             scale,
-        };
+        }
     }
 }
 
@@ -282,21 +282,21 @@ const_assert_eq!(std::mem::size_of::<OffsetCenterOfMassSettings>(), 32);
 
 impl Default for OffsetCenterOfMassSettings {
     fn default() -> OffsetCenterOfMassSettings {
-        return OffsetCenterOfMassSettings {
+        OffsetCenterOfMassSettings {
             user_data: 0,
             inner_shape: RefShape::default(),
             offset: Vec3A::ZERO,
-        };
+        }
     }
 }
 
 impl OffsetCenterOfMassSettings {
     pub fn new(inner_shape: RefShape, offset: Vec3A) -> OffsetCenterOfMassSettings {
-        return OffsetCenterOfMassSettings {
+        OffsetCenterOfMassSettings {
             user_data: 0,
-            inner_shape: inner_shape,
+            inner_shape,
             offset,
-        };
+        }
     }
 }
 
@@ -315,7 +315,7 @@ const_assert_eq!(std::mem::size_of::<ConvexHullSettings>(), 56);
 
 impl<'t> Default for ConvexHullSettings<'t> {
     fn default() -> ConvexHullSettings<'t> {
-        return ConvexHullSettings {
+        ConvexHullSettings {
             user_data: 0,
             material: RefPhysicsMaterial::default(),
             density: 1000.0,
@@ -323,16 +323,16 @@ impl<'t> Default for ConvexHullSettings<'t> {
             max_convex_radius: 0.05,
             max_error_convex_radius: 0.05,
             hull_tolerance: 1.0e-3,
-        };
+        }
     }
 }
 
 impl<'t> ConvexHullSettings<'t> {
     pub fn new(points: &'t [Vec3A]) -> ConvexHullSettings<'t> {
-        return ConvexHullSettings {
+        ConvexHullSettings {
             points,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -350,24 +350,24 @@ const_assert_eq!(std::mem::size_of::<MeshSettings>(), 64);
 
 impl<'t> Default for MeshSettings<'t> {
     fn default() -> MeshSettings<'t> {
-        return MeshSettings {
+        MeshSettings {
             user_data: 0,
             triangle_vertices: &[],
             indexed_triangles: &[],
             materials: &[],
             max_triangles_per_leaf: 8,
             active_edge_cos_threshold_angle: 0.996195, // cos(5)
-        };
+        }
     }
 }
 
 impl<'t> MeshSettings<'t> {
     pub fn new(triangle_vertices: &'t [Vec3], indexed_triangles: &'t [IndexedTriangle]) -> MeshSettings<'t> {
-        return MeshSettings {
+        MeshSettings {
             triangle_vertices,
             indexed_triangles,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -391,7 +391,7 @@ const_assert_eq!(std::mem::size_of::<HeightFieldSettings>(), 128);
 
 impl<'t> Default for HeightFieldSettings<'t> {
     fn default() -> HeightFieldSettings<'t> {
-        return HeightFieldSettings {
+        HeightFieldSettings {
             user_data: 0,
             offset: Vec3A::ZERO,
             scale: Vec3A::ONE,
@@ -404,62 +404,84 @@ impl<'t> Default for HeightFieldSettings<'t> {
             material_indices: &[],
             materials: &[],
             active_edge_cos_threshold_angle: 0.996195, // cos(5)
-        };
+        }
     }
 }
 
 impl<'t> HeightFieldSettings<'t> {
     pub fn new(height_samples: &'t [f32], sample_count: u32) -> HeightFieldSettings<'t> {
-        return HeightFieldSettings {
+        HeightFieldSettings {
             height_samples,
             sample_count,
             ..Default::default()
-        };
+        }
     }
 }
 
 pub fn create_shape_box(settings: &BoxSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeBox(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeBox(unsafe {
+        mem::transmute::<&BoxSettings, &ffi::BoxSettings>(settings)
+    }))
 }
 
 pub fn create_shape_sphere(settings: &SphereSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeSphere(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeSphere(unsafe {
+        mem::transmute::<&SphereSettings, &ffi::SphereSettings>(settings)
+    }))
 }
 
 pub fn create_shape_capsule(settings: &CapsuleSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeCapsule(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeCapsule(unsafe {
+        mem::transmute::<&CapsuleSettings, &ffi::CapsuleSettings>(settings)
+    }))
 }
 
 pub fn create_shape_tapered_capsule(settings: &TaperedCapsuleSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeTaperedCapsule(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeTaperedCapsule(unsafe {
+        mem::transmute::<&TaperedCapsuleSettings, &ffi::TaperedCapsuleSettings>(settings)
+    }))
 }
 
 pub fn create_shape_cylinder(settings: &CylinderSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeCylinder(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeCylinder(unsafe {
+        mem::transmute::<&CylinderSettings, &ffi::CylinderSettings>(settings)
+    }))
 }
 
 pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeRotatedTranslated(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeRotatedTranslated(unsafe {
+        mem::transmute::<&RotatedTranslatedSettings, &ffi::RotatedTranslatedSettings>(settings)
+    }))
 }
 
 pub fn create_shape_scaled(settings: &ScaledSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeScaled(unsafe { mem::transmute(&settings) }));
+    RefShape(ffi::CreateShapeScaled(unsafe {
+        mem::transmute::<&&ScaledSettings, &ffi::ScaledSettings>(&settings)
+    }))
 }
 
 pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe {
+        mem::transmute::<&OffsetCenterOfMassSettings, &ffi::OffsetCenterOfMassSettings>(settings)
+    }))
 }
 
 pub fn create_shape_convex_hull(settings: &ConvexHullSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeConvexHull(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeConvexHull(unsafe {
+        mem::transmute::<&ConvexHullSettings<'_>, &ffi::ConvexHullSettings>(settings)
+    }))
 }
 
 pub fn create_shape_mesh(settings: &MeshSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeMesh(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeMesh(unsafe {
+        mem::transmute::<&MeshSettings<'_>, &ffi::MeshSettings>(settings)
+    }))
 }
 
 pub fn create_shape_height_field(settings: &HeightFieldSettings) -> RefShape {
-    return RefShape(ffi::CreateShapeHeightField(unsafe { mem::transmute(settings) }));
+    RefShape(ffi::CreateShapeHeightField(unsafe {
+        mem::transmute::<&HeightFieldSettings<'_>, &ffi::HeightFieldSettings>(settings)
+    }))
 }
 
 // fn apply_shape_transform(inner: &RefShape, transform: Option<&Transform>) -> RefShape {
