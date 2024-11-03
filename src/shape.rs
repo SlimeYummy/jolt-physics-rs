@@ -3,6 +3,8 @@ use static_assertions::const_assert_eq;
 use std::mem;
 
 use crate::base::*;
+use crate::consts::{DEFAULT_CONVEX_RADIUS, MAX_CONVEX_RADIUS, MIN_CONVEX_RADIUS};
+use crate::error::{JoltError, JoltResult};
 
 #[cxx::bridge()]
 pub mod ffi {
@@ -55,22 +57,24 @@ impl Default for BoxSettings {
     fn default() -> BoxSettings {
         BoxSettings {
             user_data: 0,
-            material: RefPhysicsMaterial::default(),
+            material: RefPhysicsMaterial::invalid(),
             density: 1000.0,
             half_x: 0.0,
             half_y: 0.0,
             half_z: 0.0,
-            convex_radius: 0.05,
+            convex_radius: DEFAULT_CONVEX_RADIUS,
         }
     }
 }
 
 impl BoxSettings {
     pub fn new(half_x: f32, half_y: f32, half_z: f32) -> BoxSettings {
+        let min = half_x.min(half_y.min(half_z));
         BoxSettings {
             half_x,
             half_y,
             half_z,
+            convex_radius: (min / 10.0).clamp(MIN_CONVEX_RADIUS, MAX_CONVEX_RADIUS),
             ..Default::default()
         }
     }
@@ -90,7 +94,7 @@ impl Default for SphereSettings {
     fn default() -> SphereSettings {
         SphereSettings {
             user_data: 0,
-            material: RefPhysicsMaterial::default(),
+            material: RefPhysicsMaterial::invalid(),
             density: 1000.0,
             radius: 0.5,
         }
@@ -121,7 +125,7 @@ impl Default for CapsuleSettings {
     fn default() -> CapsuleSettings {
         CapsuleSettings {
             user_data: 0,
-            material: RefPhysicsMaterial::default(),
+            material: RefPhysicsMaterial::invalid(),
             density: 1000.0,
             radius: 0.0,
             half_height: 0.0,
@@ -155,7 +159,7 @@ impl Default for TaperedCapsuleSettings {
     fn default() -> TaperedCapsuleSettings {
         TaperedCapsuleSettings {
             user_data: 0,
-            material: RefPhysicsMaterial::default(),
+            material: RefPhysicsMaterial::invalid(),
             density: 1000.0,
             half_height: 0.0,
             top_radius: 0.0,
@@ -191,11 +195,11 @@ impl Default for CylinderSettings {
     fn default() -> CylinderSettings {
         CylinderSettings {
             user_data: 0,
-            material: RefPhysicsMaterial::default(),
+            material: RefPhysicsMaterial::invalid(),
             density: 1000.0,
             half_height: 0.0,
             radius: 0.0,
-            convex_radius: 0.05,
+            convex_radius: DEFAULT_CONVEX_RADIUS,
         }
     }
 }
@@ -205,6 +209,7 @@ impl CylinderSettings {
         CylinderSettings {
             half_height,
             radius,
+            convex_radius: (half_height / 10.0).clamp(MIN_CONVEX_RADIUS, MAX_CONVEX_RADIUS),
             ..Default::default()
         }
     }
@@ -224,7 +229,7 @@ impl Default for RotatedTranslatedSettings {
     fn default() -> RotatedTranslatedSettings {
         RotatedTranslatedSettings {
             user_data: 0,
-            inner_shape: RefShape::default(),
+            inner_shape: RefShape::invalid(),
             position: Vec3A::ZERO,
             rotation: Quat::IDENTITY,
         }
@@ -255,7 +260,7 @@ impl Default for ScaledSettings {
     fn default() -> ScaledSettings {
         ScaledSettings {
             user_data: 0,
-            inner_shape: RefShape::default(),
+            inner_shape: RefShape::invalid(),
             scale: Vec3A::ONE,
         }
     }
@@ -284,7 +289,7 @@ impl Default for OffsetCenterOfMassSettings {
     fn default() -> OffsetCenterOfMassSettings {
         OffsetCenterOfMassSettings {
             user_data: 0,
-            inner_shape: RefShape::default(),
+            inner_shape: RefShape::invalid(),
             offset: Vec3A::ZERO,
         }
     }
@@ -317,7 +322,7 @@ impl<'t> Default for ConvexHullSettings<'t> {
     fn default() -> ConvexHullSettings<'t> {
         ConvexHullSettings {
             user_data: 0,
-            material: RefPhysicsMaterial::default(),
+            material: RefPhysicsMaterial::invalid(),
             density: 1000.0,
             points: &[],
             max_convex_radius: 0.05,
@@ -418,70 +423,114 @@ impl<'t> HeightFieldSettings<'t> {
     }
 }
 
-pub fn create_shape_box(settings: &BoxSettings) -> RefShape {
-    RefShape(ffi::CreateShapeBox(unsafe {
+pub fn create_shape_box(settings: &BoxSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeBox(unsafe {
         mem::transmute::<&BoxSettings, &ffi::BoxSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_sphere(settings: &SphereSettings) -> RefShape {
-    RefShape(ffi::CreateShapeSphere(unsafe {
+pub fn create_shape_sphere(settings: &SphereSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeSphere(unsafe {
         mem::transmute::<&SphereSettings, &ffi::SphereSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_capsule(settings: &CapsuleSettings) -> RefShape {
-    RefShape(ffi::CreateShapeCapsule(unsafe {
+pub fn create_shape_capsule(settings: &CapsuleSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeCapsule(unsafe {
         mem::transmute::<&CapsuleSettings, &ffi::CapsuleSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_tapered_capsule(settings: &TaperedCapsuleSettings) -> RefShape {
-    RefShape(ffi::CreateShapeTaperedCapsule(unsafe {
+pub fn create_shape_tapered_capsule(settings: &TaperedCapsuleSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeTaperedCapsule(unsafe {
         mem::transmute::<&TaperedCapsuleSettings, &ffi::TaperedCapsuleSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_cylinder(settings: &CylinderSettings) -> RefShape {
-    RefShape(ffi::CreateShapeCylinder(unsafe {
+pub fn create_shape_cylinder(settings: &CylinderSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeCylinder(unsafe {
         mem::transmute::<&CylinderSettings, &ffi::CylinderSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> RefShape {
-    RefShape(ffi::CreateShapeRotatedTranslated(unsafe {
+pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeRotatedTranslated(unsafe {
         mem::transmute::<&RotatedTranslatedSettings, &ffi::RotatedTranslatedSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_scaled(settings: &ScaledSettings) -> RefShape {
-    RefShape(ffi::CreateShapeScaled(unsafe {
+pub fn create_shape_scaled(settings: &ScaledSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeScaled(unsafe {
         mem::transmute::<&&ScaledSettings, &ffi::ScaledSettings>(&settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings) -> RefShape {
-    RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe {
+pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe {
         mem::transmute::<&OffsetCenterOfMassSettings, &ffi::OffsetCenterOfMassSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_convex_hull(settings: &ConvexHullSettings) -> RefShape {
-    RefShape(ffi::CreateShapeConvexHull(unsafe {
+pub fn create_shape_convex_hull(settings: &ConvexHullSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeConvexHull(unsafe {
         mem::transmute::<&ConvexHullSettings<'_>, &ffi::ConvexHullSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_mesh(settings: &MeshSettings) -> RefShape {
-    RefShape(ffi::CreateShapeMesh(unsafe {
+pub fn create_shape_mesh(settings: &MeshSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeMesh(unsafe {
         mem::transmute::<&MeshSettings<'_>, &ffi::MeshSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
-pub fn create_shape_height_field(settings: &HeightFieldSettings) -> RefShape {
-    RefShape(ffi::CreateShapeHeightField(unsafe {
+pub fn create_shape_height_field(settings: &HeightFieldSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeHeightField(unsafe {
         mem::transmute::<&HeightFieldSettings<'_>, &ffi::HeightFieldSettings>(settings)
-    }))
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
 }
 
 // fn apply_shape_transform(inner: &RefShape, transform: Option<&Transform>) -> RefShape {

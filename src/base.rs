@@ -73,6 +73,7 @@ unsafe impl ExternType for XVec3 {
 }
 
 impl From<Vec3A> for XVec3 {
+    #[inline]
     fn from(v: Vec3A) -> XVec3 {
         XVec3(v)
     }
@@ -88,6 +89,7 @@ unsafe impl ExternType for XVec4 {
 }
 
 impl From<Vec4> for XVec4 {
+    #[inline]
     fn from(v: Vec4) -> XVec4 {
         XVec4(v)
     }
@@ -103,6 +105,7 @@ unsafe impl ExternType for XQuat {
 }
 
 impl From<Quat> for XQuat {
+    #[inline]
     fn from(q: Quat) -> XQuat {
         XQuat(q)
     }
@@ -118,6 +121,7 @@ unsafe impl ExternType for XMat4 {
 }
 
 impl From<Mat4> for XMat4 {
+    #[inline]
     fn from(m: Mat4) -> XMat4 {
         XMat4(m)
     }
@@ -137,6 +141,7 @@ unsafe impl ExternType for Isometry {
 }
 
 impl Isometry {
+    #[inline]
     pub fn new(position: Vec3A, rotation: Quat) -> Isometry {
         Isometry { position, rotation }
     }
@@ -157,6 +162,7 @@ unsafe impl ExternType for Transform {
 }
 
 impl Transform {
+    #[inline]
     pub fn new(position: Vec3A, rotation: Quat, scale: Vec3A) -> Transform {
         Transform { position, rotation, scale }
     }
@@ -194,6 +200,7 @@ unsafe impl ExternType for Plane {
 }
 
 impl Plane {
+    #[inline]
     pub fn new(normal: Vec3, distance: f32) -> Plane {
         Plane { normal, distance }
     }
@@ -213,6 +220,7 @@ unsafe impl ExternType for IndexedTriangle {
 }
 
 impl IndexedTriangle {
+    #[inline]
     pub fn new(idx1: u32, idx2: u32, idx3: u32, material_index: u32) -> IndexedTriangle {
         IndexedTriangle {
             idx: [idx1, idx2, idx3],
@@ -256,14 +264,17 @@ unsafe impl ExternType for BodyID {
 }
 
 impl BodyID {
+    #[inline]
     pub fn invalid() -> BodyID {
         BodyID(0xFFFF_FFFF)
     }
 
+    #[inline]
     pub fn is_valid(&self) -> bool {
         self.0 != 0xFFFF_FFFF
     }
 
+    #[inline]
     pub fn is_invalid(&self) -> bool {
         self.0 == 0xFFFF_FFFF
     }
@@ -274,13 +285,8 @@ const_assert_eq!(mem::size_of::<ffi::XRefShape>(), mem::size_of::<usize>());
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefShape(pub(crate) ffi::XRefShape);
 
-impl Default for RefShape {
-    fn default() -> RefShape {
-        RefShape(ffi::XRefShape { ptr: std::ptr::null_mut() })
-    }
-}
-
 impl Clone for RefShape {
+    #[inline]
     fn clone(&self) -> RefShape {
         RefShape(ffi::CloneRefShape(self.0))
     }
@@ -298,10 +304,27 @@ impl Drop for RefShape {
 }
 
 impl RefShape {
+    #[inline]
+    pub fn invalid() -> RefShape {
+        RefShape(ffi::XRefShape { ptr: std::ptr::null_mut() })
+    }
+
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        !self.0.ptr.is_null()
+    }
+
+    #[inline]
+    pub fn is_invalid(&self) -> bool {
+        self.0.ptr.is_null()
+    }
+
+    #[inline]
     pub fn ref_count(&self) -> u32 {
         ffi::CountRefShape(self.0)
     }
 
+    #[inline]
     pub fn as_ref(&self) -> Option<&ffi::Shape> {
         if self.0.ptr.is_null() {
             return None;
@@ -309,6 +332,7 @@ impl RefShape {
         Some(unsafe { &*(self.0.ptr as *const ffi::Shape) })
     }
 
+    #[inline]
     pub fn as_mut(&mut self) -> Option<&mut ffi::Shape> {
         if self.0.ptr.is_null() {
             return None;
@@ -316,12 +340,14 @@ impl RefShape {
         Some(unsafe { &mut *(self.0.ptr as *mut ffi::Shape) })
     }
 
+    #[inline]
     pub fn as_usize(&self) -> usize {
         self.0.ptr as usize
     }
 
     /// # Safety
     /// JoltPhysics underlying Shape object pointer
+    #[inline]
     pub unsafe fn ptr(&mut self) -> *mut ffi::Shape {
         self.0.ptr as *mut ffi::Shape
     }
@@ -332,13 +358,8 @@ const_assert_eq!(mem::size_of::<ffi::XRefPhysicsMaterial>(), mem::size_of::<usiz
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefPhysicsMaterial(pub(crate) ffi::XRefPhysicsMaterial);
 
-impl Default for RefPhysicsMaterial {
-    fn default() -> RefPhysicsMaterial {
-        RefPhysicsMaterial(ffi::XRefPhysicsMaterial { ptr: std::ptr::null_mut() })
-    }
-}
-
 impl Clone for RefPhysicsMaterial {
+    #[inline]
     fn clone(&self) -> RefPhysicsMaterial {
         RefPhysicsMaterial(ffi::CloneRefPhysicsMaterial(self.0))
     }
@@ -356,10 +377,27 @@ impl Drop for RefPhysicsMaterial {
 }
 
 impl RefPhysicsMaterial {
+    #[inline]
+    pub fn invalid() -> RefPhysicsMaterial {
+        RefPhysicsMaterial(ffi::XRefPhysicsMaterial { ptr: std::ptr::null_mut() })
+    }
+
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        !self.0.ptr.is_null()
+    }
+
+    #[inline]
+    pub fn is_invalid(&self) -> bool {
+        self.0.ptr.is_null()
+    }
+
+    #[inline]
     pub fn ref_count(&self) -> u32 {
         ffi::CountRefPhysicsMaterial(self.0)
     }
 
+    #[inline]
     pub fn as_ref(&self) -> Option<&ffi::PhysicsMaterial> {
         if self.0.ptr.is_null() {
             return None;
@@ -367,6 +405,7 @@ impl RefPhysicsMaterial {
         Some(unsafe { &*(self.0.ptr as *const ffi::PhysicsMaterial) })
     }
 
+    #[inline]
     pub fn as_mut(&mut self) -> Option<&mut ffi::PhysicsMaterial> {
         if self.0.ptr.is_null() {
             return None;
@@ -374,12 +413,14 @@ impl RefPhysicsMaterial {
         Some(unsafe { &mut *(self.0.ptr as *mut ffi::PhysicsMaterial) })
     }
 
+    #[inline]
     pub fn as_usize(&self) -> usize {
         self.0.ptr as usize
     }
 
     /// # Safety
     /// JoltPhysics underlying PhysicsMaterial object pointer
+    #[inline]
     pub unsafe fn ptr(&mut self) -> *mut ffi::PhysicsMaterial {
         self.0.ptr as *mut ffi::PhysicsMaterial
     }
@@ -388,13 +429,8 @@ impl RefPhysicsMaterial {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RefPhysicsSystem(pub(crate) ffi::XRefPhysicsSystem);
 
-impl Default for RefPhysicsSystem {
-    fn default() -> RefPhysicsSystem {
-        RefPhysicsSystem(ffi::XRefPhysicsSystem { ptr: std::ptr::null_mut() })
-    }
-}
-
 impl Clone for RefPhysicsSystem {
+    #[inline]
     fn clone(&self) -> RefPhysicsSystem {
         RefPhysicsSystem(ffi::CloneRefPhysicsSystem(self.0))
     }
@@ -412,10 +448,27 @@ impl Drop for RefPhysicsSystem {
 }
 
 impl RefPhysicsSystem {
+    #[inline]
+    pub fn invalid() -> RefPhysicsSystem {
+        RefPhysicsSystem(ffi::XRefPhysicsSystem { ptr: std::ptr::null_mut() })
+    }
+
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        !self.0.ptr.is_null()
+    }
+
+    #[inline]
+    pub fn is_invalid(&self) -> bool {
+        self.0.ptr.is_null()
+    }
+
+    #[inline]
     pub fn ref_count(&self) -> u32 {
         ffi::CountRefPhysicsSystem(self.0)
     }
 
+    #[inline]
     pub fn as_ref(&self) -> Option<&ffi::XPhysicsSystem> {
         if self.0.ptr.is_null() {
             return None;
@@ -423,6 +476,7 @@ impl RefPhysicsSystem {
         Some(unsafe { &*(self.0.ptr as *const ffi::XPhysicsSystem) })
     }
 
+    #[inline]
     pub fn as_mut(&mut self) -> Option<&mut ffi::XPhysicsSystem> {
         if self.0.ptr.is_null() {
             return None;
@@ -432,6 +486,7 @@ impl RefPhysicsSystem {
 
     /// # Safety
     /// JoltPhysics underlying XPhysicsSystem object pointer
+    #[inline]
     pub unsafe fn ptr(&mut self) -> *mut ffi::XPhysicsSystem {
         self.0.ptr as *mut ffi::XPhysicsSystem
     }
