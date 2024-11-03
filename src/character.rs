@@ -184,7 +184,7 @@ impl Default for CharacterCommonSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
-            shape: RefShape::default(),
+            shape: RefShape::invalid(),
             layer: 0,
             mass: 80.0,
             friction: 0.2,
@@ -232,7 +232,7 @@ impl Default for CharacterVirtualSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
-            shape: RefShape::default(),
+            shape: RefShape::invalid(),
             mass: 70.0,
             max_strength: 100.0,
             shape_offset: Vec3A::ZERO,
@@ -344,140 +344,174 @@ impl CharacterCommon {
         };
     }
 
+    #[inline]
     fn as_ref(&self) -> &ffi::XCharacterCommon {
         return self.chara.as_ref().unwrap();
     }
 
+    #[inline]
     fn as_mut(&mut self) -> Pin<&mut ffi::XCharacterCommon> {
         return self.chara.as_mut().unwrap();
     }
 
+    #[inline]
     pub fn set_max_slope_angle(&mut self, angle: f32) {
         self.as_mut().SetMaxSlopeAngle(angle);
     }
 
+    #[inline]
     pub fn get_cos_max_slope_angle(&self) -> f32 {
         return self.as_ref().GetCosMaxSlopeAngle();
     }
 
+    #[inline]
     pub fn set_up(&mut self, up: Vec3A) {
         self.as_mut().SetUp(up.into());
     }
 
+    #[inline]
     pub fn get_up(&self) -> Vec3A {
         return self.as_ref().GetUp().0;
     }
 
+    #[inline]
     pub fn is_slope_too_steep(&self, normal: Vec3A) -> bool {
         return self.as_ref().IsSlopeTooSteep(normal.into());
     }
 
+    #[inline]
     pub fn get_ground_state(&self) -> GroundState {
         return self.as_ref().GetGroundState();
     }
 
+    #[inline]
     pub fn is_supported(&self) -> bool {
         return self.as_ref().IsSupported();
     }
 
+    #[inline]
     pub fn get_shape(&self) -> RefShape {
         return RefShape(self.as_ref().GetShape());
     }
 
+    #[inline]
     pub fn get_ground_position(&self) -> Vec3A {
         return self.as_ref().GetGroundPosition().0;
     }
 
+    #[inline]
     pub fn get_ground_normal(&self) -> Vec3A {
         return self.as_ref().GetGroundNormal().0;
     }
 
+    #[inline]
     pub fn get_ground_velocity(&self) -> Vec3A {
         return self.as_ref().GetGroundVelocity().0;
     }
 
+    #[inline]
     pub fn get_ground_body_id(&self) -> BodyID {
         return self.as_ref().GetGroundBodyID();
     }
 
+    #[inline]
     pub fn get_body_id(&self) -> BodyID {
         return self.as_ref().GetBodyID();
     }
 
+    #[inline]
     pub fn add_to_physics_system(&mut self, active: bool, lock: bool) {
         self.as_mut().AddToPhysicsSystem(active.into(), lock);
     }
 
+    #[inline]
     pub fn remove_from_physics_system(&mut self, lock: bool) {
         self.as_mut().RemoveFromPhysicsSystem(lock);
     }
 
+    #[inline]
     pub fn activate(&mut self, lock: bool) {
         self.as_mut().Activate(lock);
     }
 
+    #[inline]
     pub fn post_simulation(&mut self, max_distance: f32, lock: bool) {
         self.as_mut().PostSimulation(max_distance, lock);
     }
 
+    #[inline]
     pub fn set_velocity(&mut self, linear: Vec3A, angular: Vec3A, lock: bool) {
         self.as_mut().SetLinearAndAngularVelocity(linear.into(), angular.into(), lock);
     }
 
+    #[inline]
     pub fn set_linear_velocity(&mut self, velocity: Vec3A, lock: bool) {
         self.as_mut().SetLinearVelocity(velocity.into(), lock);
     }
 
+    #[inline]
     pub fn add_linear_velocity(&mut self, velocity: Vec3A, lock: bool) {
         self.as_mut().AddLinearVelocity(velocity.into(), lock);
     }
 
+    #[inline]
     pub fn add_impulse(&mut self, impulse: Vec3A, lock: bool) {
         self.as_mut().AddImpulse(impulse.into(), lock);
     }
 
+    #[inline]
     pub fn get_position_and_rotation(&self, lock: bool) -> (Vec3A, Quat) {
         let isometry = self.as_ref().GetPositionAndRotation(lock);
         (isometry.position, isometry.rotation)
     }
 
+    #[inline]
     pub fn set_position_and_rotation(&mut self, position: Vec3A, rotation: Quat, active: bool, lock: bool) {
         self.as_mut()
             .SetPositionAndRotation(position.into(), rotation.into(), active.into(), lock);
     }
 
+    #[inline]
     pub fn get_position(&self, lock: bool) -> Vec3A {
         return self.as_ref().GetPosition(lock).0;
     }
 
+    #[inline]
     pub fn set_position(&mut self, position: Vec3A, active: bool, lock: bool) {
         self.as_mut().SetPosition(position.into(), active.into(), lock);
     }
 
+    #[inline]
     pub fn get_rotation(&self, lock: bool) -> Quat {
         return self.as_ref().GetRotation(lock).0;
     }
 
+    #[inline]
     pub fn set_rotation(&mut self, rotation: Quat, active: bool, lock: bool) {
         self.as_mut().SetRotation(rotation.into(), active.into(), lock);
     }
 
+    #[inline]
     pub fn get_linear_velocity(&self, lock: bool) -> Vec3A {
         return self.as_ref().GetLinearVelocity(lock).0;
     }
 
+    #[inline]
     pub fn get_center_of_mass_position(&self, lock: bool) -> Vec3A {
         return self.as_ref().GetCenterOfMassPosition(lock).0;
     }
 
+    #[inline]
     pub fn get_world_transform(&self, lock: bool) -> Mat4 {
         return self.as_ref().GetWorldTransform(lock).0;
     }
 
+    #[inline]
     pub fn set_layer(&mut self, layer: u16, lock: bool) {
         self.as_mut().SetLayer(layer, lock);
     }
 
+    #[inline]
     pub fn set_shape(&mut self, shape: RefShape, max_penetration_depth: f32, lock: bool) -> bool {
         return self.as_mut().SetShape(shape.0, max_penetration_depth, lock);
     }
@@ -510,162 +544,202 @@ impl CharacterVirtual {
         };
     }
 
+    #[inline]
     fn as_ref(&self) -> &ffi::XCharacterVirtual {
         return self.chara.as_ref().unwrap();
     }
 
+    #[inline]
     fn as_mut(&mut self) -> Pin<&mut ffi::XCharacterVirtual> {
         return self.chara.as_mut().unwrap();
     }
 
+    #[inline]
     pub fn set_max_slope_angle(&mut self, angle: f32) {
         self.as_mut().SetMaxSlopeAngle(angle);
     }
 
+    #[inline]
     pub fn get_cos_max_slope_angle(&self) -> f32 {
         return self.as_ref().GetCosMaxSlopeAngle();
     }
 
+    #[inline]
     pub fn set_up(&mut self, up: Vec3A) {
         self.as_mut().SetUp(up.into());
     }
 
+    #[inline]
     pub fn get_up(&self) -> Vec3A {
         return self.as_ref().GetUp().0;
     }
 
+    #[inline]
     pub fn is_slope_too_steep(&self, normal: Vec3A) -> bool {
         return self.as_ref().IsSlopeTooSteep(normal.into());
     }
 
+    #[inline]
     pub fn get_ground_state(&self) -> GroundState {
         return self.as_ref().GetGroundState();
     }
 
+    #[inline]
     pub fn is_supported(&self) -> bool {
         return self.as_ref().IsSupported();
     }
 
+    #[inline]
     pub fn get_shape(&self) -> RefShape {
         return RefShape(self.as_ref().GetShape());
     }
 
+    #[inline]
     pub fn get_ground_position(&self) -> Vec3A {
         return self.as_ref().GetGroundPosition().0;
     }
 
+    #[inline]
     pub fn get_ground_normal(&self) -> Vec3A {
         return self.as_ref().GetGroundNormal().0;
     }
 
+    #[inline]
     pub fn get_ground_velocity(&self) -> Vec3A {
         return self.as_ref().GetGroundVelocity().0;
     }
 
+    #[inline]
     pub fn get_ground_body_id(&self) -> BodyID {
         return self.as_ref().GetGroundBodyID();
     }
 
+    #[inline]
     pub fn get_linear_velocity(&self) -> Vec3A {
         return self.as_ref().GetLinearVelocity().0;
     }
 
+    #[inline]
     pub fn set_linear_velocity(&mut self, velocity: Vec3A) {
         self.as_mut().SetLinearVelocity(velocity.into());
     }
 
+    #[inline]
     pub fn get_position(&self) -> Vec3A {
         return self.as_ref().GetPosition().0;
     }
 
+    #[inline]
     pub fn set_position(&mut self, position: Vec3A) {
         self.as_mut().SetPosition(position.into());
     }
 
+    #[inline]
     pub fn get_rotation(&self) -> Quat {
         return self.as_ref().GetRotation().0;
     }
 
+    #[inline]
     pub fn set_rotation(&mut self, rotation: Quat) {
         self.as_mut().SetRotation(rotation.into());
     }
 
+    #[inline]
     pub fn get_world_transform(&self) -> Mat4 {
         return self.as_ref().GetWorldTransform().0;
     }
 
+    #[inline]
     pub fn get_center_of_mass_transform(&self) -> Mat4 {
         return self.as_ref().GetCenterOfMassTransform().0;
     }
 
+    #[inline]
     pub fn get_mass(&self) -> f32 {
         return self.as_ref().GetMass();
     }
 
+    #[inline]
     pub fn set_mass(&mut self, mass: f32) {
         self.as_mut().SetMass(mass);
     }
 
+    #[inline]
     pub fn get_max_strength(&self) -> f32 {
         return self.as_ref().GetMaxStrength();
     }
 
+    #[inline]
     pub fn set_max_strength(&mut self, max_strength: f32) {
         self.as_mut().SetMaxStrength(max_strength);
     }
 
+    #[inline]
     pub fn get_penetration_recovery_speed(&self) -> f32 {
         return self.as_ref().GetPenetrationRecoverySpeed();
     }
 
+    #[inline]
     pub fn set_penetration_recovery_speed(&mut self, speed: f32) {
         self.as_mut().SetPenetrationRecoverySpeed(speed);
     }
 
+    #[inline]
     pub fn get_character_padding(&self) -> f32 {
         return self.as_ref().GetCharacterPadding();
     }
 
+    #[inline]
     pub fn get_max_num_hits(&self) -> u32 {
         return self.as_ref().GetMaxNumHits();
     }
 
+    #[inline]
     pub fn set_max_num_hits(&mut self, max_hits: u32) {
         self.as_mut().SetMaxNumHits(max_hits);
     }
 
+    #[inline]
     pub fn get_hit_reduction_cos_max_angle(&self) -> f32 {
         return self.as_ref().GetHitReductionCosMaxAngle();
     }
 
+    #[inline]
     pub fn set_hit_reduction_cos_max_angle(&mut self, cos_max_angle: f32) {
         self.as_mut().SetHitReductionCosMaxAngle(cos_max_angle);
     }
 
+    #[inline]
     pub fn get_max_hits_exceeded(&self) -> bool {
         return self.as_ref().GetMaxHitsExceeded();
     }
 
+    #[inline]
     pub fn get_shape_offset(&self) -> Vec3A {
         return self.as_ref().GetShapeOffset().0;
     }
 
+    #[inline]
     pub fn set_shape_offset(&mut self, offset: Vec3A) {
         self.as_mut().SetShapeOffset(offset.into());
     }
 
+    #[inline]
     pub fn cancel_velocity_towards_steep_slopes(&self, desired_velocity: Vec3A) -> Vec3A {
         return self.as_ref().CancelVelocityTowardsSteepSlopes(desired_velocity.into()).0;
     }
 
+    #[inline]
     pub fn update(&mut self, chara_layer: u16, delta_time: f32, gravity: Vec3A) {
         self.as_mut().Update(chara_layer, delta_time, gravity.into());
     }
 
+    #[inline]
     pub fn can_walk_stairs(&self, velocity: Vec3A) -> bool {
         return self.as_ref().CanWalkStairs(velocity.into());
     }
 
+    #[inline]
     pub fn walk_stairs(
         &mut self,
         chara_layer: u16,
@@ -685,24 +759,29 @@ impl CharacterVirtual {
         );
     }
 
+    #[inline]
     pub fn stick_to_floor(&mut self, chara_layer: u16, step_down: Vec3A) -> bool {
         return self.as_mut().StickToFloor(chara_layer, step_down.into());
     }
 
+    #[inline]
     pub fn extended_update(&mut self, chara_layer: u16, delta_time: f32, gravity: Vec3A, settings: &ExtendedUpdateSettings) {
         self.as_mut().ExtendedUpdate(chara_layer, delta_time, gravity.into(), unsafe {
             mem::transmute::<&ExtendedUpdateSettings, &ffi::ExtendedUpdateSettings>(settings)
         });
     }
 
+    #[inline]
     pub fn refresh_contacts(&mut self, chara_layer: u16) {
         self.as_mut().RefreshContacts(chara_layer);
     }
 
+    #[inline]
     pub fn update_ground_velocity(&mut self) {
         self.as_mut().UpdateGroundVelocity();
     }
 
+    #[inline]
     pub fn set_shape(&mut self, chara_layer: u16, shape: RefShape, max_penetration_depth: f32) -> bool {
         return self.as_mut().SetShape(chara_layer, shape.0, max_penetration_depth);
     }
