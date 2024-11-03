@@ -180,7 +180,7 @@ const_assert_eq!(mem::size_of::<CharacterCommonSettings>(), 64);
 
 impl Default for CharacterCommonSettings {
     fn default() -> CharacterCommonSettings {
-        return CharacterCommonSettings {
+        CharacterCommonSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
@@ -189,17 +189,17 @@ impl Default for CharacterCommonSettings {
             mass: 80.0,
             friction: 0.2,
             gravity_factor: 1.0,
-        };
+        }
     }
 }
 
 impl CharacterCommonSettings {
     pub fn new(shape: RefShape, layer: u16) -> CharacterCommonSettings {
-        return CharacterCommonSettings {
+        CharacterCommonSettings {
             shape,
             layer,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -228,7 +228,7 @@ const_assert_eq!(mem::size_of::<CharacterVirtualSettings>(), 128);
 
 impl Default for CharacterVirtualSettings {
     fn default() -> CharacterVirtualSettings {
-        return CharacterVirtualSettings {
+        CharacterVirtualSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
@@ -246,16 +246,16 @@ impl Default for CharacterVirtualSettings {
             max_num_hits: 256,
             hit_reduction_cos_max_angle: 0.999,
             penetration_recovery_speed: 1.0,
-        };
+        }
     }
 }
 
 impl CharacterVirtualSettings {
     pub fn new(shape: RefShape) -> CharacterVirtualSettings {
-        return CharacterVirtualSettings {
+        CharacterVirtualSettings {
             shape,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -273,14 +273,14 @@ const_assert_eq!(mem::size_of::<ExtendedUpdateSettings>(), 64);
 
 impl Default for ExtendedUpdateSettings {
     fn default() -> ExtendedUpdateSettings {
-        return ExtendedUpdateSettings {
+        ExtendedUpdateSettings {
             stick_to_floor_step_down: Vec3A::new(0.0, -0.5, 0.0),
             walk_stairs_step_up: Vec3A::new(0.0, 0.4, 0.0),
             walk_stairs_min_step_forward: 0.02,
             walk_stairs_step_forward_test: 0.15,
-            walk_stairs_cos_angle_forward_contact: 0.258819045, // cos(75°)
+            walk_stairs_cos_angle_forward_contact: 0.258_819_04, // cos(75°)
             walk_stairs_step_down_extra: Vec3A::new(0.0, 0.0, 0.0),
-        };
+        }
     }
 }
 
@@ -306,7 +306,7 @@ impl CharacterCommon {
         let chara = unsafe {
             ffi::CreateCharacterCommon(
                 system.system_ptr(),
-                mem::transmute(settings),
+                mem::transmute::<&CharacterCommonSettings, &ffi::XCharacterCommonSettings>(settings),
                 position.into(),
                 rotation.into(),
                 user_data,
@@ -330,7 +330,7 @@ impl CharacterCommon {
         let chara = unsafe {
             ffi::CreateAddCharacterCommon(
                 system.system_ptr(),
-                mem::transmute(settings),
+                mem::transmute::<&CharacterCommonSettings, &ffi::XCharacterCommonSettings>(settings),
                 position.into(),
                 rotation.into(),
                 user_data,
@@ -438,7 +438,7 @@ impl CharacterCommon {
 
     pub fn get_position_and_rotation(&self, lock: bool) -> (Vec3A, Quat) {
         let isometry = self.as_ref().GetPositionAndRotation(lock);
-        return (isometry.position, isometry.rotation);
+        (isometry.position, isometry.rotation)
     }
 
     pub fn set_position_and_rotation(&mut self, position: Vec3A, rotation: Quat, active: bool, lock: bool) {
@@ -496,7 +496,14 @@ impl Drop for CharacterVirtual {
 
 impl CharacterVirtual {
     pub fn new(system: &mut PhysicsSystem, settings: &CharacterVirtualSettings, position: Vec3A, rotation: Quat) -> CharacterVirtual {
-        let chara = unsafe { ffi::CreateCharacterVirtual(system.system_ptr(), mem::transmute(settings), position.into(), rotation.into()) };
+        let chara = unsafe {
+            ffi::CreateCharacterVirtual(
+                system.system_ptr(),
+                mem::transmute::<&CharacterVirtualSettings, &ffi::XCharacterVirtualSettings>(settings),
+                position.into(),
+                rotation.into(),
+            )
+        };
         return CharacterVirtual {
             chara,
             _system: system.inner_ref().clone(),
@@ -683,8 +690,9 @@ impl CharacterVirtual {
     }
 
     pub fn extended_update(&mut self, chara_layer: u16, delta_time: f32, gravity: Vec3A, settings: &ExtendedUpdateSettings) {
-        self.as_mut()
-            .ExtendedUpdate(chara_layer, delta_time, gravity.into(), unsafe { mem::transmute(settings) });
+        self.as_mut().ExtendedUpdate(chara_layer, delta_time, gravity.into(), unsafe {
+            mem::transmute::<&ExtendedUpdateSettings, &ffi::ExtendedUpdateSettings>(settings)
+        });
     }
 
     pub fn refresh_contacts(&mut self, chara_layer: u16) {

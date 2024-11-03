@@ -74,7 +74,7 @@ unsafe impl ExternType for XVec3 {
 
 impl From<Vec3A> for XVec3 {
     fn from(v: Vec3A) -> XVec3 {
-        return XVec3(v);
+        XVec3(v)
     }
 }
 
@@ -89,7 +89,7 @@ unsafe impl ExternType for XVec4 {
 
 impl From<Vec4> for XVec4 {
     fn from(v: Vec4) -> XVec4 {
-        return XVec4(v);
+        XVec4(v)
     }
 }
 
@@ -104,7 +104,7 @@ unsafe impl ExternType for XQuat {
 
 impl From<Quat> for XQuat {
     fn from(q: Quat) -> XQuat {
-        return XQuat(q);
+        XQuat(q)
     }
 }
 
@@ -119,7 +119,7 @@ unsafe impl ExternType for XMat4 {
 
 impl From<Mat4> for XMat4 {
     fn from(m: Mat4) -> XMat4 {
-        return XMat4(m);
+        XMat4(m)
     }
 }
 
@@ -138,7 +138,7 @@ unsafe impl ExternType for Isometry {
 
 impl Isometry {
     pub fn new(position: Vec3A, rotation: Quat) -> Isometry {
-        return Isometry { position, rotation };
+        Isometry { position, rotation }
     }
 }
 
@@ -158,7 +158,7 @@ unsafe impl ExternType for Transform {
 
 impl Transform {
     pub fn new(position: Vec3A, rotation: Quat, scale: Vec3A) -> Transform {
-        return Transform { position, rotation, scale };
+        Transform { position, rotation, scale }
     }
 }
 
@@ -195,7 +195,7 @@ unsafe impl ExternType for Plane {
 
 impl Plane {
     pub fn new(normal: Vec3, distance: f32) -> Plane {
-        return Plane { normal, distance };
+        Plane { normal, distance }
     }
 }
 
@@ -214,10 +214,10 @@ unsafe impl ExternType for IndexedTriangle {
 
 impl IndexedTriangle {
     pub fn new(idx1: u32, idx2: u32, idx3: u32, material_index: u32) -> IndexedTriangle {
-        return IndexedTriangle {
+        IndexedTriangle {
             idx: [idx1, idx2, idx3],
             material_index,
-        };
+        }
     }
 }
 
@@ -226,13 +226,13 @@ impl Serialize for IndexedTriangle {
     where
         S: serde::Serializer,
     {
-        return IVec4::new(
+        IVec4::new(
             self.idx[0] as i32,
             self.idx[1] as i32,
             self.idx[2] as i32,
             self.material_index as i32,
         )
-        .serialize(serializer);
+        .serialize(serializer)
     }
 }
 
@@ -242,7 +242,7 @@ impl<'de> Deserialize<'de> for IndexedTriangle {
         D: serde::Deserializer<'de>,
     {
         let v = IVec4::deserialize(deserializer)?;
-        return Ok(IndexedTriangle::new(v.x as u32, v.y as u32, v.z as u32, v.w as u32));
+        Ok(IndexedTriangle::new(v.x as u32, v.y as u32, v.z as u32, v.w as u32))
     }
 }
 
@@ -257,15 +257,15 @@ unsafe impl ExternType for BodyID {
 
 impl BodyID {
     pub fn invalid() -> BodyID {
-        return BodyID(0xFFFF_FFFF);
+        BodyID(0xFFFF_FFFF)
     }
 
     pub fn is_valid(&self) -> bool {
-        return self.0 != 0xFFFF_FFFF;
+        self.0 != 0xFFFF_FFFF
     }
 
     pub fn is_invalid(&self) -> bool {
-        return self.0 == 0xFFFF_FFFF;
+        self.0 == 0xFFFF_FFFF
     }
 }
 
@@ -276,13 +276,13 @@ pub struct RefShape(pub(crate) ffi::XRefShape);
 
 impl Default for RefShape {
     fn default() -> RefShape {
-        return RefShape(ffi::XRefShape { ptr: std::ptr::null_mut() });
+        RefShape(ffi::XRefShape { ptr: std::ptr::null_mut() })
     }
 }
 
 impl Clone for RefShape {
     fn clone(&self) -> RefShape {
-        return RefShape(ffi::CloneRefShape(self.0));
+        RefShape(ffi::CloneRefShape(self.0))
     }
 }
 
@@ -299,29 +299,31 @@ impl Drop for RefShape {
 
 impl RefShape {
     pub fn ref_count(&self) -> u32 {
-        return ffi::CountRefShape(self.0);
+        ffi::CountRefShape(self.0)
     }
 
     pub fn as_ref(&self) -> Option<&ffi::Shape> {
         if self.0.ptr.is_null() {
             return None;
         }
-        return Some(unsafe { &*(self.0.ptr as *const ffi::Shape) });
+        Some(unsafe { &*(self.0.ptr as *const ffi::Shape) })
     }
 
     pub fn as_mut(&mut self) -> Option<&mut ffi::Shape> {
         if self.0.ptr.is_null() {
             return None;
         }
-        return Some(unsafe { &mut *(self.0.ptr as *mut ffi::Shape) });
+        Some(unsafe { &mut *(self.0.ptr as *mut ffi::Shape) })
     }
 
     pub fn as_usize(&self) -> usize {
-        return self.0.ptr as usize;
+        self.0.ptr as usize
     }
 
+    /// # Safety
+    /// JoltPhysics underlying Shape object pointer
     pub unsafe fn ptr(&mut self) -> *mut ffi::Shape {
-        return self.0.ptr as *mut ffi::Shape;
+        self.0.ptr as *mut ffi::Shape
     }
 }
 
@@ -332,13 +334,13 @@ pub struct RefPhysicsMaterial(pub(crate) ffi::XRefPhysicsMaterial);
 
 impl Default for RefPhysicsMaterial {
     fn default() -> RefPhysicsMaterial {
-        return RefPhysicsMaterial(ffi::XRefPhysicsMaterial { ptr: std::ptr::null_mut() });
+        RefPhysicsMaterial(ffi::XRefPhysicsMaterial { ptr: std::ptr::null_mut() })
     }
 }
 
 impl Clone for RefPhysicsMaterial {
     fn clone(&self) -> RefPhysicsMaterial {
-        return RefPhysicsMaterial(ffi::CloneRefPhysicsMaterial(self.0));
+        RefPhysicsMaterial(ffi::CloneRefPhysicsMaterial(self.0))
     }
 }
 
@@ -355,29 +357,31 @@ impl Drop for RefPhysicsMaterial {
 
 impl RefPhysicsMaterial {
     pub fn ref_count(&self) -> u32 {
-        return ffi::CountRefPhysicsMaterial(self.0);
+        ffi::CountRefPhysicsMaterial(self.0)
     }
 
     pub fn as_ref(&self) -> Option<&ffi::PhysicsMaterial> {
         if self.0.ptr.is_null() {
             return None;
         }
-        return Some(unsafe { &*(self.0.ptr as *const ffi::PhysicsMaterial) });
+        Some(unsafe { &*(self.0.ptr as *const ffi::PhysicsMaterial) })
     }
 
     pub fn as_mut(&mut self) -> Option<&mut ffi::PhysicsMaterial> {
         if self.0.ptr.is_null() {
             return None;
         }
-        return Some(unsafe { &mut *(self.0.ptr as *mut ffi::PhysicsMaterial) });
+        Some(unsafe { &mut *(self.0.ptr as *mut ffi::PhysicsMaterial) })
     }
 
     pub fn as_usize(&self) -> usize {
-        return self.0.ptr as usize;
+        self.0.ptr as usize
     }
 
+    /// # Safety
+    /// JoltPhysics underlying PhysicsMaterial object pointer
     pub unsafe fn ptr(&mut self) -> *mut ffi::PhysicsMaterial {
-        return self.0.ptr as *mut ffi::PhysicsMaterial;
+        self.0.ptr as *mut ffi::PhysicsMaterial
     }
 }
 
@@ -386,13 +390,13 @@ pub struct RefPhysicsSystem(pub(crate) ffi::XRefPhysicsSystem);
 
 impl Default for RefPhysicsSystem {
     fn default() -> RefPhysicsSystem {
-        return RefPhysicsSystem(ffi::XRefPhysicsSystem { ptr: std::ptr::null_mut() });
+        RefPhysicsSystem(ffi::XRefPhysicsSystem { ptr: std::ptr::null_mut() })
     }
 }
 
 impl Clone for RefPhysicsSystem {
     fn clone(&self) -> RefPhysicsSystem {
-        return RefPhysicsSystem(ffi::CloneRefPhysicsSystem(self.0));
+        RefPhysicsSystem(ffi::CloneRefPhysicsSystem(self.0))
     }
 }
 
@@ -409,24 +413,26 @@ impl Drop for RefPhysicsSystem {
 
 impl RefPhysicsSystem {
     pub fn ref_count(&self) -> u32 {
-        return ffi::CountRefPhysicsSystem(self.0);
+        ffi::CountRefPhysicsSystem(self.0)
     }
 
     pub fn as_ref(&self) -> Option<&ffi::XPhysicsSystem> {
         if self.0.ptr.is_null() {
             return None;
         }
-        return Some(unsafe { &*(self.0.ptr as *const ffi::XPhysicsSystem) });
+        Some(unsafe { &*(self.0.ptr as *const ffi::XPhysicsSystem) })
     }
 
     pub fn as_mut(&mut self) -> Option<&mut ffi::XPhysicsSystem> {
         if self.0.ptr.is_null() {
             return None;
         }
-        return Some(unsafe { &mut *(self.0.ptr as *mut ffi::XPhysicsSystem) });
+        Some(unsafe { &mut *(self.0.ptr as *mut ffi::XPhysicsSystem) })
     }
 
+    /// # Safety
+    /// JoltPhysics underlying XPhysicsSystem object pointer
     pub unsafe fn ptr(&mut self) -> *mut ffi::XPhysicsSystem {
-        return self.0.ptr as *mut ffi::XPhysicsSystem;
+        self.0.ptr as *mut ffi::XPhysicsSystem
     }
 }
