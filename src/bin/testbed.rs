@@ -46,25 +46,22 @@ impl DebugApplication for DebugApplicationImpl {
 }
 
 impl DebugApplicationImpl {
-    fn create_floor(&mut self) -> BodyID {
-        let floor = create_shape_box(&BoxSettings::new(100.0, 2.0, 50.0));
-        let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(floor, Vec3A::new(0.0, -1.0, 0.0), Quat::IDENTITY));
-        return self
-            .body_itf
-            .create_add_body(
-                &BodySettings::new_static(
-                    floor,
-                    PHY_LAYER_STATIC,
-                    Vec3A::new(0.0, 0.0, 50.0),
-                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                ),
-                false,
-            )
-            .unwrap();
+    fn create_floor(&mut self) -> JoltResult<BodyID> {
+        let floor = create_shape_box(&BoxSettings::new(100.0, 2.0, 50.0))?;
+        let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(floor, Vec3A::new(0.0, -1.0, 0.0), Quat::IDENTITY))?;
+        self.body_itf.create_add_body(
+            &BodySettings::new_static(
+                floor,
+                PHY_LAYER_STATIC,
+                Vec3A::new(0.0, 0.0, 50.0),
+                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            ),
+            false,
+        )
     }
 
-    fn create_dynamic_cube(&mut self) -> BodyID {
-        let boxx = create_shape_box(&BoxSettings::new(0.5, 0.5, 0.5));
+    fn create_dynamic_cube(&mut self) -> JoltResult<BodyID> {
+        let boxx = create_shape_box(&BoxSettings::new(0.5, 0.5, 0.5))?;
         let mut bs = BodySettings::new(
             boxx,
             PHY_LAYER_DYNAMIC,
@@ -74,11 +71,11 @@ impl DebugApplicationImpl {
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 10.0;
-        return self.body_itf.create_add_body(&bs, true).unwrap();
+        self.body_itf.create_add_body(&bs, true)
     }
 
-    fn create_dynamic_sphere(&mut self) -> BodyID {
-        let sphere = create_shape_sphere(&SphereSettings::new(0.8));
+    fn create_dynamic_sphere(&mut self) -> JoltResult<BodyID> {
+        let sphere = create_shape_sphere(&SphereSettings::new(0.8))?;
         let mut bs = BodySettings::new(
             sphere,
             PHY_LAYER_DYNAMIC,
@@ -88,11 +85,11 @@ impl DebugApplicationImpl {
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 25.0;
-        return self.body_itf.create_add_body(&bs, true).unwrap();
+        self.body_itf.create_add_body(&bs, true)
     }
 
-    fn create_dynamic_box(&mut self) -> BodyID {
-        let long_box = create_shape_box(&BoxSettings::new(0.5, 1.0, 0.5));
+    fn create_dynamic_box(&mut self) -> JoltResult<BodyID> {
+        let long_box = create_shape_box(&BoxSettings::new(0.5, 1.0, 0.5))?;
         let mut bs = BodySettings::new(
             long_box,
             PHY_LAYER_DYNAMIC,
@@ -102,32 +99,29 @@ impl DebugApplicationImpl {
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 70.0;
-        return self.body_itf.create_add_body(&bs, true).unwrap();
+        self.body_itf.create_add_body(&bs, true)
     }
 
-    fn create_dynamic_convex_hull(&mut self) -> BodyID {
+    fn create_dynamic_convex_hull(&mut self) -> JoltResult<BodyID> {
         let convex = create_shape_convex_hull(&ConvexHullSettings::new(&[
             Vec3A::new(1.0, 1.0, 1.0),
             Vec3A::new(1.0, -1.0, -1.0),
             Vec3A::new(-1.0, -1.0, 1.0),
             Vec3A::new(-1.0, 1.0, -1.0),
-        ]));
-        return self
-            .body_itf
-            .create_add_body(
-                &BodySettings::new(
-                    convex,
-                    PHY_LAYER_DYNAMIC,
-                    MotionType::Dynamic,
-                    Vec3A::new(-4.0, 30.0, 10.0),
-                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                ),
-                true,
-            )
-            .unwrap();
+        ]))?;
+        self.body_itf.create_add_body(
+            &BodySettings::new(
+                convex,
+                PHY_LAYER_DYNAMIC,
+                MotionType::Dynamic,
+                Vec3A::new(-4.0, 30.0, 10.0),
+                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            ),
+            true,
+        )
     }
 
-    fn create_mesh_steps(&mut self) -> BodyID {
+    fn create_mesh_steps(&mut self) -> JoltResult<BodyID> {
         let mut vertices = Vec::new();
         let mut indexes = Vec::new();
         for idx in 0..15 {
@@ -165,22 +159,19 @@ impl DebugApplicationImpl {
             indexes.push(IndexedTriangle::new(idx * 18 + 15, idx * 18 + 16, idx * 18 + 17, 0));
         }
         let settings = MeshSettings::new(&vertices, &indexes);
-        let mesh = create_shape_mesh(&settings);
-        return self
-            .body_itf
-            .create_add_body(
-                &BodySettings::new_static(
-                    mesh,
-                    PHY_LAYER_STATIC,
-                    Vec3A::new(2.0, 1.0, 15.0),
-                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                ),
-                false,
-            )
-            .unwrap();
+        let mesh = create_shape_mesh(&settings)?;
+        self.body_itf.create_add_body(
+            &BodySettings::new_static(
+                mesh,
+                PHY_LAYER_STATIC,
+                Vec3A::new(2.0, 1.0, 15.0),
+                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            ),
+            false,
+        )
     }
 
-    fn create_height_field(&mut self) -> BodyID {
+    fn create_height_field(&mut self) -> JoltResult<BodyID> {
         let mut samples = Vec::new();
         for x in 0..32 {
             for y in 0..32 {
@@ -191,36 +182,30 @@ impl DebugApplicationImpl {
         let mut settings = HeightFieldSettings::new(&samples, 32);
         settings.offset = Vec3A::new(0.0, 0.0, 0.0);
         settings.scale = Vec3A::new(1.0, 1.0, 1.0);
-        let height_field = create_shape_height_field(&settings);
-        return self
-            .body_itf
-            .create_add_body(
-                &BodySettings::new_static(
-                    height_field,
-                    PHY_LAYER_STATIC,
-                    Vec3A::new(-16.0, -5.0, -31.0),
-                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                ),
-                false,
-            )
-            .unwrap();
+        let height_field = create_shape_height_field(&settings)?;
+        self.body_itf.create_add_body(
+            &BodySettings::new_static(
+                height_field,
+                PHY_LAYER_STATIC,
+                Vec3A::new(-16.0, -5.0, -31.0),
+                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            ),
+            false,
+        )
     }
 
-    fn create_sensor_sphere(&mut self) -> BodyID {
-        let sphere = create_shape_sphere(&SphereSettings::new(4.0));
-        return self
-            .body_itf
-            .create_add_body(
-                &BodySettings::new_sensor(
-                    sphere,
-                    PHY_LAYER_STATIC,
-                    MotionType::Static,
-                    Vec3A::new(-10.0, 1.0, 10.0),
-                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-                ),
-                true,
-            )
-            .unwrap();
+    fn create_sensor_sphere(&mut self) -> JoltResult<BodyID> {
+        let sphere = create_shape_sphere(&SphereSettings::new(4.0))?;
+        self.body_itf.create_add_body(
+            &BodySettings::new_sensor(
+                sphere,
+                PHY_LAYER_STATIC,
+                MotionType::Static,
+                Vec3A::new(-10.0, 1.0, 10.0),
+                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            ),
+            true,
+        )
     }
 
     pub fn new() -> Box<dyn DebugApplication> {
@@ -235,23 +220,24 @@ impl DebugApplicationImpl {
             cv_player_body_id: BodyID::invalid(),
         });
 
-        app.create_dynamic_cube();
-        app.create_dynamic_sphere();
-        app.create_dynamic_box();
-        app.create_dynamic_convex_hull();
+        app.create_dynamic_cube().unwrap();
+        app.create_dynamic_sphere().unwrap();
+        app.create_dynamic_box().unwrap();
+        app.create_dynamic_convex_hull().unwrap();
 
-        app.create_floor();
-        app.create_mesh_steps();
-        app.create_height_field();
+        app.create_floor().unwrap();
+        app.create_mesh_steps().unwrap();
+        app.create_height_field().unwrap();
 
-        app.create_sensor_sphere();
+        app.create_sensor_sphere().unwrap();
 
-        let chara_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.35, 0.3));
+        let chara_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.35, 0.3)).unwrap();
         let chara_shape = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
             chara_shape,
             Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
             Quat::IDENTITY,
-        ));
+        ))
+        .unwrap();
 
         // common character
         let mut chara_common = CharacterCommon::new_ex(
@@ -272,12 +258,13 @@ impl DebugApplicationImpl {
             Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
         );
 
-        let target_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.2, 0.25));
+        let target_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.2, 0.25)).unwrap();
         let target_shape = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
             target_shape,
             Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
             Quat::IDENTITY,
-        ));
+        ))
+        .unwrap();
         app.cv_player_body_id = app
             .body_itf
             .create_add_body(
