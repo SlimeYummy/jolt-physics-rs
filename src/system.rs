@@ -4,6 +4,7 @@ use std::mem;
 use std::pin::Pin;
 
 use crate::base::*;
+use crate::error::{JoltError, JoltResult};
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
@@ -138,6 +139,7 @@ pub type AllowedDOFs = ffi::AllowedDOFs;
 pub type OverrideMassProperties = ffi::OverrideMassProperties;
 
 impl From<bool> for ffi::Activation {
+    #[inline]
     fn from(value: bool) -> ffi::Activation {
         if value {
             ffi::Activation::Activate
@@ -236,7 +238,7 @@ impl Default for BodySettings {
             inertia_multiplier: 1.0,
             mass_properties: MassProperties::default(),
             _shape_settings: 0,
-            shape: RefShape::default(),
+            shape: RefShape::invalid(),
         }
     }
 }
@@ -277,10 +279,12 @@ impl BodySettings {
     }
 }
 
+#[inline]
 pub fn global_initialize() {
     ffi::GlobalInitialize();
 }
 
+#[inline]
 pub fn global_finalize() {
     ffi::GlobalFinalize();
 }
@@ -298,49 +302,59 @@ impl PhysicsSystem {
     pub fn new() -> Box<PhysicsSystem> {
         let mut system = Box::new(PhysicsSystem {
             contacts: XContactCollector::new(256, 128),
-            system: RefPhysicsSystem::default(),
+            system: RefPhysicsSystem::invalid(),
         });
         system.system = RefPhysicsSystem(unsafe { ffi::CreatePhysicSystem(&mut system.contacts) });
         system
     }
 
+    #[inline]
     pub fn inner_ref(&self) -> &RefPhysicsSystem {
         &self.system
     }
 
+    #[inline]
     fn system(&self) -> &ffi::XPhysicsSystem {
         return self.system.as_ref().unwrap();
     }
 
+    #[inline]
     fn system_mut(&mut self) -> Pin<&mut ffi::XPhysicsSystem> {
         return unsafe { Pin::new_unchecked(self.system.as_mut().unwrap()) };
     }
 
+    #[inline]
     pub(crate) fn system_ptr(&mut self) -> *mut ffi::XPhysicsSystem {
         unsafe { self.system.ptr() }
     }
 
+    #[inline]
     pub fn body_interface(&mut self, lock: bool) -> BodyInterface {
         BodyInterface::new(self, lock)
     }
 
+    #[inline]
     pub fn prepare(&mut self) {
         return self.system_mut().Prepare();
     }
 
+    #[inline]
     pub fn update(&mut self, delta: f32) -> u32 {
         self.contacts.clear();
         return self.system_mut().Update(delta);
     }
 
+    #[inline]
     pub fn get_gravity(&self) -> Vec3A {
         return self.system().GetGravity().0;
     }
 
+    #[inline]
     pub fn hit_events(&self) -> &Vec<HitEvent> {
         &self.contacts.hit_events
     }
 
+    #[inline]
     pub fn sensor_events(&self) -> &Vec<SensorEvent> {
         &self.contacts.sensor_events
     }
@@ -425,88 +439,103 @@ impl BodyInterface {
         }
     }
 
+    #[inline]
     fn as_ref(&self) -> &ffi::XBodyInterface {
         unsafe { &*self.body_itf }
     }
 
+    #[inline]
     fn as_mut(&mut self) -> Pin<&mut ffi::XBodyInterface> {
         unsafe { Pin::new_unchecked(&mut *self.body_itf) }
     }
 
-    pub fn create_body(&mut self, settings: &BodySettings) -> Option<BodyID> {
+    pub fn create_body(&mut self, settings: &BodySettings) -> JoltResult<BodyID> {
         let body_id = self
             .as_mut()
             .CreateBody(unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) });
         if body_id.is_invalid() {
-            return None;
+            return Err(JoltError::CreateBody);
         }
-        Some(body_id)
+        Ok(body_id)
     }
 
-    pub fn create_add_body(&mut self, settings: &BodySettings, active: bool) -> Option<BodyID> {
+    pub fn create_add_body(&mut self, settings: &BodySettings, active: bool) -> JoltResult<BodyID> {
         let body_id = self.as_mut().CreateAddBody(
             unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) },
             active.into(),
         );
         if body_id.is_invalid() {
-            return None;
+            return Err(JoltError::CreateBody);
         }
-        Some(body_id)
+        Ok(body_id)
     }
 
+    #[inline]
     pub fn add_body(&mut self, body_id: BodyID, active: bool) {
         return self.as_mut().AddBody(&body_id, active.into());
     }
 
+    #[inline]
     pub fn set_object_layer(&mut self, body_id: BodyID, layer: u16) {
         return self.as_mut().SetObjectLayer(&body_id, layer);
     }
 
+    #[inline]
     pub fn get_object_layer(&self, body_id: BodyID) -> u16 {
         return self.as_ref().GetObjectLayer(&body_id);
     }
 
+    #[inline]
     pub fn set_position_rotation(&mut self, body_id: BodyID, position: Vec3A, rotation: Quat, active: bool) {
         return self
             .as_mut()
             .SetPositionAndRotation(&body_id, position.into(), rotation.into(), active.into());
     }
 
+    #[inline]
     pub fn set_position_rotation_when_changed(&mut self, body_id: BodyID, position: Vec3A, rotation: Quat, active: bool) {
         return self
             .as_mut()
             .SetPositionAndRotationWhenChanged(&body_id, position.into(), rotation.into(), active.into());
     }
 
+    #[inline]
     pub fn get_position_rotation(&self, body_id: BodyID) -> (Vec3A, Quat) {
         let isometry = self.as_ref().GetPositionAndRotation(&body_id);
         (isometry.position, isometry.rotation)
     }
 
+    #[inline]
     pub fn set_position(&mut self, body_id: BodyID, position: Vec3A, active: bool) {
         return self.as_mut().SetPosition(&body_id, position.into(), active.into());
     }
 
+    #[inline]
     pub fn get_position(&self, body_id: BodyID) -> Vec3A {
         return self.as_ref().GetPosition(&body_id).0;
     }
 
+    #[inline]
     pub fn get_center_of_mass_position(&self, body_id: BodyID) -> Vec3A {
         return self.as_ref().GetCenterOfMassPosition(&body_id).0;
     }
 
+    #[inline]
     pub fn set_rotation(&mut self, body_id: BodyID, rotation: Quat, active: bool) {
         return self.as_mut().SetRotation(&body_id, rotation.into(), active.into());
     }
 
+    #[inline]
     pub fn get_rotation(&self, body_id: BodyID) -> Quat {
         return self.as_ref().GetRotation(&body_id).0;
     }
 
+    #[inline]
     pub fn get_world_transform(&self, body_id: BodyID) -> Mat4 {
         return self.as_ref().GetWorldTransform(&body_id).0;
     }
 
+    #[inline]
     pub fn get_center_of_mass_transform(&self, body_id: BodyID) -> Mat4 {
         return self.as_ref().GetCenterOfMassTransform(&body_id).0;
     }
