@@ -31,7 +31,7 @@ const LAYER_BODY_FRIEND_MASK: u32 = bit(PHY_LAYER_STATIC) | bit(PHY_LAYER_DYNAMI
 const LAYER_BODY_ENEMY_MASK: u32 = bit(PHY_LAYER_STATIC) | bit(PHY_LAYER_DYNAMIC) | bit(PHY_LAYER_BODY_PLAYER) | bit(PHY_LAYER_BODY_ALLY);
 
 const fn bit(layer: u16) -> u32 {
-    return 1 << (layer >> 8);
+    1 << (layer >> 8)
 }
 
 fn rs_obj_obj_layer_filter(obj1: u16, obj2: u16) -> bool {
@@ -44,7 +44,7 @@ fn rs_obj_obj_layer_filter(obj1: u16, obj2: u16) -> bool {
     let low1 = obj1 & 0x00FF;
     let high2 = obj2 & 0xFF00;
     let low2 = obj2 & 0x00FF;
-    return match high1 {
+    match high1 {
         PHY_LAYER_STATIC => LAYER_STATIC_MASK & bit(high2) != 0,
         PHY_LAYER_DYNAMIC => LAYER_DYNAMIC_MASK & bit(high2) != 0,
         PHY_LAYER_BODY_PLAYER => LAYER_BODY_PLAYER_MASK & bit(high2) != 0,
@@ -65,7 +65,7 @@ fn rs_obj_obj_layer_filter(obj1: u16, obj2: u16) -> bool {
         PHY_LAYER_TARGET => (high2 == PHY_LAYER_HIT) & (low1 & low2 != 0),
         PHY_LAYER_HIT => (high2 == PHY_LAYER_TARGET) & (low1 & low2 != 0),
         _ => false,
-    };
+    }
 }
 
 const PHY_BP_LAYER_STATIC: u8 = 0x00;

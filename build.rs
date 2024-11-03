@@ -25,7 +25,7 @@ fn main() {
         .static_crt(false)
         .files(&cpp_file)
         .include("./JoltPhysics")
-        .files(&list_source_files("./JoltPhysics/Jolt"))
+        .files(list_source_files("./JoltPhysics/Jolt"))
         .define("JPH_DISABLE_CUSTOM_ALLOCATOR", "1")
         .define("NDEBUG", "1")
         .define("JPH_USE_SSE4_1", "1")
@@ -52,7 +52,7 @@ fn main() {
 
     if is_windows && is_debug_renderer {
         cxx.include("./JoltPhysics/TestFramework")
-            .files(&list_source_files("./JoltPhysics/TestFramework"))
+            .files(list_source_files("./JoltPhysics/TestFramework"))
             .define("JPH_DEBUG_RENDERER", "1");
     }
 
@@ -100,5 +100,5 @@ fn list_source_files<P: AsRef<Path>>(dir: P) -> Vec<String> {
             files.extend(list_source_files(path));
         }
     }
-    return files;
+    files
 }

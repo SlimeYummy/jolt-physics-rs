@@ -139,11 +139,11 @@ pub type OverrideMassProperties = ffi::OverrideMassProperties;
 
 impl From<bool> for ffi::Activation {
     fn from(value: bool) -> ffi::Activation {
-        return if value {
+        if value {
             ffi::Activation::Activate
         } else {
             ffi::Activation::DontActivate
-        };
+        }
     }
 }
 
@@ -158,11 +158,11 @@ const_assert_eq!(mem::size_of::<CollisionGroup>(), 16);
 
 impl Default for CollisionGroup {
     fn default() -> CollisionGroup {
-        return CollisionGroup {
+        CollisionGroup {
             _group_filter: 0,
             _group_id: 0xFFFF_FFFF,
             _sub_group_id: 0xFFFF_FFFF,
-        };
+        }
     }
 }
 
@@ -209,7 +209,7 @@ const_assert_eq!(mem::size_of::<BodySettings>(), 240);
 
 impl Default for BodySettings {
     fn default() -> BodySettings {
-        return BodySettings {
+        BodySettings {
             position: Vec3A::ZERO,
             rotation: Quat::IDENTITY,
             linear_velocity: Vec3A::ZERO,
@@ -237,35 +237,35 @@ impl Default for BodySettings {
             mass_properties: MassProperties::default(),
             _shape_settings: 0,
             shape: RefShape::default(),
-        };
+        }
     }
 }
 
 impl BodySettings {
     pub fn new(shape: RefShape, layer: u16, motion_type: MotionType, position: Vec3A, rotation: Quat) -> BodySettings {
-        return BodySettings {
+        BodySettings {
             position,
             rotation,
             object_layer: layer,
             motion_type,
             shape,
             ..Default::default()
-        };
+        }
     }
 
     pub fn new_static(shape: RefShape, layer: u16, position: Vec3A, rotation: Quat) -> BodySettings {
-        return BodySettings {
+        BodySettings {
             position,
             rotation,
             object_layer: layer,
             motion_type: MotionType::Static,
             shape,
             ..Default::default()
-        };
+        }
     }
 
     pub fn new_sensor(shape: RefShape, layer: u16, motion_type: MotionType, position: Vec3A, rotation: Quat) -> BodySettings {
-        return BodySettings {
+        BodySettings {
             position,
             rotation,
             object_layer: layer,
@@ -273,7 +273,7 @@ impl BodySettings {
             is_sensor: true,
             shape,
             ..Default::default()
-        };
+        }
     }
 }
 
@@ -301,11 +301,11 @@ impl PhysicsSystem {
             system: RefPhysicsSystem::default(),
         });
         system.system = RefPhysicsSystem(unsafe { ffi::CreatePhysicSystem(&mut system.contacts) });
-        return system;
+        system
     }
 
     pub fn inner_ref(&self) -> &RefPhysicsSystem {
-        return &self.system;
+        &self.system
     }
 
     fn system(&self) -> &ffi::XPhysicsSystem {
@@ -317,11 +317,11 @@ impl PhysicsSystem {
     }
 
     pub(crate) fn system_ptr(&mut self) -> *mut ffi::XPhysicsSystem {
-        return unsafe { self.system.ptr() };
+        unsafe { self.system.ptr() }
     }
 
     pub fn body_interface(&mut self, lock: bool) -> BodyInterface {
-        return BodyInterface::new(self, lock);
+        BodyInterface::new(self, lock)
     }
 
     pub fn prepare(&mut self) {
@@ -338,11 +338,11 @@ impl PhysicsSystem {
     }
 
     pub fn hit_events(&self) -> &Vec<HitEvent> {
-        return &self.contacts.hit_events;
+        &self.contacts.hit_events
     }
 
     pub fn sensor_events(&self) -> &Vec<SensorEvent> {
-        return &self.contacts.sensor_events;
+        &self.contacts.sensor_events
     }
 }
 
@@ -361,10 +361,10 @@ pub struct XContactCollector {
 
 impl XContactCollector {
     fn new(hit_cap: usize, sensor_cap: usize) -> XContactCollector {
-        return XContactCollector {
+        XContactCollector {
             hit_events: Vec::with_capacity(hit_cap),
             sensor_events: Vec::with_capacity(sensor_cap),
-        };
+        }
     }
 
     fn clear(&mut self) {
@@ -419,34 +419,39 @@ pub struct BodyInterface {
 
 impl BodyInterface {
     pub fn new(system: &mut PhysicsSystem, lock: bool) -> BodyInterface {
-        return BodyInterface {
+        BodyInterface {
             body_itf: unsafe { ffi::CreateBodyInterface(system.system_ptr(), lock) },
             _system: system.system.clone(),
-        };
+        }
     }
 
     fn as_ref(&self) -> &ffi::XBodyInterface {
-        return unsafe { &*self.body_itf };
+        unsafe { &*self.body_itf }
     }
 
     fn as_mut(&mut self) -> Pin<&mut ffi::XBodyInterface> {
-        return unsafe { Pin::new_unchecked(&mut *self.body_itf) };
+        unsafe { Pin::new_unchecked(&mut *self.body_itf) }
     }
 
     pub fn create_body(&mut self, settings: &BodySettings) -> Option<BodyID> {
-        let body_id = self.as_mut().CreateBody(unsafe { mem::transmute(settings) });
+        let body_id = self
+            .as_mut()
+            .CreateBody(unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) });
         if body_id.is_invalid() {
             return None;
         }
-        return Some(body_id);
+        Some(body_id)
     }
 
     pub fn create_add_body(&mut self, settings: &BodySettings, active: bool) -> Option<BodyID> {
-        let body_id = self.as_mut().CreateAddBody(unsafe { mem::transmute(settings) }, active.into());
+        let body_id = self.as_mut().CreateAddBody(
+            unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) },
+            active.into(),
+        );
         if body_id.is_invalid() {
             return None;
         }
-        return Some(body_id);
+        Some(body_id)
     }
 
     pub fn add_body(&mut self, body_id: BodyID, active: bool) {
@@ -475,7 +480,7 @@ impl BodyInterface {
 
     pub fn get_position_rotation(&self, body_id: BodyID) -> (Vec3A, Quat) {
         let isometry = self.as_ref().GetPositionAndRotation(&body_id);
-        return (isometry.position, isometry.rotation);
+        (isometry.position, isometry.rotation)
     }
 
     pub fn set_position(&mut self, body_id: BodyID, position: Vec3A, active: bool) {
