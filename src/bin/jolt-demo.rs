@@ -1,14 +1,9 @@
+use crate::keys::*;
 use glam::{Quat, Vec3, Vec3A};
 use jolt_physics_rs::*;
 
 // const FPS: f32 = 60.0;
-const FPS: f32 = 144.0;
-
-const KEY_UP: i32 = 0xC8;
-const KEY_LEFT: i32 = 0xCB;
-const KEY_DOWN: i32 = 0xD0;
-const KEY_RIGHT: i32 = 0xCD;
-const KEY_SPACE: i32 = 0x39;
+const FPS: f32 = 120.0;
 
 struct DebugApplicationImpl {
     system: Box<PhysicsSystem>,
@@ -20,13 +15,18 @@ struct DebugApplicationImpl {
 }
 
 impl DebugApplication for DebugApplicationImpl {
-    fn get_ref_system(&mut self) -> RefPhysicsSystem {
+    fn get_physics_system(&mut self) -> RefPhysicsSystem {
         return self.system.inner_ref().clone();
     }
 
-    fn render_frame(&mut self, delta: f32, keyboard: &mut DebugKeyboard, camera: &CameraState) -> bool {
-        self.update(delta, keyboard, camera);
+    fn update_frame(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) -> bool {
+        self.update(delta, camera, mouse, keyboard);
         return true;
+    }
+
+    fn get_initial_camera(&self, state: &mut CameraState) {
+        state.pos = Vec3A::ZERO;
+        state.forward = Vec3A::new(10.0, -2.0, 0.0).normalize();
     }
 
     fn get_camera_pivot(&self, heading: f32, pitch: f32) -> Vec3A {
@@ -174,7 +174,7 @@ impl DebugApplicationImpl {
     fn create_height_field(&mut self) -> JoltResult<BodyID> {
         let mut samples = Vec::new();
         for x in 0..32 {
-            for y in 0..32 {
+            for _y in 0..32 {
                 let z = ((x as f32) % 16.0 - 8.0).abs();
                 samples.push(z);
             }
@@ -286,20 +286,20 @@ impl DebugApplicationImpl {
         return app;
     }
 
-    fn update(&mut self, delta: f32, keyboard: &mut DebugKeyboard, camera: &CameraState) {
-        let jump = keyboard.is_key_pressed(KEY_SPACE);
+    fn update(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) {
+        let jump = keyboard.is_key_pressed(DIK_SPACE);
 
         let mut move_dir = Vec3A::ZERO;
-        if keyboard.is_key_pressed(KEY_UP) {
+        if keyboard.is_key_pressed(DIK_W) {
             move_dir.x += 1.0;
         }
-        if keyboard.is_key_pressed(KEY_DOWN) {
+        if keyboard.is_key_pressed(DIK_S) {
             move_dir.x += -1.0;
         }
-        if keyboard.is_key_pressed(KEY_LEFT) {
+        if keyboard.is_key_pressed(DIK_A) {
             move_dir.z += -1.0;
         }
-        if keyboard.is_key_pressed(KEY_RIGHT) {
+        if keyboard.is_key_pressed(DIK_D) {
             move_dir.z += 1.0;
         }
         move_dir = move_dir.normalize_or_zero();
@@ -324,7 +324,7 @@ impl DebugApplicationImpl {
         // }
 
         if let Some(chara) = &mut self.chara_virtual {
-            let mut new_velocity = Vec3A::ZERO;
+            let mut new_velocity;
             chara.update_ground_velocity();
             let ground_velocity = chara.get_ground_velocity();
             let linear_velocity = chara.get_linear_velocity();
@@ -369,5 +369,6 @@ impl DebugApplicationImpl {
 
 fn main() {
     global_initialize();
-    run_debug_application(DebugApplicationImpl::new);
+    let demo_app = DebugApplicationImpl::new();
+    run_debug_application(demo_app);
 }
