@@ -15,8 +15,15 @@ fn main() {
     }
 
     let mut cpp_file = vec!["src/shape.cpp", "src/system.cpp", "src/character.cpp"];
+    println!("cargo:rerun-if-changed=src/ffi.h");
+    println!("cargo:rerun-if-changed=src/shape.cpp");
+    println!("cargo:rerun-if-changed=src/system.cpp");
+    println!("cargo:rerun-if-changed=src/character.cpp");
+
     if is_windows && is_debug_renderer {
         cpp_file.push("src/debug.cpp");
+        println!("cargo:rerun-if-changed=src/debug.h");
+        println!("cargo:rerun-if-changed=src/debug.cpp");
     }
 
     let mut cxx = cxx_build::bridges(&rs_file);
