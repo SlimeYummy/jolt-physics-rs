@@ -15,7 +15,13 @@ pub(crate) mod ffi {
         #[cxx_name = "GetPhysicsSystem"]
         unsafe fn get_physics_system(self: &mut XDebugApp) -> *mut XPhysicsSystem;
         #[cxx_name = "UpdateFrame"]
-        unsafe fn update_frame(self: &mut XDebugApp, delta: f32, camera: &CameraState, mouse: *mut Mouse, keyboard: *mut Keyboard) -> bool;
+        unsafe fn update_frame(
+            self: &mut XDebugApp,
+            delta: f32,
+            camera: &CameraState,
+            mouse: *mut Mouse,
+            keyboard: *mut Keyboard,
+        ) -> bool;
         #[cxx_name = "GetInitialCamera"]
         unsafe fn get_initial_camera(self: &mut XDebugApp, state: *mut CameraState);
         #[cxx_name = "GetCameraPivot"]
@@ -69,7 +75,7 @@ pub struct DebugKeyboard(pub(crate) *mut ffi::Keyboard);
 
 impl DebugKeyboard {
     pub fn is_key_pressed(&self, key: i32) -> bool {
-        return unsafe { (&*self.0).IsKeyPressed(key) };
+        unsafe { (&*self.0).IsKeyPressed(key) }
     }
 }
 
@@ -78,45 +84,51 @@ pub struct DebugMouse(pub(crate) *mut ffi::Mouse);
 
 impl DebugMouse {
     pub fn get_x(&self) -> i32 {
-        return unsafe { (&*self.0).GetX() };
+        unsafe { (&*self.0).GetX() }
     }
 
     pub fn get_y(&self) -> i32 {
-        return unsafe { (&*self.0).GetY() };
+        unsafe { (&*self.0).GetY() }
     }
 
     pub fn get_dx(&self) -> i32 {
-        return unsafe { (&*self.0).GetDX() };
+        unsafe { (&*self.0).GetDX() }
     }
 
     pub fn get_dy(&self) -> i32 {
-        return unsafe { (&*self.0).GetDY() };
+        unsafe { (&*self.0).GetDY() }
     }
 
     pub fn is_left_pressed(&self) -> bool {
-        return unsafe { (&*self.0).IsLeftPressed() };
+        unsafe { (&*self.0).IsLeftPressed() }
     }
 
     pub fn is_right_pressed(&self) -> bool {
-        return unsafe { (&*self.0).IsRightPressed() };
+        unsafe { (&*self.0).IsRightPressed() }
     }
 
     pub fn is_middle_pressed(&self) -> bool {
-        return unsafe { (&*self.0).IsMiddlePressed() };
+        unsafe { (&*self.0).IsMiddlePressed() }
     }
 }
 
-pub struct XDebugApp(Box<dyn DebugApplication>);
+pub struct XDebugApp(Box<dyn DebugApp>);
 
 impl XDebugApp {
     pub fn get_physics_system(&mut self) -> *mut ffi::XPhysicsSystem {
-        return unsafe { self.0.as_mut().get_physics_system().ptr() };
+        unsafe { self.0.as_mut().get_physics_system().ptr() }
     }
 
-    fn update_frame(&mut self, delta: f32, camera: &CameraState, mouse: *mut ffi::Mouse, keyboard: *mut ffi::Keyboard) -> bool {
+    fn update_frame(
+        &mut self,
+        delta: f32,
+        camera: &CameraState,
+        mouse: *mut ffi::Mouse,
+        keyboard: *mut ffi::Keyboard,
+    ) -> bool {
         let mut mouse = DebugMouse(mouse);
         let mut keyboard = DebugKeyboard(keyboard);
-        return self.0.update_frame(delta, camera, &mut mouse, &mut keyboard);
+        self.0.update_frame(delta, camera, &mut mouse, &mut keyboard)
     }
 
     fn get_initial_camera(&self, state: *mut ffi::CameraState) {
@@ -124,18 +136,24 @@ impl XDebugApp {
     }
 
     fn get_camera_pivot(&self, heading: f32, pitch: f32) -> XVec3 {
-        return self.0.get_camera_pivot(heading, pitch).into();
+        self.0.get_camera_pivot(heading, pitch).into()
     }
 }
 
-pub trait DebugApplication {
+pub trait DebugApp {
     fn get_physics_system(&mut self) -> RefPhysicsSystem;
-    fn update_frame(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) -> bool;
+    fn update_frame(
+        &mut self,
+        delta: f32,
+        camera: &CameraState,
+        mouse: &mut DebugMouse,
+        keyboard: &mut DebugKeyboard,
+    ) -> bool;
     fn get_initial_camera(&self, state: &mut CameraState);
     fn get_camera_pivot(&self, heading: f32, pitch: f32) -> Vec3A;
 }
 
-pub fn run_debug_application(dbg_app: Box<dyn DebugApplication>) {
+pub fn run_debug_application(dbg_app: Box<dyn DebugApp>) {
     let rs_app = Box::new(XDebugApp(dbg_app));
     ffi::RunDebugApplication(rs_app);
 }

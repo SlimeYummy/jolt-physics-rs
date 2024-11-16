@@ -164,7 +164,11 @@ unsafe impl ExternType for Transform {
 impl Transform {
     #[inline]
     pub fn new(position: Vec3A, rotation: Quat, scale: Vec3A) -> Transform {
-        Transform { position, rotation, scale }
+        Transform {
+            position,
+            rotation,
+            scale,
+        }
     }
 }
 
@@ -308,7 +312,9 @@ impl Drop for RefShape {
 impl RefShape {
     #[inline]
     pub fn invalid() -> RefShape {
-        RefShape(ffi::XRefShape { ptr: std::ptr::null_mut() })
+        RefShape(ffi::XRefShape {
+            ptr: std::ptr::null_mut(),
+        })
     }
 
     #[inline]
@@ -381,7 +387,9 @@ impl Drop for RefPhysicsMaterial {
 impl RefPhysicsMaterial {
     #[inline]
     pub fn invalid() -> RefPhysicsMaterial {
-        RefPhysicsMaterial(ffi::XRefPhysicsMaterial { ptr: std::ptr::null_mut() })
+        RefPhysicsMaterial(ffi::XRefPhysicsMaterial {
+            ptr: std::ptr::null_mut(),
+        })
     }
 
     #[inline]
@@ -452,7 +460,9 @@ impl Drop for RefPhysicsSystem {
 impl RefPhysicsSystem {
     #[inline]
     pub fn invalid() -> RefPhysicsSystem {
-        RefPhysicsSystem(ffi::XRefPhysicsSystem { ptr: std::ptr::null_mut() })
+        RefPhysicsSystem(ffi::XRefPhysicsSystem {
+            ptr: std::ptr::null_mut(),
+        })
     }
 
     #[inline]
