@@ -91,7 +91,7 @@ static_assert(sizeof(Float3) == 12, "Float3 size");
 struct Int3 { int32_t x, y, z; };
 static_assert(sizeof(Int3) == 12, "Int3 size");
 static_assert(sizeof(Plane) == 16, "Plane size");
-static_assert(sizeof(IndexedTriangle) == 16, "Int4 size");
+static_assert(sizeof(IndexedTriangle) == 20, "IndexedTriangle size");
 
 static_assert(sizeof(BodyID) == 4, "BodyID size");
 static_assert(sizeof(SubShapeID) == 4, "SubShapeID size");
