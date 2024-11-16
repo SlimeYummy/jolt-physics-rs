@@ -341,6 +341,6 @@ unique_ptr<XCharacterVirtual> CreateCharacterVirtual(
 
 #if defined(JPH_DEBUG_RENDERER)
 
-struct XDebugApplication;
-void RunDebugApplication(rust::Box<XDebugApplication> rs_app);
+struct XDebugApp;
+void RunDebugApplication(rust::Box<XDebugApp> rs_app);
 #endif
