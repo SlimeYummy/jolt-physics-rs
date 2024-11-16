@@ -158,11 +158,11 @@ void DebugApp::Run() {
                 } else if (key == DIK_F2) {
                     mSingleStep = true;
                 } else if (key == DIK_F3) {
-                    mCursorVisible ? mMouse->HideCursor() : mMouse->ShowCursor();
-                    mCursorVisible = !mCursorVisible;
-                } else if (key == DIK_F4) {
                     // Dump timing info to file
                     JPH_PROFILE_DUMP();
+                } else if (key == DIK_F4) {
+                    mCursorVisible ? mMouse->HideCursor() : mMouse->ShowCursor();
+                    mCursorVisible = !mCursorVisible;
                 } else if (key == DIK_ESCAPE) {
                     mDebugUI->ToggleVisibility();
                 }
