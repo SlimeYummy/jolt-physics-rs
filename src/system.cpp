@@ -2,7 +2,7 @@
 #include "jolt-physics-rs/src/shape.rs.h"
 #include "jolt-physics-rs/src/system.rs.h"
 
-static_assert(sizeof(BodyCreationSettings) == 240, "BodyCreationSettings size");
+static_assert(sizeof(BodyCreationSettings) == 256, "BodyCreationSettings size");
 static_assert(sizeof(CollisionGroup) == 16, "CollisionGroup size");
 static_assert(sizeof(MassProperties) == 80, "MassProperties size");
 

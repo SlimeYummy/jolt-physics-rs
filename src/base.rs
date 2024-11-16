@@ -211,8 +211,9 @@ impl Plane {
 pub struct IndexedTriangle {
     pub idx: [u32; 3],
     pub material_index: u32,
+    pub user_data: u32,
 }
-const_assert_eq!(mem::size_of::<IndexedTriangle>(), 16);
+const_assert_eq!(mem::size_of::<IndexedTriangle>(), 20);
 
 unsafe impl ExternType for IndexedTriangle {
     type Id = type_id!("IndexedTriangle");
@@ -225,6 +226,7 @@ impl IndexedTriangle {
         IndexedTriangle {
             idx: [idx1, idx2, idx3],
             material_index,
+            user_data: 0,
         }
     }
 }
