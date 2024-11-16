@@ -16,6 +16,8 @@ pub use system::*;
 
 #[cfg(all(windows, feature = "debug-renderer"))]
 mod debug;
+#[cfg(all(windows, feature = "debug-renderer"))]
+pub mod keys;
 
 #[cfg(all(windows, feature = "debug-renderer"))]
 pub use debug::*;

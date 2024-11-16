@@ -10,17 +10,19 @@ assert_cfg!(windows, "Debug rendering is only supported on Windows");
 #[cxx::bridge()]
 pub(crate) mod ffi {
     extern "Rust" {
-        type XDebugApplication;
+        type XDebugApp;
 
-        #[cxx_name = "Initialize"]
-        unsafe fn initialize(self: &mut XDebugApplication) -> *mut XPhysicsSystem;
-        #[cxx_name = "RenderFrame"]
-        unsafe fn render_frame(self: &mut XDebugApplication, delta: f32, camera: &CameraState, keyboard: *mut Keyboard) -> bool;
+        #[cxx_name = "GetPhysicsSystem"]
+        unsafe fn get_physics_system(self: &mut XDebugApp) -> *mut XPhysicsSystem;
+        #[cxx_name = "UpdateFrame"]
+        unsafe fn update_frame(self: &mut XDebugApp, delta: f32, camera: &CameraState, mouse: *mut Mouse, keyboard: *mut Keyboard) -> bool;
+        #[cxx_name = "GetInitialCamera"]
+        unsafe fn get_initial_camera(self: &mut XDebugApp, state: *mut CameraState);
         #[cxx_name = "GetCameraPivot"]
-        fn get_camera_pivot(self: &XDebugApplication, heading: f32, pitch: f32) -> Vec3;
+        fn get_camera_pivot(self: &XDebugApp, heading: f32, pitch: f32) -> Vec3;
     }
 
-    extern "C++" {
+    unsafe extern "C++" {
         include!("rust/cxx.h");
         include!("jolt-physics-rs/src/ffi.h");
 
@@ -31,9 +33,18 @@ pub(crate) mod ffi {
         type CameraState = crate::debug::CameraState;
 
         type Keyboard;
-        unsafe fn IsKeyPressed(self: &Keyboard, inKey: i32) -> bool;
+        fn IsKeyPressed(self: &Keyboard, key: i32) -> bool;
 
-        unsafe fn RunDebugApplication(rs_app: Box<XDebugApplication>);
+        type Mouse;
+        fn GetX(self: &Mouse) -> i32;
+        fn GetY(self: &Mouse) -> i32;
+        fn GetDX(self: &Mouse) -> i32;
+        fn GetDY(self: &Mouse) -> i32;
+        fn IsLeftPressed(self: &Mouse) -> bool;
+        fn IsRightPressed(self: &Mouse) -> bool;
+        fn IsMiddlePressed(self: &Mouse) -> bool;
+
+        fn RunDebugApplication(rs_app: Box<XDebugApp>);
     }
 }
 
@@ -62,44 +73,69 @@ impl DebugKeyboard {
     }
 }
 
-pub struct XDebugApplication {
-    creator: fn() -> Box<dyn DebugApplication>,
-    app: Option<Box<dyn DebugApplication>>,
+#[derive(PartialEq)]
+pub struct DebugMouse(pub(crate) *mut ffi::Mouse);
+
+impl DebugMouse {
+    pub fn get_x(&self) -> i32 {
+        return unsafe { (&*self.0).GetX() };
+    }
+
+    pub fn get_y(&self) -> i32 {
+        return unsafe { (&*self.0).GetY() };
+    }
+
+    pub fn get_dx(&self) -> i32 {
+        return unsafe { (&*self.0).GetDX() };
+    }
+
+    pub fn get_dy(&self) -> i32 {
+        return unsafe { (&*self.0).GetDY() };
+    }
+
+    pub fn is_left_pressed(&self) -> bool {
+        return unsafe { (&*self.0).IsLeftPressed() };
+    }
+
+    pub fn is_right_pressed(&self) -> bool {
+        return unsafe { (&*self.0).IsRightPressed() };
+    }
+
+    pub fn is_middle_pressed(&self) -> bool {
+        return unsafe { (&*self.0).IsMiddlePressed() };
+    }
 }
 
-impl XDebugApplication {
-    pub fn new(creator: fn() -> Box<dyn DebugApplication>) -> Self {
-        return Self { creator, app: None };
+pub struct XDebugApp(Box<dyn DebugApplication>);
+
+impl XDebugApp {
+    pub fn get_physics_system(&mut self) -> *mut ffi::XPhysicsSystem {
+        return unsafe { self.0.as_mut().get_physics_system().ptr() };
     }
 
-    pub fn initialize(&mut self) -> *mut ffi::XPhysicsSystem {
-        self.app = Some((self.creator)());
-        return unsafe { self.app.as_mut().unwrap().get_ref_system().ptr() };
+    fn update_frame(&mut self, delta: f32, camera: &CameraState, mouse: *mut ffi::Mouse, keyboard: *mut ffi::Keyboard) -> bool {
+        let mut mouse = DebugMouse(mouse);
+        let mut keyboard = DebugKeyboard(keyboard);
+        return self.0.update_frame(delta, camera, &mut mouse, &mut keyboard);
     }
 
-    fn render_frame(&mut self, delta: f32, camera: &CameraState, keyboard: *mut ffi::Keyboard) -> bool {
-        if let Some(app) = &mut self.app {
-            let mut keyboard = DebugKeyboard(keyboard);
-            return app.render_frame(delta, &mut keyboard, camera);
-        }
-        return false;
+    fn get_initial_camera(&self, state: *mut ffi::CameraState) {
+        unsafe { self.0.get_initial_camera(&mut *state) };
     }
 
     fn get_camera_pivot(&self, heading: f32, pitch: f32) -> XVec3 {
-        if let Some(app) = &self.app {
-            return app.get_camera_pivot(heading, pitch).into();
-        }
-        return Vec3A::new(0.0, 0.0, 0.0).into();
+        return self.0.get_camera_pivot(heading, pitch).into();
     }
 }
 
 pub trait DebugApplication {
-    fn get_ref_system(&mut self) -> RefPhysicsSystem;
-    fn render_frame(&mut self, delta: f32, keyboard: &mut DebugKeyboard, camera: &CameraState) -> bool;
+    fn get_physics_system(&mut self) -> RefPhysicsSystem;
+    fn update_frame(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) -> bool;
+    fn get_initial_camera(&self, state: &mut CameraState);
     fn get_camera_pivot(&self, heading: f32, pitch: f32) -> Vec3A;
 }
 
-pub fn run_debug_application(creator: fn() -> Box<dyn DebugApplication>) {
-    let rs_app = Box::new(XDebugApplication { creator, app: None });
-    unsafe { ffi::RunDebugApplication(rs_app) };
+pub fn run_debug_application(dbg_app: Box<dyn DebugApplication>) {
+    let rs_app = Box::new(XDebugApp(dbg_app));
+    ffi::RunDebugApplication(rs_app);
 }
