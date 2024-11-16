@@ -190,9 +190,11 @@ pub struct BodySettings {
     pub allowed_dofs: AllowedDOFs,
     pub allow_dynamic_kinematic: bool,
     pub is_sensor: bool,
-    pub sensor_detects_static: bool,
+    pub collide_kinematic_vs_non_dynamic: bool,
     pub use_manifold_reduction: bool,
+    pub apply_gyroscopic_force: bool,
     pub motion_quality: MotionQuality,
+    pub enhance_internal_edge_removal: bool,
     pub allow_sleeping: bool,
     pub friction: f32,
     pub restitution: f32,
@@ -201,13 +203,15 @@ pub struct BodySettings {
     pub max_linear_velocity: f32,
     pub max_angular_velocity: f32,
     pub gravity_factor: f32,
+    pub num_velocity_steps_override: u32,
+    pub num_position_steps_override: u32,
     pub override_mass_properties: OverrideMassProperties,
     pub inertia_multiplier: f32,
     pub mass_properties: MassProperties,
     _shape_settings: usize,
     pub shape: RefShape,
 }
-const_assert_eq!(mem::size_of::<BodySettings>(), 240);
+const_assert_eq!(mem::size_of::<BodySettings>(), 256);
 
 impl Default for BodySettings {
     fn default() -> BodySettings {
@@ -223,9 +227,11 @@ impl Default for BodySettings {
             allowed_dofs: AllowedDOFs::All,
             allow_dynamic_kinematic: false,
             is_sensor: false,
-            sensor_detects_static: false,
+            collide_kinematic_vs_non_dynamic: false,
             use_manifold_reduction: true,
+            apply_gyroscopic_force: false,
             motion_quality: MotionQuality::Discrete,
+            enhance_internal_edge_removal: false,
             allow_sleeping: true,
             friction: 0.2,
             restitution: 0.0,
@@ -234,6 +240,8 @@ impl Default for BodySettings {
             max_linear_velocity: 500.0,
             max_angular_velocity: 0.25 * std::f32::consts::PI * 60.0,
             gravity_factor: 1.0,
+            num_velocity_steps_override: 0,
+            num_position_steps_override: 0,
             override_mass_properties: OverrideMassProperties::CalculateMassAndInertia,
             inertia_multiplier: 1.0,
             mass_properties: MassProperties::default(),
