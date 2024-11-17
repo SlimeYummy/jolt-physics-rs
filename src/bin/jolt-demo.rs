@@ -5,7 +5,7 @@ use jolt_physics_rs::*;
 // const FPS: f32 = 60.0;
 const FPS: f32 = 120.0;
 
-struct DebugApplicationImpl {
+struct JoltDemo {
     system: Box<PhysicsSystem>,
     body_itf: BodyInterface,
     chara_common: Option<CharacterCommon>,
@@ -14,14 +14,20 @@ struct DebugApplicationImpl {
     cv_player_body_id: BodyID,
 }
 
-impl DebugApplication for DebugApplicationImpl {
+impl DebugApp for JoltDemo {
     fn get_physics_system(&mut self) -> RefPhysicsSystem {
-        return self.system.inner_ref().clone();
+        self.system.inner_ref().clone()
     }
 
-    fn update_frame(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) -> bool {
+    fn update_frame(
+        &mut self,
+        delta: f32,
+        camera: &CameraState,
+        mouse: &mut DebugMouse,
+        keyboard: &mut DebugKeyboard,
+    ) -> bool {
         self.update(delta, camera, mouse, keyboard);
-        return true;
+        true
     }
 
     fn get_initial_camera(&self, state: &mut CameraState) {
@@ -41,14 +47,18 @@ impl DebugApplication for DebugApplicationImpl {
             let ret = Vec3A::new(pos.x, pos.y + 1.0, pos.z) - 5.0 * fwd;
             return ret;
         }
-        return Vec3A::new(0.0, 10.0, 0.0);
+        Vec3A::new(0.0, 10.0, 0.0)
     }
 }
 
-impl DebugApplicationImpl {
+impl JoltDemo {
     fn create_floor(&mut self) -> JoltResult<BodyID> {
         let floor = create_shape_box(&BoxSettings::new(100.0, 2.0, 50.0))?;
-        let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(floor, Vec3A::new(0.0, -1.0, 0.0), Quat::IDENTITY))?;
+        let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
+            floor,
+            Vec3A::new(0.0, -1.0, 0.0),
+            Quat::IDENTITY,
+        ))?;
         self.body_itf.create_add_body(
             &BodySettings::new_static(
                 floor,
@@ -208,7 +218,7 @@ impl DebugApplicationImpl {
         )
     }
 
-    pub fn new() -> Box<dyn DebugApplication> {
+    pub fn new() -> Box<dyn DebugApp> {
         let mut system = PhysicsSystem::new();
         let body_itf = BodyInterface::new(system.as_mut(), false);
         let mut app = Box::new(Self {
@@ -283,7 +293,7 @@ impl DebugApplicationImpl {
 
         app.chara_common = Some(chara_common);
         app.chara_virtual = Some(chara_virtual);
-        return app;
+        app
     }
 
     fn update(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) {
@@ -356,7 +366,8 @@ impl DebugApplicationImpl {
                 &ExtendedUpdateSettings::default(),
             );
 
-            self.body_itf.set_position(self.cv_player_body_id, chara.get_position(), true);
+            self.body_itf
+                .set_position(self.cv_player_body_id, chara.get_position(), true);
         }
 
         self.system.update(1.0 / FPS);
@@ -369,6 +380,6 @@ impl DebugApplicationImpl {
 
 fn main() {
     global_initialize();
-    let demo_app = DebugApplicationImpl::new();
+    let demo_app = JoltDemo::new();
     run_debug_application(demo_app);
 }
