@@ -9,7 +9,13 @@ fn main() {
     let is_debug_renderer = env::var("CARGO_FEATURE_DEBUG_RENDERER").is_ok();
     let is_debug_print = env::var("CARGO_FEATURE_DEBUG_PRINT").is_ok();
 
-    let mut rs_file = vec!["src/base.rs", "src/layer.rs", "src/shape.rs", "src/system.rs", "src/character.rs"];
+    let mut rs_file = vec![
+        "src/base.rs",
+        "src/layer.rs",
+        "src/shape.rs",
+        "src/system.rs",
+        "src/character.rs",
+    ];
     if is_windows && is_debug_renderer {
         rs_file.push("src/debug.rs");
     }

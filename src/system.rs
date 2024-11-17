@@ -110,11 +110,18 @@ pub(crate) mod ffi {
         unsafe fn CreateBodyInterface(system: *mut XPhysicsSystem, lock: bool) -> *mut XBodyInterface;
         type BodyCreationSettings;
         fn CreateBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings) -> BodyID;
-        fn CreateAddBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings, active: Activation) -> BodyID;
+        fn CreateAddBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings, active: Activation)
+            -> BodyID;
         fn AddBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID, active: Activation);
         fn SetObjectLayer(self: Pin<&mut XBodyInterface>, body_id: &BodyID, layer: u16);
         fn GetObjectLayer(self: &XBodyInterface, body_id: &BodyID) -> u16;
-        fn SetPositionAndRotation(self: Pin<&mut XBodyInterface>, body_id: &BodyID, position: Vec3, rotation: Quat, active: Activation);
+        fn SetPositionAndRotation(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            position: Vec3,
+            rotation: Quat,
+            active: Activation,
+        );
         fn SetPositionAndRotationWhenChanged(
             self: Pin<&mut XBodyInterface>,
             body_id: &BodyID,
@@ -274,7 +281,13 @@ impl BodySettings {
         }
     }
 
-    pub fn new_sensor(shape: RefShape, layer: u16, motion_type: MotionType, position: Vec3A, rotation: Quat) -> BodySettings {
+    pub fn new_sensor(
+        shape: RefShape,
+        layer: u16,
+        motion_type: MotionType,
+        position: Vec3A,
+        rotation: Quat,
+    ) -> BodySettings {
         BodySettings {
             position,
             rotation,
@@ -323,12 +336,12 @@ impl PhysicsSystem {
 
     #[inline]
     fn system(&self) -> &ffi::XPhysicsSystem {
-        return self.system.as_ref().unwrap();
+        self.system.as_ref().unwrap()
     }
 
     #[inline]
     fn system_mut(&mut self) -> Pin<&mut ffi::XPhysicsSystem> {
-        return unsafe { Pin::new_unchecked(self.system.as_mut().unwrap()) };
+        unsafe { Pin::new_unchecked(self.system.as_mut().unwrap()) }
     }
 
     #[inline]
@@ -343,18 +356,18 @@ impl PhysicsSystem {
 
     #[inline]
     pub fn prepare(&mut self) {
-        return self.system_mut().Prepare();
+        self.system_mut().Prepare()
     }
 
     #[inline]
     pub fn update(&mut self, delta: f32) -> u32 {
         self.contacts.clear();
-        return self.system_mut().Update(delta);
+        self.system_mut().Update(delta)
     }
 
     #[inline]
     pub fn get_gravity(&self) -> Vec3A {
-        return self.system().GetGravity().0;
+        self.system().GetGravity().0
     }
 
     #[inline]
@@ -480,31 +493,35 @@ impl BodyInterface {
 
     #[inline]
     pub fn add_body(&mut self, body_id: BodyID, active: bool) {
-        return self.as_mut().AddBody(&body_id, active.into());
+        self.as_mut().AddBody(&body_id, active.into())
     }
 
     #[inline]
     pub fn set_object_layer(&mut self, body_id: BodyID, layer: u16) {
-        return self.as_mut().SetObjectLayer(&body_id, layer);
+        self.as_mut().SetObjectLayer(&body_id, layer)
     }
 
     #[inline]
     pub fn get_object_layer(&self, body_id: BodyID) -> u16 {
-        return self.as_ref().GetObjectLayer(&body_id);
+        self.as_ref().GetObjectLayer(&body_id)
     }
 
     #[inline]
     pub fn set_position_rotation(&mut self, body_id: BodyID, position: Vec3A, rotation: Quat, active: bool) {
-        return self
-            .as_mut()
-            .SetPositionAndRotation(&body_id, position.into(), rotation.into(), active.into());
+        self.as_mut()
+            .SetPositionAndRotation(&body_id, position.into(), rotation.into(), active.into())
     }
 
     #[inline]
-    pub fn set_position_rotation_when_changed(&mut self, body_id: BodyID, position: Vec3A, rotation: Quat, active: bool) {
-        return self
-            .as_mut()
-            .SetPositionAndRotationWhenChanged(&body_id, position.into(), rotation.into(), active.into());
+    pub fn set_position_rotation_when_changed(
+        &mut self,
+        body_id: BodyID,
+        position: Vec3A,
+        rotation: Quat,
+        active: bool,
+    ) {
+        self.as_mut()
+            .SetPositionAndRotationWhenChanged(&body_id, position.into(), rotation.into(), active.into())
     }
 
     #[inline]
@@ -515,36 +532,36 @@ impl BodyInterface {
 
     #[inline]
     pub fn set_position(&mut self, body_id: BodyID, position: Vec3A, active: bool) {
-        return self.as_mut().SetPosition(&body_id, position.into(), active.into());
+        self.as_mut().SetPosition(&body_id, position.into(), active.into())
     }
 
     #[inline]
     pub fn get_position(&self, body_id: BodyID) -> Vec3A {
-        return self.as_ref().GetPosition(&body_id).0;
+        self.as_ref().GetPosition(&body_id).0
     }
 
     #[inline]
     pub fn get_center_of_mass_position(&self, body_id: BodyID) -> Vec3A {
-        return self.as_ref().GetCenterOfMassPosition(&body_id).0;
+        self.as_ref().GetCenterOfMassPosition(&body_id).0
     }
 
     #[inline]
     pub fn set_rotation(&mut self, body_id: BodyID, rotation: Quat, active: bool) {
-        return self.as_mut().SetRotation(&body_id, rotation.into(), active.into());
+        self.as_mut().SetRotation(&body_id, rotation.into(), active.into())
     }
 
     #[inline]
     pub fn get_rotation(&self, body_id: BodyID) -> Quat {
-        return self.as_ref().GetRotation(&body_id).0;
+        self.as_ref().GetRotation(&body_id).0
     }
 
     #[inline]
     pub fn get_world_transform(&self, body_id: BodyID) -> Mat4 {
-        return self.as_ref().GetWorldTransform(&body_id).0;
+        self.as_ref().GetWorldTransform(&body_id).0
     }
 
     #[inline]
     pub fn get_center_of_mass_transform(&self, body_id: BodyID) -> Mat4 {
-        return self.as_ref().GetCenterOfMassTransform(&body_id).0;
+        self.as_ref().GetCenterOfMassTransform(&body_id).0
     }
 }
