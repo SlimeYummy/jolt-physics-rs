@@ -30,12 +30,12 @@ impl DebugApp for JoltDemo {
         true
     }
 
-    fn get_initial_camera(&self, state: &mut CameraState) {
+    fn get_initial_camera(&mut self, state: &mut CameraState) {
         state.pos = Vec3A::ZERO;
         state.forward = Vec3A::new(10.0, -2.0, 0.0).normalize();
     }
 
-    fn get_camera_pivot(&self, heading: f32, pitch: f32) -> Vec3A {
+    fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> Vec3A {
         let fwd = Vec3A::new(pitch.cos() * heading.cos(), pitch.sin(), pitch.cos() * heading.sin());
         // if let Some(chara) = &self.chara_common {
         //     let pos = chara.get_position(false);

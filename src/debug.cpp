@@ -145,7 +145,10 @@ void DebugApp::Run() {
             JPH_PROFILE("DispatchMessage");
 
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            bool ignore = (msg.message == WM_SYSKEYDOWN || msg.message == WM_SYSKEYUP) && msg.wParam == VK_MENU; // ignore alt
+            if (!ignore) {
+                DispatchMessage(&msg);
+            }
         } else {
             // Get new input
             mKeyboard->Poll();
