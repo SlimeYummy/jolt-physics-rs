@@ -25,7 +25,7 @@ pub(crate) mod ffi {
         #[cxx_name = "GetInitialCamera"]
         unsafe fn get_initial_camera(self: &mut XDebugApp, state: *mut CameraState);
         #[cxx_name = "GetCameraPivot"]
-        fn get_camera_pivot(self: &XDebugApp, heading: f32, pitch: f32) -> Vec3;
+        fn get_camera_pivot(self: &mut XDebugApp, heading: f32, pitch: f32) -> Vec3;
     }
 
     unsafe extern "C++" {
@@ -131,11 +131,11 @@ impl XDebugApp {
         self.0.update_frame(delta, camera, &mut mouse, &mut keyboard)
     }
 
-    fn get_initial_camera(&self, state: *mut ffi::CameraState) {
+    fn get_initial_camera(&mut self, state: *mut ffi::CameraState) {
         unsafe { self.0.get_initial_camera(&mut *state) };
     }
 
-    fn get_camera_pivot(&self, heading: f32, pitch: f32) -> XVec3 {
+    fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> XVec3 {
         self.0.get_camera_pivot(heading, pitch).into()
     }
 }
@@ -149,8 +149,8 @@ pub trait DebugApp {
         mouse: &mut DebugMouse,
         keyboard: &mut DebugKeyboard,
     ) -> bool;
-    fn get_initial_camera(&self, state: &mut CameraState);
-    fn get_camera_pivot(&self, heading: f32, pitch: f32) -> Vec3A;
+    fn get_initial_camera(&mut self, state: &mut CameraState);
+    fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> Vec3A;
 }
 
 pub fn run_debug_application(dbg_app: Box<dyn DebugApp>) {
