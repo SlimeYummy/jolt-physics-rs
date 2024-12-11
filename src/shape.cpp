@@ -118,6 +118,33 @@ XRefShape CreateShapeCylinder(const CylinderSettings& st) {
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
 
+struct TaperedCylinderSettings {
+	uint64 userData;
+	RefConst<PhysicsMaterial> material;
+	float density;
+	float halfHeight;
+	float topRadius;
+	float bottomRadius;
+	float convexRadius;
+};
+static_assert(sizeof(TaperedCylinderSettings) == 40, "TaperedCylinderSettings size");
+
+XRefShape CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
+	TaperedCylinderShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mDensity = st.density;
+	settings.mHalfHeight = st.halfHeight;
+	settings.mTopRadius = st.topRadius;
+	settings.mBottomRadius = st.bottomRadius;
+	settings.mConvexRadius = st.convexRadius;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
 struct RotatedTranslatedSettings {
 	uint64 userData;
 	RefConst<Shape> innerShape;

@@ -19,6 +19,7 @@ pub mod ffi {
         type CapsuleSettings;
         type TaperedCapsuleSettings;
         type CylinderSettings;
+        type TaperedCylinderSettings;
         type OffsetCenterOfMassSettings;
         type RotatedTranslatedSettings;
         type ScaledSettings;
@@ -31,6 +32,7 @@ pub mod ffi {
         fn CreateShapeCapsule(settings: &CapsuleSettings) -> XRefShape;
         fn CreateShapeTaperedCapsule(settings: &TaperedCapsuleSettings) -> XRefShape;
         fn CreateShapeCylinder(settings: &CylinderSettings) -> XRefShape;
+        fn CreateShapeTaperedCylinder(settings: &CylinderSettings) -> XRefShape;
         fn CreateShapeRotatedTranslated(settings: &RotatedTranslatedSettings) -> XRefShape;
         fn CreateShapeScaled(settings: &ScaledSettings) -> XRefShape;
         fn CreateShapeOffsetCenterOfMass(settings: &OffsetCenterOfMassSettings) -> XRefShape;
@@ -209,6 +211,45 @@ impl CylinderSettings {
         CylinderSettings {
             half_height,
             radius,
+            convex_radius: (half_height / 10.0).clamp(MIN_CONVEX_RADIUS, MAX_CONVEX_RADIUS),
+            ..Default::default()
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct TaperedCylinderSettings {
+    pub user_data: u64,
+    pub material: RefPhysicsMaterial,
+    pub density: f32,
+    pub half_height: f32,
+    pub top_radius: f32,
+    pub bottom_radius: f32,
+    pub convex_radius: f32,
+}
+const_assert_eq!(std::mem::size_of::<TaperedCylinderSettings>(), 40);
+
+impl Default for TaperedCylinderSettings {
+    fn default() -> TaperedCylinderSettings {
+        TaperedCylinderSettings {
+            user_data: 0,
+            material: RefPhysicsMaterial::invalid(),
+            density: 1000.0,
+            half_height: 0.0,
+            top_radius: 0.0,
+            bottom_radius: 0.0,
+            convex_radius: DEFAULT_CONVEX_RADIUS,
+        }
+    }
+}
+
+impl TaperedCylinderSettings {
+    pub fn new(half_height: f32, top_radius: f32, bottom_radius: f32) -> TaperedCylinderSettings {
+        TaperedCylinderSettings {
+            half_height,
+            top_radius,
+            bottom_radius,
             convex_radius: (half_height / 10.0).clamp(MIN_CONVEX_RADIUS, MAX_CONVEX_RADIUS),
             ..Default::default()
         }
