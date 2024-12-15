@@ -1,6 +1,27 @@
 #include "jolt-physics-rs/src/ffi.h"
 #include "jolt-physics-rs/src/shape.rs.h"
 
+struct SphereSettings {
+	uint64 userData;
+	RefConst<PhysicsMaterial> material;
+	float density;
+	float radius;
+};
+static_assert(sizeof(SphereSettings) == 24, "SphereSettings size");
+
+XRefShape CreateShapeSphere(const SphereSettings& st) {
+	SphereShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mDensity = st.density;
+	settings.mRadius = st.radius;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
 struct BoxSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
@@ -17,27 +38,6 @@ XRefShape CreateShapeBox(const BoxSettings& st) {
 	settings.mDensity = st.density;
 	settings.mHalfExtent = Vec3(st.halfX, st.halfY, st.halfZ);
 	settings.mConvexRadius = st.convexRadius;
-	auto result = settings.Create();
-	if (result.HasError()) {
-		return XRefShape{};
-	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
-}
-
-struct SphereSettings {
-	uint64 userData;
-	RefConst<PhysicsMaterial> material;
-	float density;
-	float radius;
-};
-static_assert(sizeof(SphereSettings) == 24, "SphereSettings size");
-
-XRefShape CreateShapeSphere(const SphereSettings& st) {
-	SphereShapeSettings settings;
-	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
-	settings.mDensity = st.density;
-	settings.mRadius = st.radius;
 	auto result = settings.Create();
 	if (result.HasError()) {
 		return XRefShape{};
@@ -145,65 +145,6 @@ XRefShape CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
 
-struct RotatedTranslatedSettings {
-	uint64 userData;
-	RefConst<Shape> innerShape;
-	Vec3 position;
-	Quat rotation;
-};
-static_assert(sizeof(RotatedTranslatedSettings) == 48, "RotatedTranslatedSettings size");
-
-XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
-	RotatedTranslatedShapeSettings settings;
-	settings.mUserData = st.userData;
-	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
-	settings.mPosition = st.position;
-	settings.mRotation = st.rotation;
-	auto result = settings.Create();
-	if (result.HasError()) {
-		return XRefShape{};
-	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
-}
-
-struct ScaledSettings {
-	uint64 userData;
-	RefConst<Shape> innerShape;
-	Vec3 scale;
-};
-static_assert(sizeof(ScaledSettings) == 32, "ScaledSettings size");
-
-XRefShape CreateShapeScaled(const ScaledSettings& st) {
-	ScaledShapeSettings settings;
-	settings.mUserData = st.userData;
-	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
-	settings.mScale = st.scale;
-	auto result = settings.Create();
-	if (result.HasError()) {
-		return XRefShape{};
-	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
-}
-
-struct OffsetCenterOfMassSettings {
-	uint64 userData;
-	RefConst<Shape> innerShape;
-	Vec3 offset;
-};
-static_assert(sizeof(OffsetCenterOfMassSettings) == 32, "OffsetCenterOfMassSettings size");
-
-XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
-	OffsetCenterOfMassShapeSettings settings;
-	settings.mUserData = st.userData;
-	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
-	settings.mOffset = st.offset;
-	auto result = settings.Create();
-	if (result.HasError()) {
-		return XRefShape{};
-	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
-}
-
 struct ConvexHullSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
@@ -296,6 +237,65 @@ XRefShape CreateShapeHeightField(const HeightFieldSettings& st) {
 	settings.mBlockSize = st.blockSize;
 	settings.mBitsPerSample = st.bitsPerSample;
 	settings.mActiveEdgeCosThresholdAngle = st.activeEdgeCosThresholdAngle;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+struct ScaledSettings {
+	uint64 userData;
+	RefConst<Shape> innerShape;
+	Vec3 scale;
+};
+static_assert(sizeof(ScaledSettings) == 32, "ScaledSettings size");
+
+XRefShape CreateShapeScaled(const ScaledSettings& st) {
+	ScaledShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mScale = st.scale;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+struct RotatedTranslatedSettings {
+	uint64 userData;
+	RefConst<Shape> innerShape;
+	Vec3 position;
+	Quat rotation;
+};
+static_assert(sizeof(RotatedTranslatedSettings) == 48, "RotatedTranslatedSettings size");
+
+XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
+	RotatedTranslatedShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mPosition = st.position;
+	settings.mRotation = st.rotation;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+struct OffsetCenterOfMassSettings {
+	uint64 userData;
+	RefConst<Shape> innerShape;
+	Vec3 offset;
+};
+static_assert(sizeof(OffsetCenterOfMassSettings) == 32, "OffsetCenterOfMassSettings size");
+
+XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
+	OffsetCenterOfMassShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mOffset = st.offset;
 	auto result = settings.Create();
 	if (result.HasError()) {
 		return XRefShape{};
