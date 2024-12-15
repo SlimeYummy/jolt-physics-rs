@@ -190,8 +190,8 @@ unsafe impl ExternType for XInt3 {
     type Kind = cxx::kind::Trivial;
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[repr(C, align(16))]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Plane {
     pub normal: Vec3,
     pub distance: f32,
@@ -201,6 +201,13 @@ const_assert_eq!(mem::size_of::<Plane>(), 16);
 unsafe impl ExternType for Plane {
     type Id = type_id!("Plane");
     type Kind = cxx::kind::Trivial;
+}
+
+impl Default for Plane {
+    #[inline]
+    fn default() -> Self {
+        Plane::new(Vec3::Y, 0.0)
+    }
 }
 
 impl Plane {

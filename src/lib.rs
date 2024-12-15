@@ -6,7 +6,7 @@ mod layer;
 mod shape;
 mod system;
 
-pub use base::{BodyID, IndexedTriangle, RefPhysicsMaterial, RefPhysicsSystem, RefShape};
+pub use base::{BodyID, IndexedTriangle, Plane, RefPhysicsMaterial, RefPhysicsSystem, RefShape};
 pub use character::*;
 pub use consts::*;
 pub use error::*;
