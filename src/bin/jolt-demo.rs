@@ -52,20 +52,15 @@ impl DebugApp for JoltDemo {
 }
 
 impl JoltDemo {
-    fn create_floor(&mut self) -> JoltResult<BodyID> {
-        let floor = create_shape_box(&BoxSettings::new(100.0, 1.0, 50.0))?;
-        let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
-            floor,
-            Vec3A::new(0.0, -1.0, 0.0),
-            Quat::IDENTITY,
-        ))?;
+    fn create_ground(&mut self) -> JoltResult<BodyID> {
+        let ground = create_shape_plane(&PlaneSettings::new(Plane::new(Vec3::Y, 0.0), 50.0))?;
+        // let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
+        //     floor,
+        //     Vec3A::new(0.0, -1.0, 0.0),
+        //     Quat::IDENTITY,
+        // ))?;
         self.body_itf.create_add_body(
-            &BodySettings::new_static(
-                floor,
-                PHY_LAYER_STATIC,
-                Vec3A::new(0.0, 0.0, 50.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-            ),
+            &BodySettings::new_static(ground, PHY_LAYER_STATIC, Vec3A::new(0.0, 0.0, 50.0), Quat::IDENTITY),
             false,
         )
     }
@@ -77,7 +72,7 @@ impl JoltDemo {
             PHY_LAYER_DYNAMIC,
             MotionType::Dynamic,
             Vec3A::new(8.0, 15.0, 8.0),
-            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            Quat::IDENTITY,
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 10.0;
@@ -91,7 +86,7 @@ impl JoltDemo {
             PHY_LAYER_DYNAMIC,
             MotionType::Dynamic,
             Vec3A::new(10.0, 20.0, 10.0),
-            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            Quat::IDENTITY,
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 25.0;
@@ -105,7 +100,7 @@ impl JoltDemo {
             PHY_LAYER_DYNAMIC,
             MotionType::Dynamic,
             Vec3A::new(2.0, 20.0, 10.0),
-            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            Quat::IDENTITY,
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 70.0;
@@ -125,7 +120,7 @@ impl JoltDemo {
                 PHY_LAYER_DYNAMIC,
                 MotionType::Dynamic,
                 Vec3A::new(-4.0, 30.0, 10.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                Quat::IDENTITY,
             ),
             true,
         )
@@ -171,21 +166,22 @@ impl JoltDemo {
         let settings = MeshSettings::new(&vertices, &indexes);
         let mesh = create_shape_mesh(&settings)?;
         self.body_itf.create_add_body(
-            &BodySettings::new_static(
-                mesh,
-                PHY_LAYER_STATIC,
-                Vec3A::new(2.0, 0.0, 15.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
-            ),
+            &BodySettings::new_static(mesh, PHY_LAYER_STATIC, Vec3A::new(2.0, 0.0, 15.0), Quat::IDENTITY),
             false,
         )
     }
 
     fn create_height_field(&mut self) -> JoltResult<BodyID> {
         let mut samples = Vec::new();
-        for x in 0..32 {
-            for _y in 0..32 {
-                let z = ((x as f32) % 16.0 - 8.0).abs();
+        for x in 1..=32 {
+            for y in 1..=32 {
+                let z = if x == 32 {
+                    0.0
+                } else {
+                    let r = (((10007 + 6961 * x) ^ (8623 + 1187 * y)) & 0xFF) as f32 / 256.0;
+                    let xy = (((x + 4) % 8) * ((y + 4) % 8)) as f32 / 32.0;
+                    f32::sqrt(r + xy) - 0.5
+                };
                 samples.push(z);
             }
         }
@@ -197,8 +193,8 @@ impl JoltDemo {
             &BodySettings::new_static(
                 height_field,
                 PHY_LAYER_STATIC,
-                Vec3A::new(-16.0, -5.0, -31.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                Vec3A::new(-16.0, 0.0, -31.0),
+                Quat::IDENTITY,
             ),
             false,
         )
@@ -212,7 +208,7 @@ impl JoltDemo {
                 PHY_LAYER_STATIC,
                 MotionType::Static,
                 Vec3A::new(-10.0, 1.0, 10.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                Quat::IDENTITY,
             ),
             true,
         )
@@ -223,7 +219,7 @@ impl JoltDemo {
         // setting.convex_radius = 0.2;
         // let obj = create_shape_cylinder(&setting)?;
 
-        let sphere = create_shape_tapered_capsule(&TaperedCapsuleSettings::new(2.0, 1.0, 0.2))?;
+        let obj = create_shape_tapered_capsule(&TaperedCapsuleSettings::new(2.0, 1.0, 0.2))?;
 
         self.body_itf.create_add_body(
             &BodySettings::new_sensor(
@@ -231,7 +227,7 @@ impl JoltDemo {
                 PHY_LAYER_STATIC,
                 MotionType::Static,
                 Vec3A::new(0.0, 2.2, 0.0),
-                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                Quat::IDENTITY,
             ),
             true,
         )
@@ -254,9 +250,9 @@ impl JoltDemo {
         app.create_dynamic_box().unwrap();
         app.create_dynamic_convex_hull().unwrap();
 
-        app.create_floor().unwrap();
+        app.create_ground().unwrap();
         app.create_mesh_steps().unwrap();
-        // app.create_height_field().unwrap();
+        app.create_height_field().unwrap();
 
         app.create_sensor_sphere().unwrap();
         app.create_sensor_tapered_capsule().unwrap();
@@ -274,7 +270,7 @@ impl JoltDemo {
             app.system.as_mut(),
             &CharacterCommonSettings::new(chara_shape.clone(), PHY_LAYER_BODY_PLAYER),
             Vec3A::new(0.0, 5.0, 1.0),
-            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            Quat::IDENTITY,
             0,
             true,
             true,
@@ -285,7 +281,7 @@ impl JoltDemo {
             app.system.as_mut(),
             &CharacterVirtualSettings::new(chara_shape),
             Vec3A::new(4.0, 5.0, 4.0),
-            Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            Quat::IDENTITY,
         );
 
         let target_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.2, 0.25)).unwrap();
@@ -303,7 +299,7 @@ impl JoltDemo {
                     PHY_LAYER_BODY_PLAYER,
                     MotionType::Kinematic,
                     Vec3A::new(4.0, 5.0, 4.0),
-                    Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+                    Quat::IDENTITY,
                 ),
                 false,
             )
