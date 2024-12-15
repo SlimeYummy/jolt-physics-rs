@@ -135,10 +135,10 @@ inline uint32 CountRefPhysicsMaterial(XRefPhysicsMaterial ref) { return CountRef
 // shape
 //
 
-struct BoxSettings;
-XRefShape CreateShapeBox(const BoxSettings& settings);
 struct SphereSettings;
 XRefShape CreateShapeSphere(const SphereSettings& settings);
+struct BoxSettings;
+XRefShape CreateShapeBox(const BoxSettings& settings);
 struct CapsuleSettings;
 XRefShape CreateShapeCapsule(const CapsuleSettings& settings);
 struct TaperedCapsuleSettings;
@@ -147,18 +147,25 @@ struct CylinderSettings;
 XRefShape CreateShapeCylinder(const CylinderSettings& settings);
 struct TaperedCylinderSettings;
 XRefShape CreateShapeTaperedCylinder(const TaperedCylinderSettings& settings);
-struct RotatedTranslatedSettings;
-XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
-struct ScaledSettings;
-XRefShape CreateShapeScaled(const ScaledSettings& settings);
-struct OffsetCenterOfMassSettings;
-XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
 struct ConvexHullSettings;
 XRefShape CreateShapeConvexHull(const ConvexHullSettings& settings);
+struct TriangleSettings;
+XRefShape CreateShapeTriangle(const TriangleSettings& settings);
+struct PlaneSettings;
+XRefShape CreateShapePlane(const PlaneSettings& settings);
 struct MeshSettings;
 XRefShape CreateShapeMesh(const MeshSettings& settings);
 struct HeightFieldSettings;
 XRefShape CreateShapeHeightField(const HeightFieldSettings& settings);
+struct EmptySettings;
+XRefShape CreateShapeEmpty(const EmptySettings& settings);
+
+struct ScaledSettings;
+XRefShape CreateShapeScaled(const ScaledSettings& settings);
+struct RotatedTranslatedSettings;
+XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
+struct OffsetCenterOfMassSettings;
+XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
 
 //
 // system

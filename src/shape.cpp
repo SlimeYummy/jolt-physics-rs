@@ -172,6 +172,54 @@ XRefShape CreateShapeConvexHull(const ConvexHullSettings& st) {
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
 
+struct TriangleSettings {
+	uint64 userData;
+	RefConst<PhysicsMaterial> material;
+	float density;
+	float convexRadius;
+	Vec3 v1;
+	Vec3 v2;
+	Vec3 v3;
+};
+static_assert(sizeof(TriangleSettings) == 80, "TriangleSettings size");
+
+XRefShape CreateShapeTriangle(const TriangleSettings& st) {
+	TriangleShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mDensity = st.density;
+	settings.mV1 = st.v1;
+	settings.mV2 = st.v2;
+	settings.mV3 = st.v3;
+	settings.mConvexRadius = st.convexRadius;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+struct PlaneSettings {
+	uint64 userData;
+	RefConst<PhysicsMaterial> material;
+	Plane plane;
+	float halfExtent;
+};
+static_assert(sizeof(PlaneSettings) == 48, "PlaneSettings size");
+
+XRefShape CreateShapePlane(const PlaneSettings& st) {
+	PlaneShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mPlane = st.plane;
+	settings.mHalfExtent = st.halfExtent;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
 struct MeshSettings {
 	uint64 userData;
 	rust::Slice<Float3> triangleVertices;
@@ -237,6 +285,23 @@ XRefShape CreateShapeHeightField(const HeightFieldSettings& st) {
 	settings.mBlockSize = st.blockSize;
 	settings.mBitsPerSample = st.bitsPerSample;
 	settings.mActiveEdgeCosThresholdAngle = st.activeEdgeCosThresholdAngle;
+	auto result = settings.Create();
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+struct EmptySettings {
+	uint64 userData;
+	Vec3 centerOfMass;
+};
+static_assert(sizeof(EmptySettings) == 32, "EmptySettings size");
+
+XRefShape CreateShapeEmpty(const EmptySettings& st) {
+	EmptyShapeSettings settings;
+	settings.mUserData = st.userData;
+	settings.mCenterOfMass = st.centerOfMass;
 	auto result = settings.Create();
 	if (result.HasError()) {
 		return XRefShape{};

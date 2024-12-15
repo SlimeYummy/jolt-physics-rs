@@ -21,8 +21,11 @@ pub mod ffi {
         type CylinderSettings;
         type TaperedCylinderSettings;
         type ConvexHullSettings;
+        type TriangleSettings;
+        type PlaneSettings;
         type MeshSettings;
         type HeightFieldSettings;
+        type EmptySettings;
 
         type ScaledSettings;
         type RotatedTranslatedSettings;
@@ -35,8 +38,11 @@ pub mod ffi {
         fn CreateShapeCylinder(settings: &CylinderSettings) -> XRefShape;
         fn CreateShapeTaperedCylinder(settings: &TaperedCylinderSettings) -> XRefShape;
         fn CreateShapeConvexHull(settings: &ConvexHullSettings) -> XRefShape;
+        fn CreateShapeTriangle(settings: &TriangleSettings) -> XRefShape;
+        fn CreateShapePlane(settings: &PlaneSettings) -> XRefShape;
         fn CreateShapeMesh(settings: &MeshSettings) -> XRefShape;
         fn CreateShapeHeightField(settings: &HeightFieldSettings) -> XRefShape;
+        fn CreateShapeEmpty(settings: &EmptySettings) -> XRefShape;
 
         fn CreateShapeScaled(settings: &ScaledSettings) -> XRefShape;
         fn CreateShapeRotatedTranslated(settings: &RotatedTranslatedSettings) -> XRefShape;
@@ -295,6 +301,75 @@ impl<'t> ConvexHullSettings<'t> {
 }
 
 #[repr(C)]
+#[derive(Debug)]
+pub struct TriangleSettings {
+    pub user_data: u64,
+    pub material: RefPhysicsMaterial,
+    pub density: f32,
+    pub convex_radius: f32,
+    pub v1: Vec3A,
+    pub v2: Vec3A,
+    pub v3: Vec3A,
+}
+const_assert_eq!(std::mem::size_of::<TriangleSettings>(), 80);
+
+impl Default for TriangleSettings {
+    fn default() -> TriangleSettings {
+        TriangleSettings {
+            user_data: 0,
+            material: RefPhysicsMaterial::invalid(),
+            density: 1000.0,
+            convex_radius: 0.05,
+            v1: Vec3A::ZERO,
+            v2: Vec3A::ZERO,
+            v3: Vec3A::ZERO,
+        }
+    }
+}
+
+impl TriangleSettings {
+    pub fn new(v1: Vec3A, v2: Vec3A, v3: Vec3A) -> TriangleSettings {
+        TriangleSettings {
+            v1,
+            v2,
+            v3,
+            ..Default::default()
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct PlaneSettings {
+    pub user_data: u64,
+    pub material: RefPhysicsMaterial,
+    pub plane: Plane,
+    pub half_extent: f32,
+}
+const_assert_eq!(std::mem::size_of::<PlaneSettings>(), 48);
+
+impl Default for PlaneSettings {
+    fn default() -> PlaneSettings {
+        PlaneSettings {
+            user_data: 0,
+            material: RefPhysicsMaterial::invalid(),
+            plane: Plane::new(Vec3::Y, 0.0),
+            half_extent: 1000.0,
+        }
+    }
+}
+
+impl PlaneSettings {
+    pub fn new(plane: Plane, half_extent: f32) -> PlaneSettings {
+        PlaneSettings {
+            plane,
+            half_extent,
+            ..Default::default()
+        }
+    }
+}
+
+#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct MeshSettings<'t> {
     pub user_data: u64,
@@ -371,6 +446,32 @@ impl<'t> HeightFieldSettings<'t> {
         HeightFieldSettings {
             height_samples,
             sample_count,
+            ..Default::default()
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct EmptySettings {
+    pub user_data: u64,
+    pub center_of_mass: Vec3A,
+}
+const_assert_eq!(std::mem::size_of::<EmptySettings>(), 32);
+
+impl Default for EmptySettings {
+    fn default() -> EmptySettings {
+        EmptySettings {
+            user_data: 0,
+            center_of_mass: Vec3A::ZERO,
+        }
+    }
+}
+
+impl EmptySettings {
+    pub fn new(center_of_mass: Vec3A) -> EmptySettings {
+        EmptySettings {
+            center_of_mass,
             ..Default::default()
         }
     }
@@ -536,6 +637,26 @@ pub fn create_shape_convex_hull(settings: &ConvexHullSettings) -> JoltResult<Ref
     Ok(shape)
 }
 
+pub fn create_shape_triangle(settings: &TriangleSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeTriangle(unsafe {
+        mem::transmute::<&TriangleSettings, &ffi::TriangleSettings>(settings)
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
+}
+
+pub fn create_shape_plane(settings: &PlaneSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapePlane(unsafe {
+        mem::transmute::<&PlaneSettings, &ffi::PlaneSettings>(settings)
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
+}
+
 pub fn create_shape_mesh(settings: &MeshSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeMesh(unsafe {
         mem::transmute::<&MeshSettings<'_>, &ffi::MeshSettings>(settings)
@@ -549,6 +670,16 @@ pub fn create_shape_mesh(settings: &MeshSettings) -> JoltResult<RefShape> {
 pub fn create_shape_height_field(settings: &HeightFieldSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeHeightField(unsafe {
         mem::transmute::<&HeightFieldSettings<'_>, &ffi::HeightFieldSettings>(settings)
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
+}
+
+pub fn create_shape_empty(settings: &EmptySettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeEmpty(unsafe {
+        mem::transmute::<&EmptySettings, &ffi::EmptySettings>(settings)
     }));
     if shape.is_invalid() {
         return Err(JoltError::CreateShape);
