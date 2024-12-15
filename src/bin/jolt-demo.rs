@@ -53,7 +53,7 @@ impl DebugApp for JoltDemo {
 
 impl JoltDemo {
     fn create_floor(&mut self) -> JoltResult<BodyID> {
-        let floor = create_shape_box(&BoxSettings::new(100.0, 2.0, 50.0))?;
+        let floor = create_shape_box(&BoxSettings::new(100.0, 1.0, 50.0))?;
         let floor = create_shape_rotated_translated(&RotatedTranslatedSettings::new(
             floor,
             Vec3A::new(0.0, -1.0, 0.0),
@@ -174,7 +174,7 @@ impl JoltDemo {
             &BodySettings::new_static(
                 mesh,
                 PHY_LAYER_STATIC,
-                Vec3A::new(2.0, 1.0, 15.0),
+                Vec3A::new(2.0, 0.0, 15.0),
                 Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
             ),
             false,
@@ -218,6 +218,25 @@ impl JoltDemo {
         )
     }
 
+    fn create_sensor_tapered_capsule(&mut self) -> JoltResult<BodyID> {
+        // let mut setting = CylinderSettings::new(1.0, 0.5);
+        // setting.convex_radius = 0.2;
+        // let obj = create_shape_cylinder(&setting)?;
+
+        let sphere = create_shape_tapered_capsule(&TaperedCapsuleSettings::new(2.0, 1.0, 0.2))?;
+
+        self.body_itf.create_add_body(
+            &BodySettings::new_sensor(
+                obj,
+                PHY_LAYER_STATIC,
+                MotionType::Static,
+                Vec3A::new(0.0, 2.2, 0.0),
+                Quat::from_xyzw(0.0, 0.0, 0.0, 1.0),
+            ),
+            true,
+        )
+    }
+
     pub fn new() -> Box<dyn DebugApp> {
         let mut system = PhysicsSystem::new();
         let body_itf = BodyInterface::new(system.as_mut(), false);
@@ -237,9 +256,10 @@ impl JoltDemo {
 
         app.create_floor().unwrap();
         app.create_mesh_steps().unwrap();
-        app.create_height_field().unwrap();
+        // app.create_height_field().unwrap();
 
         app.create_sensor_sphere().unwrap();
+        app.create_sensor_tapered_capsule().unwrap();
 
         let chara_shape = create_shape_capsule(&CapsuleSettings::new(0.5 * 1.35, 0.3)).unwrap();
         let chara_shape = create_shape_rotated_translated(&RotatedTranslatedSettings::new(

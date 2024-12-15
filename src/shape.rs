@@ -14,31 +14,63 @@ pub mod ffi {
 
         type XRefShape = crate::base::ffi::XRefShape;
 
-        type BoxSettings;
         type SphereSettings;
+        type BoxSettings;
         type CapsuleSettings;
         type TaperedCapsuleSettings;
         type CylinderSettings;
         type TaperedCylinderSettings;
-        type OffsetCenterOfMassSettings;
-        type RotatedTranslatedSettings;
-        type ScaledSettings;
         type ConvexHullSettings;
         type MeshSettings;
         type HeightFieldSettings;
 
-        fn CreateShapeBox(settings: &BoxSettings) -> XRefShape;
+        type ScaledSettings;
+        type RotatedTranslatedSettings;
+        type OffsetCenterOfMassSettings;
+
         fn CreateShapeSphere(settings: &SphereSettings) -> XRefShape;
+        fn CreateShapeBox(settings: &BoxSettings) -> XRefShape;
         fn CreateShapeCapsule(settings: &CapsuleSettings) -> XRefShape;
         fn CreateShapeTaperedCapsule(settings: &TaperedCapsuleSettings) -> XRefShape;
         fn CreateShapeCylinder(settings: &CylinderSettings) -> XRefShape;
-        fn CreateShapeTaperedCylinder(settings: &CylinderSettings) -> XRefShape;
-        fn CreateShapeRotatedTranslated(settings: &RotatedTranslatedSettings) -> XRefShape;
-        fn CreateShapeScaled(settings: &ScaledSettings) -> XRefShape;
-        fn CreateShapeOffsetCenterOfMass(settings: &OffsetCenterOfMassSettings) -> XRefShape;
+        fn CreateShapeTaperedCylinder(settings: &TaperedCylinderSettings) -> XRefShape;
         fn CreateShapeConvexHull(settings: &ConvexHullSettings) -> XRefShape;
         fn CreateShapeMesh(settings: &MeshSettings) -> XRefShape;
         fn CreateShapeHeightField(settings: &HeightFieldSettings) -> XRefShape;
+
+        fn CreateShapeScaled(settings: &ScaledSettings) -> XRefShape;
+        fn CreateShapeRotatedTranslated(settings: &RotatedTranslatedSettings) -> XRefShape;
+        fn CreateShapeOffsetCenterOfMass(settings: &OffsetCenterOfMassSettings) -> XRefShape;
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct SphereSettings {
+    pub user_data: u64,
+    pub material: RefPhysicsMaterial,
+    pub density: f32,
+    pub radius: f32,
+}
+const_assert_eq!(std::mem::size_of::<SphereSettings>(), 24);
+
+impl Default for SphereSettings {
+    fn default() -> SphereSettings {
+        SphereSettings {
+            user_data: 0,
+            material: RefPhysicsMaterial::invalid(),
+            density: 1000.0,
+            radius: 0.5,
+        }
+    }
+}
+
+impl SphereSettings {
+    pub fn new(radius: f32) -> SphereSettings {
+        SphereSettings {
+            radius,
+            ..Default::default()
+        }
     }
 }
 
@@ -77,36 +109,6 @@ impl BoxSettings {
             half_y,
             half_z,
             convex_radius: (min / 10.0).clamp(MIN_CONVEX_RADIUS, MAX_CONVEX_RADIUS),
-            ..Default::default()
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct SphereSettings {
-    pub user_data: u64,
-    pub material: RefPhysicsMaterial,
-    pub density: f32,
-    pub radius: f32,
-}
-const_assert_eq!(std::mem::size_of::<SphereSettings>(), 24);
-
-impl Default for SphereSettings {
-    fn default() -> SphereSettings {
-        SphereSettings {
-            user_data: 0,
-            material: RefPhysicsMaterial::invalid(),
-            density: 1000.0,
-            radius: 0.5,
-        }
-    }
-}
-
-impl SphereSettings {
-    pub fn new(radius: f32) -> SphereSettings {
-        SphereSettings {
-            radius,
             ..Default::default()
         }
     }
@@ -257,96 +259,6 @@ impl TaperedCylinderSettings {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone)]
-pub struct RotatedTranslatedSettings {
-    pub user_data: u64,
-    pub inner_shape: RefShape,
-    pub position: Vec3A,
-    pub rotation: Quat,
-}
-const_assert_eq!(std::mem::size_of::<RotatedTranslatedSettings>(), 48);
-
-impl Default for RotatedTranslatedSettings {
-    fn default() -> RotatedTranslatedSettings {
-        RotatedTranslatedSettings {
-            user_data: 0,
-            inner_shape: RefShape::invalid(),
-            position: Vec3A::ZERO,
-            rotation: Quat::IDENTITY,
-        }
-    }
-}
-
-impl RotatedTranslatedSettings {
-    pub fn new(inner_shape: RefShape, position: Vec3A, rotation: Quat) -> RotatedTranslatedSettings {
-        RotatedTranslatedSettings {
-            user_data: 0,
-            inner_shape,
-            position,
-            rotation,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct ScaledSettings {
-    pub user_data: u64,
-    pub inner_shape: RefShape,
-    pub scale: Vec3A,
-}
-const_assert_eq!(std::mem::size_of::<ScaledSettings>(), 32);
-
-impl Default for ScaledSettings {
-    fn default() -> ScaledSettings {
-        ScaledSettings {
-            user_data: 0,
-            inner_shape: RefShape::invalid(),
-            scale: Vec3A::ONE,
-        }
-    }
-}
-
-impl ScaledSettings {
-    pub fn new(inner_shape: RefShape, scale: Vec3A) -> ScaledSettings {
-        ScaledSettings {
-            user_data: 0,
-            inner_shape,
-            scale,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct OffsetCenterOfMassSettings {
-    pub user_data: u64,
-    pub inner_shape: RefShape,
-    pub offset: Vec3A,
-}
-const_assert_eq!(std::mem::size_of::<OffsetCenterOfMassSettings>(), 32);
-
-impl Default for OffsetCenterOfMassSettings {
-    fn default() -> OffsetCenterOfMassSettings {
-        OffsetCenterOfMassSettings {
-            user_data: 0,
-            inner_shape: RefShape::invalid(),
-            offset: Vec3A::ZERO,
-        }
-    }
-}
-
-impl OffsetCenterOfMassSettings {
-    pub fn new(inner_shape: RefShape, offset: Vec3A) -> OffsetCenterOfMassSettings {
-        OffsetCenterOfMassSettings {
-            user_data: 0,
-            inner_shape,
-            offset,
-        }
-    }
-}
-
-#[repr(C)]
 #[derive(Debug)]
 pub struct ConvexHullSettings<'t> {
     pub user_data: u64,
@@ -464,9 +376,99 @@ impl<'t> HeightFieldSettings<'t> {
     }
 }
 
-pub fn create_shape_box(settings: &BoxSettings) -> JoltResult<RefShape> {
-    let shape = RefShape(ffi::CreateShapeBox(unsafe {
-        mem::transmute::<&BoxSettings, &ffi::BoxSettings>(settings)
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct ScaledSettings {
+    pub user_data: u64,
+    pub inner_shape: RefShape,
+    pub scale: Vec3A,
+}
+const_assert_eq!(std::mem::size_of::<ScaledSettings>(), 32);
+
+impl Default for ScaledSettings {
+    fn default() -> ScaledSettings {
+        ScaledSettings {
+            user_data: 0,
+            inner_shape: RefShape::invalid(),
+            scale: Vec3A::ONE,
+        }
+    }
+}
+
+impl ScaledSettings {
+    pub fn new(inner_shape: RefShape, scale: Vec3A) -> ScaledSettings {
+        ScaledSettings {
+            user_data: 0,
+            inner_shape,
+            scale,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct RotatedTranslatedSettings {
+    pub user_data: u64,
+    pub inner_shape: RefShape,
+    pub position: Vec3A,
+    pub rotation: Quat,
+}
+const_assert_eq!(std::mem::size_of::<RotatedTranslatedSettings>(), 48);
+
+impl Default for RotatedTranslatedSettings {
+    fn default() -> RotatedTranslatedSettings {
+        RotatedTranslatedSettings {
+            user_data: 0,
+            inner_shape: RefShape::invalid(),
+            position: Vec3A::ZERO,
+            rotation: Quat::IDENTITY,
+        }
+    }
+}
+
+impl RotatedTranslatedSettings {
+    pub fn new(inner_shape: RefShape, position: Vec3A, rotation: Quat) -> RotatedTranslatedSettings {
+        RotatedTranslatedSettings {
+            user_data: 0,
+            inner_shape,
+            position,
+            rotation,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct OffsetCenterOfMassSettings {
+    pub user_data: u64,
+    pub inner_shape: RefShape,
+    pub offset: Vec3A,
+}
+const_assert_eq!(std::mem::size_of::<OffsetCenterOfMassSettings>(), 32);
+
+impl Default for OffsetCenterOfMassSettings {
+    fn default() -> OffsetCenterOfMassSettings {
+        OffsetCenterOfMassSettings {
+            user_data: 0,
+            inner_shape: RefShape::invalid(),
+            offset: Vec3A::ZERO,
+        }
+    }
+}
+
+impl OffsetCenterOfMassSettings {
+    pub fn new(inner_shape: RefShape, offset: Vec3A) -> OffsetCenterOfMassSettings {
+        OffsetCenterOfMassSettings {
+            user_data: 0,
+            inner_shape,
+            offset,
+        }
+    }
+}
+
+pub fn create_shape_sphere(settings: &SphereSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeSphere(unsafe {
+        mem::transmute::<&SphereSettings, &ffi::SphereSettings>(settings)
     }));
     if shape.is_invalid() {
         return Err(JoltError::CreateShape);
@@ -474,9 +476,9 @@ pub fn create_shape_box(settings: &BoxSettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_sphere(settings: &SphereSettings) -> JoltResult<RefShape> {
-    let shape = RefShape(ffi::CreateShapeSphere(unsafe {
-        mem::transmute::<&SphereSettings, &ffi::SphereSettings>(settings)
+pub fn create_shape_box(settings: &BoxSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeBox(unsafe {
+        mem::transmute::<&BoxSettings, &ffi::BoxSettings>(settings)
     }));
     if shape.is_invalid() {
         return Err(JoltError::CreateShape);
@@ -514,29 +516,9 @@ pub fn create_shape_cylinder(settings: &CylinderSettings) -> JoltResult<RefShape
     Ok(shape)
 }
 
-pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> JoltResult<RefShape> {
-    let shape = RefShape(ffi::CreateShapeRotatedTranslated(unsafe {
-        mem::transmute::<&RotatedTranslatedSettings, &ffi::RotatedTranslatedSettings>(settings)
-    }));
-    if shape.is_invalid() {
-        return Err(JoltError::CreateShape);
-    }
-    Ok(shape)
-}
-
-pub fn create_shape_scaled(settings: &ScaledSettings) -> JoltResult<RefShape> {
-    let shape = RefShape(ffi::CreateShapeScaled(unsafe {
-        mem::transmute::<&&ScaledSettings, &ffi::ScaledSettings>(&settings)
-    }));
-    if shape.is_invalid() {
-        return Err(JoltError::CreateShape);
-    }
-    Ok(shape)
-}
-
-pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings) -> JoltResult<RefShape> {
-    let shape = RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe {
-        mem::transmute::<&OffsetCenterOfMassSettings, &ffi::OffsetCenterOfMassSettings>(settings)
+pub fn create_shape_tapered_cylinder(settings: &TaperedCylinderSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeTaperedCylinder(unsafe {
+        mem::transmute::<&TaperedCylinderSettings, &ffi::TaperedCylinderSettings>(settings)
     }));
     if shape.is_invalid() {
         return Err(JoltError::CreateShape);
@@ -574,19 +556,32 @@ pub fn create_shape_height_field(settings: &HeightFieldSettings) -> JoltResult<R
     Ok(shape)
 }
 
-// fn apply_shape_transform(inner: &RefShape, transform: Option<&Transform>) -> RefShape {
-//     if let Some(t) = transform {
-//         let mut shape = inner.clone();
-//         if t.scale != Vec3A::ONE {
-//             let settings = ScaledSettings::new(shape, t.scale);
-//             shape = RefShape(ffi::CreateShapeScaled(unsafe { mem::transmute(&settings) }));
-//         }
-//         if t.position != Vec3A::ZERO || !(t.rotation.xyz() == Vec3::ZERO && t.rotation.w.abs() == 1.0) {
-//             let settings = RotatedTranslatedSettings::new(shape, t.position, t.rotation);
-//             shape = RefShape(ffi::CreateShapeRotatedTranslated(unsafe { mem::transmute(&settings) }));
-//         }
-//         return shape;
-//     } else {
-//         return inner.clone();
-//     }
-// }
+pub fn create_shape_scaled(settings: &ScaledSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeScaled(unsafe {
+        mem::transmute::<&&ScaledSettings, &ffi::ScaledSettings>(&settings)
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
+}
+
+pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeRotatedTranslated(unsafe {
+        mem::transmute::<&RotatedTranslatedSettings, &ffi::RotatedTranslatedSettings>(settings)
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
+}
+
+pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings) -> JoltResult<RefShape> {
+    let shape = RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe {
+        mem::transmute::<&OffsetCenterOfMassSettings, &ffi::OffsetCenterOfMassSettings>(settings)
+    }));
+    if shape.is_invalid() {
+        return Err(JoltError::CreateShape);
+    }
+    Ok(shape)
+}
