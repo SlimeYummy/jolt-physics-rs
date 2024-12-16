@@ -367,3 +367,78 @@ XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
 	}
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
+
+struct SubShapeSettings {
+	void* _shape;
+	RefConst<Shape> shape;
+	Vec3 position;
+	Quat rotation;
+	uint32 userData;
+};
+static_assert(sizeof(SubShapeSettings) == 64, "SubShapeSettings size");
+
+struct SubShape {
+	RefConst<Shape> shape;
+	Float3 positionCOM;
+	Float3 rotation;
+	uint32 userData;
+	bool isRotationIdentity;
+};
+static_assert(sizeof(SubShape) == 40, "SubShape size");
+static_assert(sizeof(CompoundShape::SubShape) == 40, "CompoundShape::SubShape size");
+
+struct JoltArray {
+	size_t size;
+	size_t capacity;
+	SubShapeSettings* elements;
+};
+
+struct StaticCompoundSettings {
+	uint64 userData;
+	rust::Slice<SubShapeSettings> subShape;
+};
+static_assert(sizeof(StaticCompoundSettings) == 24, "StaticCompoundSettings size");
+
+XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& st) {
+	StaticCompoundShapeSettings settings;
+	settings.mUserData = st.userData;
+	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
+	subShapes->size = st.subShape.size();
+	subShapes->capacity = st.subShape.size();
+	subShapes->elements = st.subShape.data();
+	auto result = settings.Create();
+	subShapes->size = 0;
+	subShapes->capacity = 0;
+	subShapes->elements = nullptr;
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+struct MutableCompoundSettings {
+	uint64 userData;
+	rust::Slice<SubShapeSettings> subShape;
+};
+static_assert(sizeof(MutableCompoundSettings) == 24, "MutableCompoundSettings size");
+
+XRefShape CreateShapeStaticCompound(const MutableCompoundSettings& st) {
+	MutableCompoundShapeSettings settings;
+	settings.mUserData = st.userData;
+	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
+	subShapes->size = st.subShape.size();
+	subShapes->capacity = st.subShape.size();
+	subShapes->elements = st.subShape.data();
+	auto result = settings.Create();
+	subShapes->size = 0;
+	subShapes->capacity = 0;
+	subShapes->elements = nullptr;
+	if (result.HasError()) {
+		return XRefShape{};
+	}
+	return CreateRefT<Shape, XRefShape>(result.Get());
+}
+
+// const SubShape* XStaticCompoundShape::GetSubShape(uint inIdx) const {
+// 	return (SubShape*)&AsRefConst<CompoundShape>(this)->GetSubShape(inIdx);
+// }

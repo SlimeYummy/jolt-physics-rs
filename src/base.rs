@@ -4,7 +4,7 @@ use cxx::{type_id, ExternType};
 use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
-use std::mem;
+use std::{mem, pin::Pin};
 
 #[cxx::bridge()]
 pub mod ffi {
@@ -28,6 +28,8 @@ pub mod ffi {
     impl Vec<Vec3> {}
     impl Vec<Float3> {}
     impl Vec<Int3> {}
+    impl Vec<Plane> {}
+    impl Vec<AABox> {}
     impl Vec<IndexedTriangle> {}
 
     unsafe extern "C++" {
@@ -43,6 +45,7 @@ pub mod ffi {
         type Float3 = crate::base::XFloat3;
         type Int3 = crate::base::XInt3;
         type Plane = crate::base::Plane;
+        type AABox = crate::base::AABox;
         type IndexedTriangle = crate::base::IndexedTriangle;
         type BodyID = crate::base::BodyID;
 
@@ -218,6 +221,26 @@ impl Plane {
 }
 
 #[repr(C)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct AABox {
+    pub min: Vec3A,
+    pub max: Vec3A,
+}
+const_assert_eq!(mem::size_of::<AABox>(), 32);
+
+unsafe impl ExternType for AABox {
+    type Id = type_id!("AABox");
+    type Kind = cxx::kind::Trivial;
+}
+
+impl AABox {
+    #[inline]
+    pub fn new(min: Vec3A, max: Vec3A) -> AABox {
+        AABox { min, max }
+    }
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexedTriangle {
     pub idx: [u32; 3],
@@ -340,30 +363,32 @@ impl RefShape {
     }
 
     #[inline]
-    pub fn as_ref(&self) -> Option<&ffi::Shape> {
-        if self.0.ptr.is_null() {
-            return None;
-        }
-        Some(unsafe { &*(self.0.ptr as *const ffi::Shape) })
+    pub(crate) fn as_ref(&self) -> &ffi::Shape {
+        unsafe { &*(self.0.ptr as *const ffi::Shape) }
     }
 
     #[inline]
-    pub fn as_mut(&mut self) -> Option<&mut ffi::Shape> {
-        if self.0.ptr.is_null() {
-            return None;
-        }
-        Some(unsafe { &mut *(self.0.ptr as *mut ffi::Shape) })
+    pub(crate) fn as_mut(&mut self) -> Pin<&mut ffi::Shape> {
+        unsafe { Pin::new_unchecked(&mut *(self.0.ptr as *mut ffi::Shape)) }
     }
 
     #[inline]
-    pub fn as_usize(&self) -> usize {
-        self.0.ptr as usize
+    pub(crate) unsafe fn as_ref_t<T>(&self) -> &T {
+        unsafe { &*(self.0.ptr as *const T) }
     }
 
-    /// # Safety
-    /// JoltPhysics underlying Shape object pointer
     #[inline]
-    pub unsafe fn ptr(&mut self) -> *mut ffi::Shape {
+    pub(crate) unsafe fn as_mut_t<T>(&mut self) -> Pin<&mut T> {
+        unsafe { Pin::new_unchecked(&mut *(self.0.ptr as *mut T)) }
+    }
+
+    #[inline]
+    pub(crate) fn as_ptr(&self) -> *const ffi::Shape {
+        self.0.ptr as *const ffi::Shape
+    }
+
+    #[inline]
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::Shape {
         self.0.ptr as *mut ffi::Shape
     }
 }
