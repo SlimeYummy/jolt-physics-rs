@@ -120,6 +120,9 @@ template <class T, class R> RefConst<T> AsRefConst(R ref) { return *reinterpret_
 
 class XPhysicsSystem;
 
+typedef EShapeType ShapeType;
+typedef EShapeSubType ShapeSubType;
+
 #include "jolt-physics-rs/src/base.rs.h"
 #include "jolt-physics-rs/src/layer.rs.h"
 
@@ -166,6 +169,15 @@ struct RotatedTranslatedSettings;
 XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
 struct OffsetCenterOfMassSettings;
 XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
+
+struct SubShapeSettings;
+struct SubShape;
+struct StaticCompoundSettings;
+XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& settings);
+struct MutableCompoundSettings;
+XRefShape CreateShapeMutableCompound(const MutableCompoundSettings& settings);
+
+inline const SubShape* CompoundShapeGetSubShape(XRefShape ref, uint idx) { return (const SubShape*)&AsRefConst<CompoundShape>(ref)->GetSubShape(idx); }
 
 //
 // system
