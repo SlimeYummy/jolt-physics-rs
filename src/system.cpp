@@ -131,9 +131,9 @@ void XPhysicsSystem::DebugRender(DebugRenderer* debugRenderer) {
 }
 #endif
 
-XRefPhysicsSystem CreatePhysicSystem(XContactCollector* contacts) {
+XPhysicsSystem* CreatePhysicSystem(XContactCollector* contacts) {
 	auto system = XPhysicsSystem::Create(contacts);
-	return CreateRefT<XPhysicsSystem, XRefPhysicsSystem>(system);
+	return LeakRefT<XPhysicsSystem>(system);
 }
 
 //
