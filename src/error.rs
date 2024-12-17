@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum JoltError {
     #[error("Create shape")]
     CreateShape,
+    #[error("Too less subshape")]
+    TooLessSubShape,
     #[error("Create body")]
     CreateBody,
 }

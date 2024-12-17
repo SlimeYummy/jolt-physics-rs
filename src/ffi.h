@@ -80,19 +80,6 @@ static_assert(sizeof(Vec4) == 16, "Vec4 size");
 static_assert(sizeof(Quat) == 16, "Quat size");
 static_assert(sizeof(Mat44) == 64, "Mat44 size");
 
-struct Isometry {
-	Vec3 position;
-	Quat rotation;
-};
-static_assert(sizeof(Isometry) == 32, "Isometry size");
-
-struct Transform {
-	Vec3 position;
-	Quat rotation;
-	Vec3 scale;
-};
-static_assert(sizeof(Transform) == 48, "Transform size");
-
 static_assert(sizeof(Float3) == 12, "Float3 size");
 struct Int3 { int32_t x, y, z; };
 static_assert(sizeof(Int3) == 12, "Int3 size");
@@ -216,6 +203,7 @@ public:
 	virtual void OnContactRemoved(const SubShapeIDPair& pair) override;
 };
 
+typedef EBodyType BodyType;
 typedef EMotionType MotionType;
 typedef EMotionQuality MotionQuality;
 typedef EAllowedDOFs AllowedDOFs;
@@ -268,8 +256,8 @@ class XBodyInterface: public BodyInterface {
 public:
 	~XBodyInterface() { PRINT_ONLY(printf("~XBodyInterface\n")); }
 	BodyID CreateBody(const BodyCreationSettings& settings);
+	BodyID CreateBodyWithID(const BodyID &bodyId, const BodyCreationSettings& settings);
 	BodyID CreateAddBody(const BodyCreationSettings& settings, EActivation activation);
-	Isometry GetPositionAndRotation(const BodyID& bodyId) const;
 };
 
 XBodyInterface* CreateBodyInterface(XPhysicsSystem* system, bool lock);
@@ -289,7 +277,6 @@ public:
 	XCharacterCommon(XPhysicsSystem* system, const CharacterSettings* settings, Vec3 position, Quat rotation, uint64 userData);
 	~XCharacterCommon() override;
 	XRefShape GetShape() const { return CreateRefT<Shape, XRefShape>(const_cast<Shape*>(Character::GetShape())); }
-	Isometry GetPositionAndRotation(bool lock) const;
 	bool SetShape(XRefShape shape, float maxPenetrationDepth, bool lock);
 	// TODO: CheckCollision()
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
