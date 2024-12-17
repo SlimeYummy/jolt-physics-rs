@@ -9,17 +9,17 @@ struct SphereSettings {
 };
 static_assert(sizeof(SphereSettings) == 24, "SphereSettings size");
 
-XRefShape CreateShapeSphere(const SphereSettings& st) {
+Shape* CreateShapeSphere(const SphereSettings& st) {
 	SphereShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mRadius = st.radius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct BoxSettings {
@@ -31,18 +31,18 @@ struct BoxSettings {
 };
 static_assert(sizeof(BoxSettings) == 40, "BoxSettings size");
 
-XRefShape CreateShapeBox(const BoxSettings& st) {
+Shape* CreateShapeBox(const BoxSettings& st) {
 	BoxShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mHalfExtent = Vec3(st.halfX, st.halfY, st.halfZ);
 	settings.mConvexRadius = st.convexRadius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(std::move(result.Get()));
 }
 
 struct CapsuleSettings {
@@ -54,18 +54,18 @@ struct CapsuleSettings {
 };
 static_assert(sizeof(CapsuleSettings) == 32, "CapsuleSettings size");
 
-XRefShape CreateShapeCapsule(const CapsuleSettings& st) {
+Shape* CreateShapeCapsule(const CapsuleSettings& st) {
 	CapsuleShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mHalfHeightOfCylinder = st.halfHeight;
 	settings.mRadius = st.radius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct TaperedCapsuleSettings {
@@ -78,19 +78,19 @@ struct TaperedCapsuleSettings {
 };
 static_assert(sizeof(TaperedCapsuleSettings) == 32, "TaperedCapsuleSettings size");
 
-XRefShape CreateShapeTaperedCapsule(const TaperedCapsuleSettings& st) {
+Shape* CreateShapeTaperedCapsule(const TaperedCapsuleSettings& st) {
 	TaperedCapsuleShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mHalfHeightOfTaperedCylinder = st.halfHeight;
 	settings.mTopRadius = st.topRadius;
 	settings.mBottomRadius = st.bottomRadius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct CylinderSettings {
@@ -103,19 +103,19 @@ struct CylinderSettings {
 };
 static_assert(sizeof(CylinderSettings) == 32, "CylinderSettings size");
 
-XRefShape CreateShapeCylinder(const CylinderSettings& st) {
+Shape* CreateShapeCylinder(const CylinderSettings& st) {
 	CylinderShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mHalfHeight = st.halfHeight;
 	settings.mRadius = st.radius;
 	settings.mConvexRadius = st.convexRadius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct TaperedCylinderSettings {
@@ -129,10 +129,10 @@ struct TaperedCylinderSettings {
 };
 static_assert(sizeof(TaperedCylinderSettings) == 40, "TaperedCylinderSettings size");
 
-XRefShape CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
+Shape* CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
 	TaperedCylinderShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mHalfHeight = st.halfHeight;
 	settings.mTopRadius = st.topRadius;
@@ -140,9 +140,9 @@ XRefShape CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
 	settings.mConvexRadius = st.convexRadius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct ConvexHullSettings {
@@ -156,10 +156,10 @@ struct ConvexHullSettings {
 };
 static_assert(sizeof(ConvexHullSettings) == 56, "ConvexHullSettings size");
 
-XRefShape CreateShapeConvexHull(const ConvexHullSettings& st) {
+Shape* CreateShapeConvexHull(const ConvexHullSettings& st) {
 	ConvexHullShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mPoints.assign(st.points.begin(), st.points.end());
 	settings.mMaxConvexRadius = st.maxConvexRadius;
@@ -167,9 +167,9 @@ XRefShape CreateShapeConvexHull(const ConvexHullSettings& st) {
 	settings.mHullTolerance = st.hullTolerance;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct TriangleSettings {
@@ -183,10 +183,10 @@ struct TriangleSettings {
 };
 static_assert(sizeof(TriangleSettings) == 80, "TriangleSettings size");
 
-XRefShape CreateShapeTriangle(const TriangleSettings& st) {
+Shape* CreateShapeTriangle(const TriangleSettings& st) {
 	TriangleShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mDensity = st.density;
 	settings.mV1 = st.v1;
 	settings.mV2 = st.v2;
@@ -194,9 +194,9 @@ XRefShape CreateShapeTriangle(const TriangleSettings& st) {
 	settings.mConvexRadius = st.convexRadius;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct PlaneSettings {
@@ -207,30 +207,30 @@ struct PlaneSettings {
 };
 static_assert(sizeof(PlaneSettings) == 48, "PlaneSettings size");
 
-XRefShape CreateShapePlane(const PlaneSettings& st) {
+Shape* CreateShapePlane(const PlaneSettings& st) {
 	PlaneShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mMaterial = AsRefConst<PhysicsMaterial>(st.material);
+	settings.mMaterial = st.material;
 	settings.mPlane = st.plane;
 	settings.mHalfExtent = st.halfExtent;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct MeshSettings {
 	uint64 userData;
 	rust::Slice<Float3> triangleVertices;
 	rust::Slice<IndexedTriangle> indexedTriangles;
-	rust::Slice<XRefPhysicsMaterial> materials;
+	rust::Slice<PhysicsMaterial*> materials;
 	uint32 maxTrianglesPerLeaf;
 	float activeEdgeCosThresholdAngle;
 };
 static_assert(sizeof(MeshSettings) == 64, "MeshSettings size");
 
-XRefShape CreateShapeMesh(const MeshSettings& st) {
+Shape* CreateShapeMesh(const MeshSettings& st) {
 	MeshShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mTriangleVertices.assign(st.triangleVertices.begin(), st.triangleVertices.end());
@@ -243,9 +243,9 @@ XRefShape CreateShapeMesh(const MeshSettings& st) {
 	settings.mActiveEdgeCosThresholdAngle = st.activeEdgeCosThresholdAngle;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct HeightFieldSettings {
@@ -259,14 +259,14 @@ struct HeightFieldSettings {
 	uint32 bitsPerSample;
 	rust::Slice<float> heightSamples;
 	rust::Slice<uint8_t> materialIndices;
-	rust::Slice<XRefPhysicsMaterial> materials;
+	rust::Slice<PhysicsMaterial*> materials;
 	float activeEdgeCosThresholdAngle;
 };
 static_assert(sizeof(HeightFieldSettings) == 128, "HeightFieldSettings size");
 
-XRefShape CreateShapeHeightField(const HeightFieldSettings& st) {
+Shape* CreateShapeHeightField(const HeightFieldSettings& st) {
 	if (st.heightSamples.size() != st.sampleCount * st.sampleCount) {
-		return XRefShape{};
+		return nullptr;
 	}
 	HeightFieldShapeSettings settings(
 		st.heightSamples.data(),
@@ -287,9 +287,9 @@ XRefShape CreateShapeHeightField(const HeightFieldSettings& st) {
 	settings.mActiveEdgeCosThresholdAngle = st.activeEdgeCosThresholdAngle;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct EmptySettings {
@@ -298,15 +298,15 @@ struct EmptySettings {
 };
 static_assert(sizeof(EmptySettings) == 32, "EmptySettings size");
 
-XRefShape CreateShapeEmpty(const EmptySettings& st) {
+Shape* CreateShapeEmpty(const EmptySettings& st) {
 	EmptyShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mCenterOfMass = st.centerOfMass;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct ScaledSettings {
@@ -316,16 +316,17 @@ struct ScaledSettings {
 };
 static_assert(sizeof(ScaledSettings) == 32, "ScaledSettings size");
 
-XRefShape CreateShapeScaled(const ScaledSettings& st) {
+Shape* CreateShapeScaled(const ScaledSettings& st) {
 	ScaledShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mInnerShapePtr = st.innerShape;
 	settings.mScale = st.scale;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct RotatedTranslatedSettings {
@@ -336,17 +337,17 @@ struct RotatedTranslatedSettings {
 };
 static_assert(sizeof(RotatedTranslatedSettings) == 48, "RotatedTranslatedSettings size");
 
-XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
+Shape* CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
 	RotatedTranslatedShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mInnerShapePtr = st.innerShape;
 	settings.mPosition = st.position;
 	settings.mRotation = st.rotation;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct OffsetCenterOfMassSettings {
@@ -356,16 +357,16 @@ struct OffsetCenterOfMassSettings {
 };
 static_assert(sizeof(OffsetCenterOfMassSettings) == 32, "OffsetCenterOfMassSettings size");
 
-XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
+Shape* CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
 	OffsetCenterOfMassShapeSettings settings;
 	settings.mUserData = st.userData;
-	settings.mInnerShapePtr = AsRefConst<Shape>(st.innerShape);
+	settings.mInnerShapePtr = st.innerShape;
 	settings.mOffset = st.offset;
 	auto result = settings.Create();
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct SubShapeSettings {
@@ -377,21 +378,12 @@ struct SubShapeSettings {
 };
 static_assert(sizeof(SubShapeSettings) == 64, "SubShapeSettings size");
 
-struct SubShape {
-	RefConst<Shape> shape;
-	Float3 positionCOM;
-	Float3 rotation;
-	uint32 userData;
-	bool isRotationIdentity;
-};
-static_assert(sizeof(SubShape) == 40, "SubShape size");
-static_assert(sizeof(CompoundShape::SubShape) == 40, "CompoundShape::SubShape size");
-
 struct JoltArray {
 	size_t size;
 	size_t capacity;
 	SubShapeSettings* elements;
 };
+static_assert(sizeof(JoltArray) == sizeof(Array<SubShapeSettings>));
 
 struct StaticCompoundSettings {
 	uint64 userData;
@@ -399,7 +391,7 @@ struct StaticCompoundSettings {
 };
 static_assert(sizeof(StaticCompoundSettings) == 24, "StaticCompoundSettings size");
 
-XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& st) {
+Shape* CreateShapeStaticCompound(const StaticCompoundSettings& st) {
 	StaticCompoundShapeSettings settings;
 	settings.mUserData = st.userData;
 	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
@@ -411,9 +403,9 @@ XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& st) {
 	subShapes->capacity = 0;
 	subShapes->elements = nullptr;
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }
 
 struct MutableCompoundSettings {
@@ -422,7 +414,7 @@ struct MutableCompoundSettings {
 };
 static_assert(sizeof(MutableCompoundSettings) == 24, "MutableCompoundSettings size");
 
-XRefShape CreateShapeMutableCompound(const MutableCompoundSettings& st) {
+Shape* CreateShapeMutableCompound(const MutableCompoundSettings& st) {
 	MutableCompoundShapeSettings settings;
 	settings.mUserData = st.userData;
 	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
@@ -434,7 +426,7 @@ XRefShape CreateShapeMutableCompound(const MutableCompoundSettings& st) {
 	subShapes->capacity = 0;
 	subShapes->elements = nullptr;
 	if (result.HasError()) {
-		return XRefShape{};
+		return nullptr;
 	}
-	return CreateRefT<Shape, XRefShape>(result.Get());
+	return LeakRefT<Shape>(result.Get());
 }

@@ -90,20 +90,31 @@ static_assert(sizeof(BodyID) == 4, "BodyID size");
 static_assert(sizeof(SubShapeID) == 4, "SubShapeID size");
 
 static_assert(sizeof(Ref<int>) == sizeof(size_t), "RsRef size");
-template <class T, class R> R CreateRefT(Ref<T> cxx_ref) {
-	R ref = R{};
-	reinterpret_cast<Ref<T>*>(&ref)->operator=(cxx_ref);
-	return ref;
+
+template <class T>
+T* LeakRefT(RefConst<T> cxx_ref) {
+	T* new_ptr = nullptr;
+	reinterpret_cast<RefConst<T>*>(&new_ptr)->operator=(std::move(cxx_ref));
+	return new_ptr;
 }
-template <class T, class R> void DropRefT(R ref) { if (ref.ptr != nullptr) { reinterpret_cast<Ref<T>*>(&ref)->~Ref(); } }
-template <class T, class R> uint32 CountRefT(R ref) { return ref.ptr == nullptr ? 0 : (*reinterpret_cast<Ref<T>*>(&ref))->GetRefCount(); }
-template <class T, class R> R CloneRefT(R ref) {
-	R rs_ref_new = R{};
-	*reinterpret_cast<Ref<T>*>(&rs_ref_new) = *reinterpret_cast<Ref<T>*>(&ref);
-	return rs_ref_new;
+
+template <class T>
+void DropRef(T* rs_ptr) {
+	if (rs_ptr != nullptr) {
+		reinterpret_cast<RefConst<T>*>(&rs_ptr)->~RefConst();
+	}
 }
-template <class T, class R> Ref<T> AsRefMut(R ref) { return *reinterpret_cast<Ref<T>*>(&ref); }
-template <class T, class R> RefConst<T> AsRefConst(R ref) { return *reinterpret_cast<RefConst<T>*>(&ref); }
+
+template <class T> T* CloneRef(T* rs_ptr) {
+	T* new_ptr = nullptr;
+	*reinterpret_cast<RefConst<T>*>(&new_ptr) = *reinterpret_cast<RefConst<T>*>(&rs_ptr);
+	return new_ptr;
+}
+
+template <class T>
+uint32 CountRef(T* rs_ptr) {
+	return rs_ptr == nullptr ? 0 : (*reinterpret_cast<RefConst<T>*>(&rs_ptr))->GetRefCount();
+}
 
 class XPhysicsSystem;
 
@@ -113,58 +124,57 @@ typedef EShapeSubType ShapeSubType;
 #include "jolt-physics-rs/src/base.rs.h"
 #include "jolt-physics-rs/src/layer.rs.h"
 
-inline void DropRefShape(XRefShape ref) { DropRefT<Shape>(ref); }
-inline XRefShape CloneRefShape(XRefShape ref) { return CloneRefT<Shape>(ref); }
-inline uint32 CountRefShape(XRefShape ref) { return CountRefT<Shape>(ref); }
+inline void DropRefShape(Shape* ptr) { DropRef<Shape>(ptr); }
+inline Shape* CloneRefShape(Shape* ptr) { return CloneRef<Shape>(ptr); }
+inline uint32 CountRefShape(Shape* ptr) { return CountRef<Shape>(ptr); }
 
-inline void DropRefPhysicsMaterial(XRefPhysicsMaterial ref) { DropRefT<PhysicsMaterial>(ref); }
-inline XRefPhysicsMaterial CloneRefPhysicsMaterial(XRefPhysicsMaterial ref) { return CloneRefT<PhysicsMaterial>(ref); }
-inline uint32 CountRefPhysicsMaterial(XRefPhysicsMaterial ref) { return CountRefT<PhysicsMaterial>(ref); }
+inline void DropRefPhysicsMaterial(PhysicsMaterial* ptr) { DropRef<PhysicsMaterial>(ptr); }
+inline PhysicsMaterial* CloneRefPhysicsMaterial(PhysicsMaterial* ptr) { return CloneRef<PhysicsMaterial>(ptr); }
+inline uint32 CountRefPhysicsMaterial(PhysicsMaterial* ptr) { return CountRef<PhysicsMaterial>(ptr); }
 
 //
 // shape
 //
 
 struct SphereSettings;
-XRefShape CreateShapeSphere(const SphereSettings& settings);
+Shape* CreateShapeSphere(const SphereSettings& settings);
 struct BoxSettings;
-XRefShape CreateShapeBox(const BoxSettings& settings);
+Shape* CreateShapeBox(const BoxSettings& settings);
 struct CapsuleSettings;
-XRefShape CreateShapeCapsule(const CapsuleSettings& settings);
+Shape* CreateShapeCapsule(const CapsuleSettings& settings);
 struct TaperedCapsuleSettings;
-XRefShape CreateShapeTaperedCapsule(const TaperedCapsuleSettings& settings);
+Shape* CreateShapeTaperedCapsule(const TaperedCapsuleSettings& settings);
 struct CylinderSettings;
-XRefShape CreateShapeCylinder(const CylinderSettings& settings);
+Shape* CreateShapeCylinder(const CylinderSettings& settings);
 struct TaperedCylinderSettings;
-XRefShape CreateShapeTaperedCylinder(const TaperedCylinderSettings& settings);
+Shape* CreateShapeTaperedCylinder(const TaperedCylinderSettings& settings);
 struct ConvexHullSettings;
-XRefShape CreateShapeConvexHull(const ConvexHullSettings& settings);
+Shape* CreateShapeConvexHull(const ConvexHullSettings& settings);
 struct TriangleSettings;
-XRefShape CreateShapeTriangle(const TriangleSettings& settings);
+Shape* CreateShapeTriangle(const TriangleSettings& settings);
 struct PlaneSettings;
-XRefShape CreateShapePlane(const PlaneSettings& settings);
+Shape* CreateShapePlane(const PlaneSettings& settings);
 struct MeshSettings;
-XRefShape CreateShapeMesh(const MeshSettings& settings);
+Shape* CreateShapeMesh(const MeshSettings& settings);
 struct HeightFieldSettings;
-XRefShape CreateShapeHeightField(const HeightFieldSettings& settings);
+Shape* CreateShapeHeightField(const HeightFieldSettings& settings);
 struct EmptySettings;
-XRefShape CreateShapeEmpty(const EmptySettings& settings);
+Shape* CreateShapeEmpty(const EmptySettings& settings);
 
 struct ScaledSettings;
-XRefShape CreateShapeScaled(const ScaledSettings& settings);
+Shape* CreateShapeScaled(const ScaledSettings& settings);
 struct RotatedTranslatedSettings;
-XRefShape CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
+Shape* CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
 struct OffsetCenterOfMassSettings;
-XRefShape CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
+Shape* CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
 
 struct SubShapeSettings;
-struct SubShape;
 struct StaticCompoundSettings;
-XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& settings);
+Shape* CreateShapeStaticCompound(const StaticCompoundSettings& settings);
 struct MutableCompoundSettings;
-XRefShape CreateShapeMutableCompound(const MutableCompoundSettings& settings);
-
-inline const SubShape* CompoundShapeGetSubShape(XRefShape ref, uint idx) { return (const SubShape*)&AsRefConst<CompoundShape>(ref)->GetSubShape(idx); }
+Shape* CreateShapeMutableCompound(const MutableCompoundSettings& settings);
+typedef CompoundShape::SubShape CompoundShapeSubShape;
+static_assert(sizeof(CompoundShape::SubShape) == 40, "CompoundShape::SubShape size");
 
 //
 // system
@@ -247,10 +257,10 @@ public:
 	RENDERER_ONLY(void DebugRender(DebugRenderer* debugRenderer);)
 };
 
-XRefPhysicsSystem CreatePhysicSystem(XContactCollector* contacts);
-inline void DropRefPhysicsSystem(XRefPhysicsSystem ref) { DropRefT<XPhysicsSystem>(ref); }
-inline XRefPhysicsSystem CloneRefPhysicsSystem(XRefPhysicsSystem ref) { return CloneRefT<XPhysicsSystem>(ref); }
-inline uint32 CountRefPhysicsSystem(XRefPhysicsSystem ref) { return CountRefT<XPhysicsSystem>(ref); }
+XPhysicsSystem* CreatePhysicSystem(XContactCollector* contacts);
+inline void DropRefPhysicsSystem(XPhysicsSystem* ptr) { DropRef<XPhysicsSystem>(ptr); }
+inline XPhysicsSystem* CloneRefPhysicsSystem(XPhysicsSystem* ptr) { return CloneRef<XPhysicsSystem>(ptr); }
+inline uint32 CountRefPhysicsSystem(XPhysicsSystem* ptr) { return CountRef<XPhysicsSystem>(ptr); }
 
 class XBodyInterface: public BodyInterface {
 public:
@@ -276,8 +286,6 @@ private:
 public:
 	XCharacterCommon(XPhysicsSystem* system, const CharacterSettings* settings, Vec3 position, Quat rotation, uint64 userData);
 	~XCharacterCommon() override;
-	XRefShape GetShape() const { return CreateRefT<Shape, XRefShape>(const_cast<Shape*>(Character::GetShape())); }
-	bool SetShape(XRefShape shape, float maxPenetrationDepth, bool lock);
 	// TODO: CheckCollision()
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
 };
@@ -306,7 +314,6 @@ private:
 public:
 	XCharacterVirtual(XPhysicsSystem* system, const CharacterVirtualSettings* settings, Vec3 position, Quat rotation);
 	~XCharacterVirtual() override;
-	XRefShape GetShape() const { return CreateRefT<Shape, XRefShape>(const_cast<Shape*>(CharacterVirtual::GetShape())); }
 	void Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity);
 	bool CanWalkStairs(Vec3 velocity) const { return CharacterVirtual::CanWalkStairs(velocity); }
 	bool WalkStairs(ObjectLayer chara_layer, float deltaTime, Vec3 stepUp, Vec3 stepForward, Vec3 stepForwardTest, Vec3 stepDownExtra);
@@ -314,8 +321,8 @@ public:
 	void ExtendedUpdate(ObjectLayer chara_layer, float deltaTime, Vec3 gravity, const ExtendedUpdateSettings& settings);
 	void RefreshContacts(ObjectLayer chara_layer);
 	void UpdateGroundVelocity() { CharacterVirtual::UpdateGroundVelocity(); }
-	bool SetShape(ObjectLayer chara_layer, XRefShape shape, float maxPenetrationDepth);
-	// void CheckCollision(ObjectLayer chara_layer, RsVec3 position, RsQuat rotation, RsVec3 movementDirection, float maxPenetrationDepth, XRefShape shape, RsVec3 baseOffset) const;
+	bool SetShape(ObjectLayer chara_layer, const Shape* shape, float maxPenetrationDepth);
+	// void CheckCollision(ObjectLayer chara_layer, RsVec3 position, RsQuat rotation, RsVec3 movementDirection, float maxPenetrationDepth, Shape* shape, RsVec3 baseOffset) const;
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
 public:
 	void OnAdjustBodyVelocity(const CharacterVirtual* chara, const Body& body2, Vec3& linearVelocity, Vec3& angularVelocity) override;
