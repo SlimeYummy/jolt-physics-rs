@@ -212,12 +212,13 @@ impl JoltDemo {
 
         self.system.update(1.0 / FPS);
 
-        // if let Some(chara) = &mut self.chara_common {
-        //     chara.post_simulation(0.1, false);
-        // }
+        if let Some(chara) = &mut self.chara_common {
+            chara.post_simulation(0.1, false);
+        }
     }
 
     fn create_ground(&mut self) -> JoltResult<BodyID> {
+        println!("create_ground");
         let ground = create_plane_shape(&PlaneSettings::new(Plane::new(Vec3::Y, 0.0), 50.0))?;
         self.body_itf.create_add_body(
             &BodySettings::new_static(ground, PHY_LAYER_STATIC, Vec3A::new(0.0, 0.0, 50.0), Quat::IDENTITY),
@@ -226,6 +227,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_cube(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_cube");
         let boxx = create_box_shape(&BoxSettings::new(0.5, 0.5, 0.5))?;
         let mut bs = BodySettings::new(
             boxx,
@@ -240,6 +242,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_sphere(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_sphere");
         let sphere = create_sphere_shape(&SphereSettings::new(0.8))?;
         let mut bs = BodySettings::new(
             sphere,
@@ -254,6 +257,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_box(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_box");
         let long_box = create_box_shape(&BoxSettings::new(0.5, 1.0, 0.5))?;
         let mut bs = BodySettings::new(
             long_box,
@@ -268,6 +272,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_tapered_capsule(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_tapered_capsule");
         let obj = create_tapered_capsule_shape(&TaperedCapsuleSettings::new(1.0, 1.0, 0.3))?;
         self.body_itf.create_add_body(
             &BodySettings::new(
@@ -282,6 +287,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_convex_hull(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_convex_hull");
         let convex = create_convex_hull_shape(&ConvexHullSettings::new(&[
             Vec3A::new(1.0, 1.0, 1.0),
             Vec3A::new(1.0, -1.0, -1.0),
@@ -301,6 +307,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_static_compound(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_static_compound");
         let capsule = create_capsule_shape(&CapsuleSettings::new(0.25, 0.5))?;
         let boxx = create_box_shape(&BoxSettings::new(0.1, 0.1, 1.0))?;
         let sub_shapes = vec![
@@ -322,6 +329,7 @@ impl JoltDemo {
     }
 
     fn create_dyn_mutable_compound(&mut self) -> JoltResult<BodyID> {
+        println!("create_dyn_mutable_compound");
         let sphere = create_sphere_shape(&SphereSettings::new(0.75))?;
         let boxx = create_box_shape(&BoxSettings::new(0.1, 0.1, 1.0))?;
         let sub_shapes = vec![
@@ -344,21 +352,24 @@ impl JoltDemo {
     }
 
     fn update_dyn_mutable_compound(&mut self) {
-        let (mut mutable_compound, body_id) = match self.mutable_object.clone() {
-            Some(v) => v,
+        let (mutable_compound, body_id) = match self.mutable_object.as_mut() {
+            Some(v) => (&mut v.0, v.1.clone()),
             None => return,
         };
         let previous_center_of_mass = mutable_compound.get_center_of_mass();
-        mutable_compound.modify_shapes(
-            0,
-            &[Vec3A::new(0.0, 0.0, 0.0), Vec3A::new(0.0, 0.0, 0.0)],
-            &[Quat::IDENTITY, Quat::from_rotation_x(self.duration * PI / 4.0)],
-        );
+        unsafe {
+            mutable_compound.modify_shapes(
+                0,
+                &[Vec3A::new(0.0, 0.0, 0.0), Vec3A::new(0.0, 0.0, 0.0)],
+                &[Quat::IDENTITY, Quat::from_rotation_x(self.duration * PI / 4.0)],
+            )
+        };
         self.body_itf
             .notify_shape_changed(body_id, previous_center_of_mass, false, true);
     }
 
     fn create_mesh_steps(&mut self) -> JoltResult<BodyID> {
+        println!("create_mesh_steps");
         let mut vertices = Vec::new();
         let mut indexes = Vec::new();
         for idx in 0..15 {
@@ -404,6 +415,7 @@ impl JoltDemo {
     }
 
     fn create_height_field(&mut self) -> JoltResult<BodyID> {
+        println!("create_height_field");
         let mut samples = Vec::new();
         for x in 1..=32 {
             for y in 1..=32 {
@@ -433,6 +445,7 @@ impl JoltDemo {
     }
 
     fn create_sensor_sphere(&mut self) -> JoltResult<BodyID> {
+        println!("create_sensor_sphere");
         let sphere = create_sphere_shape(&SphereSettings::new(4.0))?;
         self.body_itf.create_add_body(
             &BodySettings::new_sensor(

@@ -33,9 +33,9 @@ pub(crate) mod ffi {
         type Quat = crate::base::ffi::Quat;
         type Mat44 = crate::base::ffi::Mat44;
         type BodyID = crate::base::ffi::BodyID;
-        type XRefShape = crate::base::ffi::XRefShape;
-        type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
         type Activation = crate::system::ffi::Activation;
+        type Shape = crate::shape::ffi::Shape;
+        type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
 
         type GroundState;
         type BackFaceMode;
@@ -67,7 +67,7 @@ pub(crate) mod ffi {
         fn IsSlopeTooSteep(self: &XCharacterCommon, normal: Vec3) -> bool;
         fn GetGroundState(self: &XCharacterCommon) -> GroundState;
         fn IsSupported(self: &XCharacterCommon) -> bool;
-        fn GetShape(self: &XCharacterCommon) -> XRefShape;
+        unsafe fn GetShape(self: &XCharacterCommon) -> *const Shape;
         fn GetGroundPosition(self: &XCharacterCommon) -> Vec3;
         fn GetGroundNormal(self: &XCharacterCommon) -> Vec3;
         fn GetGroundVelocity(self: &XCharacterCommon) -> Vec3;
@@ -97,8 +97,12 @@ pub(crate) mod ffi {
         fn GetCenterOfMassPosition(self: &XCharacterCommon, lock: bool) -> Vec3;
         fn GetWorldTransform(self: &XCharacterCommon, lock: bool) -> Mat44;
         fn SetLayer(self: Pin<&mut XCharacterCommon>, layer: u16, lock: bool);
-        fn SetShape(self: Pin<&mut XCharacterCommon>, shape: XRefShape, max_penetration_depth: f32, lock: bool)
-            -> bool;
+        unsafe fn SetShape(
+            self: Pin<&mut XCharacterCommon>,
+            shape: *const Shape,
+            max_penetration_depth: f32,
+            lock: bool,
+        ) -> bool;
 
         type XCharacterVirtual;
         unsafe fn CreateCharacterVirtual(
@@ -114,7 +118,7 @@ pub(crate) mod ffi {
         fn IsSlopeTooSteep(self: &XCharacterVirtual, normal: Vec3) -> bool;
         fn GetGroundState(self: &XCharacterVirtual) -> GroundState;
         fn IsSupported(self: &XCharacterVirtual) -> bool;
-        fn GetShape(self: &XCharacterVirtual) -> XRefShape;
+        fn GetShape(self: &XCharacterVirtual) -> *const Shape;
         fn GetGroundPosition(self: &XCharacterVirtual) -> Vec3;
         fn GetGroundNormal(self: &XCharacterVirtual) -> Vec3;
         fn GetGroundVelocity(self: &XCharacterVirtual) -> Vec3;
@@ -163,10 +167,10 @@ pub(crate) mod ffi {
         );
         fn RefreshContacts(self: Pin<&mut XCharacterVirtual>, chara_layer: u16);
         fn UpdateGroundVelocity(self: Pin<&mut XCharacterVirtual>);
-        fn SetShape(
+        unsafe fn SetShape(
             self: Pin<&mut XCharacterVirtual>,
             chara_layer: u16,
-            shape: XRefShape,
+            shape: *const Shape,
             max_penetration_depth: f32,
         ) -> bool;
     }
@@ -181,7 +185,7 @@ pub struct CharacterCommonSettings {
     up: Vec3A,
     supporting_volume: Plane,
     max_slope_angle: f32,
-    shape: RefShape,
+    shape: Option<RefShape>,
     layer: u16,
     mass: f32,
     friction: f32,
@@ -195,7 +199,7 @@ impl Default for CharacterCommonSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
-            shape: RefShape::invalid(),
+            shape: None,
             layer: 0,
             mass: 80.0,
             friction: 0.2,
@@ -207,7 +211,7 @@ impl Default for CharacterCommonSettings {
 impl CharacterCommonSettings {
     pub fn new(shape: RefShape, layer: u16) -> CharacterCommonSettings {
         CharacterCommonSettings {
-            shape,
+            shape: Some(shape),
             layer,
             ..Default::default()
         }
@@ -220,7 +224,7 @@ pub struct CharacterVirtualSettings {
     up: Vec3A,
     supporting_volume: Plane,
     max_slope_angle: f32,
-    shape: RefShape,
+    shape: Option<RefShape>,
     mass: f32,
     max_strength: f32,
     shape_offset: Vec3A,
@@ -243,7 +247,7 @@ impl Default for CharacterVirtualSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
-            shape: RefShape::invalid(),
+            shape: None,
             mass: 70.0,
             max_strength: 100.0,
             shape_offset: Vec3A::ZERO,
@@ -264,7 +268,7 @@ impl Default for CharacterVirtualSettings {
 impl CharacterVirtualSettings {
     pub fn new(shape: RefShape) -> CharacterVirtualSettings {
         CharacterVirtualSettings {
-            shape,
+            shape: Some(shape),
             ..Default::default()
         }
     }
@@ -402,7 +406,7 @@ impl CharacterCommon {
 
     #[inline]
     pub fn get_shape(&self) -> RefShape {
-        RefShape(self.as_ref().GetShape())
+        unsafe { RefShape::new(self.as_ref().GetShape() as *mut _) }
     }
 
     #[inline]
@@ -526,8 +530,8 @@ impl CharacterCommon {
     }
 
     #[inline]
-    pub fn set_shape(&mut self, shape: RefShape, max_penetration_depth: f32, lock: bool) -> bool {
-        self.as_mut().SetShape(shape.0, max_penetration_depth, lock)
+    pub fn set_shape(&mut self, shape: &mut RefShape, max_penetration_depth: f32, lock: bool) -> bool {
+        unsafe { self.as_mut().SetShape(shape.as_ptr(), max_penetration_depth, lock) }
     }
 }
 
@@ -610,7 +614,7 @@ impl CharacterVirtual {
 
     #[inline]
     pub fn get_shape(&self) -> RefShape {
-        RefShape(self.as_ref().GetShape())
+        unsafe { RefShape::new(self.as_ref().GetShape() as *mut _) }
     }
 
     #[inline]
@@ -810,7 +814,10 @@ impl CharacterVirtual {
     }
 
     #[inline]
-    pub fn set_shape(&mut self, chara_layer: u16, shape: RefShape, max_penetration_depth: f32) -> bool {
-        self.as_mut().SetShape(chara_layer, shape.0, max_penetration_depth)
+    pub fn set_shape(&mut self, chara_layer: u16, shape: &mut RefShape, max_penetration_depth: f32) -> bool {
+        unsafe {
+            self.as_mut()
+                .SetShape(chara_layer, shape.as_ptr(), max_penetration_depth)
+        }
     }
 }
