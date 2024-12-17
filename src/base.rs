@@ -4,7 +4,8 @@ use cxx::{type_id, ExternType};
 use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
-use std::{mem, pin::Pin};
+use std::mem;
+use std::pin::Pin;
 
 #[cxx::bridge()]
 pub mod ffi {
@@ -40,8 +41,6 @@ pub mod ffi {
         type Vec4 = crate::base::XVec4;
         type Quat = crate::base::XQuat;
         type Mat44 = crate::base::XMat4;
-        type Isometry = crate::base::Isometry;
-        type Transform = crate::base::Transform;
         type Float3 = crate::base::XFloat3;
         type Int3 = crate::base::XInt3;
         type Plane = crate::base::Plane;
@@ -127,51 +126,6 @@ impl From<Mat4> for XMat4 {
     #[inline]
     fn from(m: Mat4) -> XMat4 {
         XMat4(m)
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Isometry {
-    pub position: Vec3A,
-    pub rotation: Quat,
-}
-const_assert_eq!(mem::size_of::<Isometry>(), 32);
-
-unsafe impl ExternType for Isometry {
-    type Id = type_id!("Isometry");
-    type Kind = cxx::kind::Trivial;
-}
-
-impl Isometry {
-    #[inline]
-    pub fn new(position: Vec3A, rotation: Quat) -> Isometry {
-        Isometry { position, rotation }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Transform {
-    pub position: Vec3A,
-    pub rotation: Quat,
-    pub scale: Vec3A,
-}
-const_assert_eq!(mem::size_of::<Transform>(), 48);
-
-unsafe impl ExternType for Transform {
-    type Id = type_id!("Transform");
-    type Kind = cxx::kind::Trivial;
-}
-
-impl Transform {
-    #[inline]
-    pub fn new(position: Vec3A, rotation: Quat, scale: Vec3A) -> Transform {
-        Transform {
-            position,
-            rotation,
-            scale,
-        }
     }
 }
 
@@ -291,7 +245,7 @@ impl<'de> Deserialize<'de> for IndexedTriangle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BodyID(u32);
+pub struct BodyID(pub u32);
 const_assert_eq!(mem::size_of::<BodyID>(), 4);
 
 unsafe impl ExternType for BodyID {
@@ -300,6 +254,11 @@ unsafe impl ExternType for BodyID {
 }
 
 impl BodyID {
+    #[inline]
+    pub fn new(id: u32) -> BodyID {
+        BodyID(id)
+    }
+
     #[inline]
     pub fn invalid() -> BodyID {
         BodyID(0xFFFF_FFFF)
@@ -313,6 +272,20 @@ impl BodyID {
     #[inline]
     pub fn is_invalid(&self) -> bool {
         self.0 == 0xFFFF_FFFF
+    }
+}
+
+impl From<u32> for BodyID {
+    #[inline]
+    fn from(id: u32) -> BodyID {
+        BodyID(id)
+    }
+}
+
+impl From<BodyID> for u32 {
+    #[inline]
+    fn from(id: BodyID) -> u32 {
+        id.0
     }
 }
 

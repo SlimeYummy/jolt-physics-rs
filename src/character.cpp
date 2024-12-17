@@ -27,13 +27,6 @@ XCharacterCommon::~XCharacterCommon() {
 	PRINT_ONLY(printf("~XCharacterCommon %d\n", _system->GetRefCount()));
 }
 
-Isometry XCharacterCommon::GetPositionAndRotation(bool lock) const {
-	Vec3 position = Vec3::sZero();
-	Quat rotation = Quat::sIdentity();
-	Character::GetPositionAndRotation(position, rotation, lock);
-	return Isometry{position, rotation};
-}
-
 bool XCharacterCommon::SetShape(XRefShape shape, float maxPenetrationDepth, bool lock) {
 	return Character::SetShape(AsRefConst<Shape>(shape), maxPenetrationDepth, lock);
 }
