@@ -27,10 +27,6 @@ XCharacterCommon::~XCharacterCommon() {
 	PRINT_ONLY(printf("~XCharacterCommon %d\n", _system->GetRefCount()));
 }
 
-bool XCharacterCommon::SetShape(XRefShape shape, float maxPenetrationDepth, bool lock) {
-	return Character::SetShape(AsRefConst<Shape>(shape), maxPenetrationDepth, lock);
-}
-
 #if defined(JPH_DEBUG_RENDERER)
 void XCharacterCommon::Render(DebugRenderer* render) const {}
 #endif
@@ -168,9 +164,9 @@ void XCharacterVirtual::RefreshContacts(ObjectLayer chara_layer) {
 	);
 }
 
-bool XCharacterVirtual::SetShape(ObjectLayer chara_layer, XRefShape shape, float maxPenetrationDepth) {
+bool XCharacterVirtual::SetShape(ObjectLayer chara_layer, const Shape* shape, float maxPenetrationDepth) {
 	return CharacterVirtual::SetShape(
-		AsRefConst<Shape>(shape),
+		shape,
 		maxPenetrationDepth,
 		_system->PhySys().GetDefaultBroadPhaseLayerFilter(chara_layer),
 		_system->PhySys().GetDefaultLayerFilter(chara_layer),
@@ -188,7 +184,7 @@ void XCharacterVirtual::Render(DebugRenderer* debugRenderer) const {
 }
 #endif
 
-// void XCharacterVirtual::CheckCollision(ObjectLayer chara_layer, RsVec3 position, RsQuat rotation, RsVec3 movementDirection, float maxPenetrationDepth, XRefShape shape, RsVec3 baseOffset) const {
+// void XCharacterVirtual::CheckCollision(ObjectLayer chara_layer, RsVec3 position, RsQuat rotation, RsVec3 movementDirection, float maxPenetrationDepth, Shape* shape, RsVec3 baseOffset) const {
 // 	CharacterVirtual::CheckCollision(
 // 		AsVec3(position),
 // 		AsQuat(rotation),
