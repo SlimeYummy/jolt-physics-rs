@@ -32,7 +32,6 @@ pub(crate) mod ffi {
         type Vec3 = crate::base::ffi::Vec3;
         type Quat = crate::base::ffi::Quat;
         type Mat44 = crate::base::ffi::Mat44;
-        type Isometry = crate::base::ffi::Isometry;
         type BodyID = crate::base::ffi::BodyID;
         type XRefShape = crate::base::ffi::XRefShape;
         type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
@@ -83,7 +82,7 @@ pub(crate) mod ffi {
         fn SetLinearVelocity(self: Pin<&mut XCharacterCommon>, velocity: Vec3, lock: bool);
         fn AddLinearVelocity(self: Pin<&mut XCharacterCommon>, velocity: Vec3, lock: bool);
         fn AddImpulse(self: Pin<&mut XCharacterCommon>, impulse: Vec3, lock: bool);
-        fn GetPositionAndRotation(self: &XCharacterCommon, lock: bool) -> Isometry;
+        fn GetPositionAndRotation(self: &XCharacterCommon, position: &mut Vec3, rotation: &mut Quat, lock: bool);
         fn SetPositionAndRotation(
             self: &XCharacterCommon,
             position: Vec3,
@@ -474,8 +473,10 @@ impl CharacterCommon {
 
     #[inline]
     pub fn get_position_and_rotation(&self, lock: bool) -> (Vec3A, Quat) {
-        let isometry = self.as_ref().GetPositionAndRotation(lock);
-        (isometry.position, isometry.rotation)
+        let mut position = XVec3::default();
+        let mut rotation = XQuat::default();
+        self.as_ref().GetPositionAndRotation(&mut position, &mut rotation, lock);
+        (position.0, rotation.0)
     }
 
     #[inline]

@@ -161,29 +161,29 @@ pub mod ffi {
         fn SetCompoundUserData(self: Pin<&mut MutableCompoundShape>, idx: u32, data: u32);
         unsafe fn AddShape(
             self: Pin<&mut MutableCompoundShape>,
-            pos: Vec3,
-            rot: Quat,
+            position: Vec3,
+            rotation: Quat,
             shape: *const Shape,
             user_data: u32,
         ) -> u32;
         fn RemoveShape(self: Pin<&mut MutableCompoundShape>, index: u32);
-        fn ModifyShape(self: Pin<&mut MutableCompoundShape>, index: u32, pos: Vec3, rot: Quat);
+        fn ModifyShape(self: Pin<&mut MutableCompoundShape>, index: u32, position: Vec3, rotation: Quat);
         #[rust_name = "ModifyShapeEx"]
         unsafe fn ModifyShape(
             self: Pin<&mut MutableCompoundShape>,
             index: u32,
-            pos: Vec3,
-            rot: Quat,
+            position: Vec3,
+            rotation: Quat,
             shape: *const Shape,
         );
         unsafe fn ModifyShapes(
             self: Pin<&mut MutableCompoundShape>,
             start_idx: u32,
             count: u32,
-            pos: *const Vec3,
-            rot: *const Quat,
-            pos_stride: u32,
-            rot_stride: u32,
+            position: *const Vec3,
+            rotation: *const Quat,
+            position_stride: u32,
+            rotation_stride: u32,
         );
         fn AdjustCenterOfMass(self: Pin<&mut MutableCompoundShape>);
     }
@@ -781,23 +781,23 @@ impl SubShape {
 #[derive(Debug, Clone)]
 pub struct StaticCompoundSettings<'t> {
     pub user_data: u64,
-    pub sub_shape: &'t [SubShapeSettings],
+    pub sub_shapes: &'t [SubShapeSettings],
 }
 
 impl<'t> Default for StaticCompoundSettings<'t> {
     fn default() -> StaticCompoundSettings<'t> {
         StaticCompoundSettings {
             user_data: 0,
-            sub_shape: &[],
+            sub_shapes: &[],
         }
     }
 }
 
 impl StaticCompoundSettings<'_> {
-    pub fn new(sub_shape: &[SubShapeSettings]) -> StaticCompoundSettings<'_> {
+    pub fn new(sub_shapes: &[SubShapeSettings]) -> StaticCompoundSettings<'_> {
         StaticCompoundSettings {
             user_data: 0,
-            sub_shape,
+            sub_shapes,
         }
     }
 }
@@ -806,28 +806,28 @@ impl StaticCompoundSettings<'_> {
 #[derive(Debug, Clone)]
 pub struct MutableCompoundSettings<'t> {
     pub user_data: u64,
-    pub sub_shape: &'t [SubShapeSettings],
+    pub sub_shapes: &'t [SubShapeSettings],
 }
 
 impl<'t> Default for MutableCompoundSettings<'t> {
     fn default() -> MutableCompoundSettings<'t> {
         MutableCompoundSettings {
             user_data: 0,
-            sub_shape: &[],
+            sub_shapes: &[],
         }
     }
 }
 
 impl MutableCompoundSettings<'_> {
-    pub fn new(sub_shape: &[SubShapeSettings]) -> MutableCompoundSettings<'_> {
+    pub fn new(sub_shapes: &[SubShapeSettings]) -> MutableCompoundSettings<'_> {
         MutableCompoundSettings {
             user_data: 0,
-            sub_shape,
+            sub_shapes,
         }
     }
 }
 
-pub fn create_shape_sphere(settings: &SphereSettings) -> JoltResult<RefShape> {
+pub fn create_sphere_shape(settings: &SphereSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeSphere(unsafe {
         mem::transmute::<&SphereSettings, &ffi::SphereSettings>(settings)
     }));
@@ -837,7 +837,7 @@ pub fn create_shape_sphere(settings: &SphereSettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_box(settings: &BoxSettings) -> JoltResult<RefShape> {
+pub fn create_box_shape(settings: &BoxSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeBox(unsafe {
         mem::transmute::<&BoxSettings, &ffi::BoxSettings>(settings)
     }));
@@ -847,7 +847,7 @@ pub fn create_shape_box(settings: &BoxSettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_capsule(settings: &CapsuleSettings) -> JoltResult<RefShape> {
+pub fn create_capsule_shape(settings: &CapsuleSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeCapsule(unsafe {
         mem::transmute::<&CapsuleSettings, &ffi::CapsuleSettings>(settings)
     }));
@@ -857,7 +857,7 @@ pub fn create_shape_capsule(settings: &CapsuleSettings) -> JoltResult<RefShape> 
     Ok(shape)
 }
 
-pub fn create_shape_tapered_capsule(settings: &TaperedCapsuleSettings) -> JoltResult<RefShape> {
+pub fn create_tapered_capsule_shape(settings: &TaperedCapsuleSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeTaperedCapsule(unsafe {
         mem::transmute::<&TaperedCapsuleSettings, &ffi::TaperedCapsuleSettings>(settings)
     }));
@@ -867,7 +867,7 @@ pub fn create_shape_tapered_capsule(settings: &TaperedCapsuleSettings) -> JoltRe
     Ok(shape)
 }
 
-pub fn create_shape_cylinder(settings: &CylinderSettings) -> JoltResult<RefShape> {
+pub fn create_cylinder_shape(settings: &CylinderSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeCylinder(unsafe {
         mem::transmute::<&CylinderSettings, &ffi::CylinderSettings>(settings)
     }));
@@ -877,7 +877,7 @@ pub fn create_shape_cylinder(settings: &CylinderSettings) -> JoltResult<RefShape
     Ok(shape)
 }
 
-pub fn create_shape_tapered_cylinder(settings: &TaperedCylinderSettings) -> JoltResult<RefShape> {
+pub fn create_tapered_cylinder_shape(settings: &TaperedCylinderSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeTaperedCylinder(unsafe {
         mem::transmute::<&TaperedCylinderSettings, &ffi::TaperedCylinderSettings>(settings)
     }));
@@ -887,7 +887,7 @@ pub fn create_shape_tapered_cylinder(settings: &TaperedCylinderSettings) -> Jolt
     Ok(shape)
 }
 
-pub fn create_shape_convex_hull(settings: &ConvexHullSettings) -> JoltResult<RefShape> {
+pub fn create_convex_hull_shape(settings: &ConvexHullSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeConvexHull(unsafe {
         mem::transmute::<&ConvexHullSettings<'_>, &ffi::ConvexHullSettings>(settings)
     }));
@@ -897,7 +897,7 @@ pub fn create_shape_convex_hull(settings: &ConvexHullSettings) -> JoltResult<Ref
     Ok(shape)
 }
 
-pub fn create_shape_triangle(settings: &TriangleSettings) -> JoltResult<RefShape> {
+pub fn create_triangle_shape(settings: &TriangleSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeTriangle(unsafe {
         mem::transmute::<&TriangleSettings, &ffi::TriangleSettings>(settings)
     }));
@@ -907,7 +907,7 @@ pub fn create_shape_triangle(settings: &TriangleSettings) -> JoltResult<RefShape
     Ok(shape)
 }
 
-pub fn create_shape_plane(settings: &PlaneSettings) -> JoltResult<RefShape> {
+pub fn create_plane_shape(settings: &PlaneSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapePlane(unsafe {
         mem::transmute::<&PlaneSettings, &ffi::PlaneSettings>(settings)
     }));
@@ -917,7 +917,7 @@ pub fn create_shape_plane(settings: &PlaneSettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_mesh(settings: &MeshSettings) -> JoltResult<RefShape> {
+pub fn create_mesh_shape(settings: &MeshSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeMesh(unsafe {
         mem::transmute::<&MeshSettings<'_>, &ffi::MeshSettings>(settings)
     }));
@@ -927,7 +927,7 @@ pub fn create_shape_mesh(settings: &MeshSettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_height_field(settings: &HeightFieldSettings) -> JoltResult<RefShape> {
+pub fn create_height_field_shape(settings: &HeightFieldSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeHeightField(unsafe {
         mem::transmute::<&HeightFieldSettings<'_>, &ffi::HeightFieldSettings>(settings)
     }));
@@ -937,7 +937,7 @@ pub fn create_shape_height_field(settings: &HeightFieldSettings) -> JoltResult<R
     Ok(shape)
 }
 
-pub fn create_shape_empty(settings: &EmptySettings) -> JoltResult<RefShape> {
+pub fn create_empty_shape(settings: &EmptySettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeEmpty(unsafe {
         mem::transmute::<&EmptySettings, &ffi::EmptySettings>(settings)
     }));
@@ -947,7 +947,7 @@ pub fn create_shape_empty(settings: &EmptySettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_scaled(settings: &ScaledSettings) -> JoltResult<RefShape> {
+pub fn create_scaled_shape(settings: &ScaledSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeScaled(unsafe {
         mem::transmute::<&&ScaledSettings, &ffi::ScaledSettings>(&settings)
     }));
@@ -957,7 +957,7 @@ pub fn create_shape_scaled(settings: &ScaledSettings) -> JoltResult<RefShape> {
     Ok(shape)
 }
 
-pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> JoltResult<RefShape> {
+pub fn create_rotated_translated_shape(settings: &RotatedTranslatedSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeRotatedTranslated(unsafe {
         mem::transmute::<&RotatedTranslatedSettings, &ffi::RotatedTranslatedSettings>(settings)
     }));
@@ -967,7 +967,7 @@ pub fn create_shape_rotated_translated(settings: &RotatedTranslatedSettings) -> 
     Ok(shape)
 }
 
-pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings) -> JoltResult<RefShape> {
+pub fn create_offset_center_of_mass_shape(settings: &OffsetCenterOfMassSettings) -> JoltResult<RefShape> {
     let shape = RefShape(ffi::CreateShapeOffsetCenterOfMass(unsafe {
         mem::transmute::<&OffsetCenterOfMassSettings, &ffi::OffsetCenterOfMassSettings>(settings)
     }));
@@ -977,82 +977,94 @@ pub fn create_shape_offset_center_of_mass(settings: &OffsetCenterOfMassSettings)
     Ok(shape)
 }
 
-pub fn create_shape_static_compound(settings: &StaticCompoundSettings) -> JoltResult<RefShape> {
+pub fn create_static_compound_shape(settings: &StaticCompoundSettings) -> JoltResult<RefStaticCompoundShape> {
+    if settings.sub_shapes.len() < 2 {
+        return Err(JoltError::TooLessSubShape);
+    }
     let shape = RefShape(ffi::CreateShapeStaticCompound(unsafe {
         mem::transmute::<&StaticCompoundSettings<'_>, &ffi::StaticCompoundSettings>(settings)
     }));
     if shape.is_invalid() {
         return Err(JoltError::CreateShape);
     }
-    Ok(shape)
+    Ok(RefStaticCompoundShape(shape))
 }
 
-pub fn create_shape_mutable_compound(settings: &MutableCompoundSettings) -> JoltResult<RefShape> {
+pub fn create_mutable_compound_shape(settings: &MutableCompoundSettings) -> JoltResult<RefMutableCompoundShape> {
+    if settings.sub_shapes.len() < 2 {
+        return Err(JoltError::TooLessSubShape);
+    }
     let shape = RefShape(ffi::CreateShapeMutableCompound(unsafe {
         mem::transmute::<&MutableCompoundSettings<'_>, &ffi::MutableCompoundSettings>(settings)
     }));
     if shape.is_invalid() {
         return Err(JoltError::CreateShape);
     }
-    Ok(shape)
+    Ok(RefMutableCompoundShape(shape))
 }
 
-impl RefShape {
-    #[inline]
-    pub fn get_type(&self) -> ShapeType {
-        self.as_ref().GetType()
-    }
+macro_rules! shape_methods {
+    ($type:ty, $ref:path, $mut:path) => {
+        impl $type {
+            #[inline]
+            pub fn get_type(&self) -> ShapeType {
+                $ref(self).GetType()
+            }
 
-    #[inline]
-    pub fn get_sub_type(&self) -> ShapeSubType {
-        self.as_ref().GetSubType()
-    }
+            #[inline]
+            pub fn get_sub_type(&self) -> ShapeSubType {
+                $ref(self).GetSubType()
+            }
 
-    #[inline]
-    pub fn get_user_data(&self) -> u64 {
-        self.as_ref().GetUserData()
-    }
+            #[inline]
+            pub fn get_user_data(&self) -> u64 {
+                $ref(self).GetUserData()
+            }
 
-    #[inline]
-    pub fn set_user_data(&mut self, data: u64) {
-        self.as_mut().SetUserData(data);
-    }
+            #[inline]
+            pub fn set_user_data(&mut self, data: u64) {
+                $mut(self).SetUserData(data);
+            }
 
-    #[inline]
-    pub fn get_center_of_mass(&self) -> Vec3A {
-        self.as_ref().GetCenterOfMass().0
-    }
+            #[inline]
+            pub fn get_center_of_mass(&self) -> Vec3A {
+                $ref(self).GetCenterOfMass().0
+            }
 
-    #[inline]
-    pub fn must_be_static(&self) -> bool {
-        self.as_ref().MustBeStatic()
-    }
+            #[inline]
+            pub fn must_be_static(&self) -> bool {
+                $ref(self).MustBeStatic()
+            }
 
-    #[inline]
-    pub fn get_local_bounds(&self) -> AABox {
-        self.as_ref().GetLocalBounds()
-    }
+            #[inline]
+            pub fn get_local_bounds(&self) -> AABox {
+                $ref(self).GetLocalBounds()
+            }
 
-    #[inline]
-    pub fn get_inner_radius(&self) -> f32 {
-        self.as_ref().GetInnerRadius()
-    }
+            #[inline]
+            pub fn get_inner_radius(&self) -> f32 {
+                $ref(self).GetInnerRadius()
+            }
 
-    #[inline]
-    pub fn get_volume(&self) -> f32 {
-        self.as_ref().GetVolume()
-    }
+            #[inline]
+            pub fn get_volume(&self) -> f32 {
+                $ref(self).GetVolume()
+            }
 
-    #[inline]
-    pub fn is_valid_scale(&self, scale: Vec3A) -> bool {
-        self.as_ref().IsValidScale(scale.into())
-    }
+            #[inline]
+            pub fn is_valid_scale(&self, scale: Vec3A) -> bool {
+                $ref(self).IsValidScale(scale.into())
+            }
 
-    #[inline]
-    pub fn make_scale_valid(&self, scale: Vec3A) -> Vec3A {
-        self.as_ref().MakeScaleValid(scale.into()).0
-    }
+            #[inline]
+            pub fn make_scale_valid(&self, scale: Vec3A) -> Vec3A {
+                $ref(self).MakeScaleValid(scale.into()).0
+            }
+        }
+    };
 }
+
+shape_methods!(RefShape, RefShape::as_ref, RefShape::as_mut);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefStaticCompoundShape(RefShape);
@@ -1063,6 +1075,24 @@ impl From<RefStaticCompoundShape> for RefShape {
         shape.0
     }
 }
+
+impl RefStaticCompoundShape {
+    #[inline]
+    fn as_shape_ref(&self) -> &ffi::Shape {
+        self.0.as_ref()
+    }
+
+    #[inline]
+    fn as_shape_mut(&mut self) -> Pin<&mut ffi::Shape> {
+        self.0.as_mut()
+    }
+}
+
+shape_methods!(
+    RefStaticCompoundShape,
+    RefStaticCompoundShape::as_shape_ref,
+    RefStaticCompoundShape::as_shape_mut
+);
 
 impl RefStaticCompoundShape {
     #[inline]
@@ -1097,16 +1127,34 @@ impl RefStaticCompoundShape {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MutableCompoundShape(RefShape);
+pub struct RefMutableCompoundShape(RefShape);
 
-impl From<MutableCompoundShape> for RefShape {
+impl From<RefMutableCompoundShape> for RefShape {
     #[inline]
-    fn from(shape: MutableCompoundShape) -> RefShape {
+    fn from(shape: RefMutableCompoundShape) -> RefShape {
         shape.0
     }
 }
 
-impl MutableCompoundShape {
+impl RefMutableCompoundShape {
+    #[inline]
+    fn as_shape_ref(&self) -> &ffi::Shape {
+        self.0.as_ref()
+    }
+
+    #[inline]
+    fn as_shape_mut(&mut self) -> Pin<&mut ffi::Shape> {
+        self.0.as_mut()
+    }
+}
+
+shape_methods!(
+    RefMutableCompoundShape,
+    RefMutableCompoundShape::as_shape_ref,
+    RefMutableCompoundShape::as_shape_mut
+);
+
+impl RefMutableCompoundShape {
     #[inline]
     fn as_ref(&self) -> &ffi::MutableCompoundShape {
         unsafe { self.0.as_ref_t::<ffi::MutableCompoundShape>() }
@@ -1138,10 +1186,10 @@ impl MutableCompoundShape {
     }
 
     #[inline]
-    pub fn add_shape(&mut self, pos: Vec3A, rot: Quat, shape: RefShape, user_data: u32) -> u32 {
+    pub fn add_shape(&mut self, position: Vec3A, rotation: Quat, shape: RefShape, user_data: u32) -> u32 {
         unsafe {
             self.as_mut()
-                .AddShape(pos.into(), rot.into(), shape.as_ptr(), user_data)
+                .AddShape(position.into(), rotation.into(), shape.as_ptr(), user_data)
         }
     }
 
@@ -1151,15 +1199,15 @@ impl MutableCompoundShape {
     }
 
     #[inline]
-    pub fn modify_shape(&mut self, index: u32, pos: Vec3A, rot: Quat) {
-        self.as_mut().ModifyShape(index, pos.into(), rot.into());
+    pub fn modify_shape(&mut self, index: u32, position: Vec3A, rotation: Quat) {
+        self.as_mut().ModifyShape(index, position.into(), rotation.into());
     }
 
     #[inline]
-    pub fn modify_shape_ex(&mut self, index: u32, pos: Vec3A, rot: Quat, shape: RefShape) {
+    pub fn modify_shape_ex(&mut self, index: u32, position: Vec3A, rotation: Quat, shape: RefShape) {
         unsafe {
             self.as_mut()
-                .ModifyShapeEx(index, pos.into(), rot.into(), shape.as_ptr())
+                .ModifyShapeEx(index, position.into(), rotation.into(), shape.as_ptr())
         }
     }
 
@@ -1168,13 +1216,38 @@ impl MutableCompoundShape {
         self.as_mut().AdjustCenterOfMass();
     }
 
-    // unsafe fn ModifyShapes(
-    //     self: Pin<&mut MutableCompoundShape>,
-    //     start_idx: u32,
-    //     count: u32,
-    //     pos: *const Vec3,
-    //     rot: *const Quat,
-    //     pos_stride: u32,
-    //     rot_stride: u32,
-    // );
+    #[inline]
+    pub fn modify_shapes(&mut self, sub_shape_start_idx: u32, position: &[Vec3A], rotation: &[Quat]) {
+        let count = usize::min(position.len(), rotation.len()) as u32;
+        unsafe {
+            self.as_mut().ModifyShapes(
+                sub_shape_start_idx,
+                count,
+                position.as_ptr() as *const XVec3,
+                rotation.as_ptr() as *const XQuat,
+                mem::size_of::<Vec3A>() as u32,
+                mem::size_of::<Quat>() as u32,
+            );
+        }
+    }
+
+    #[inline]
+    pub unsafe fn modify_shapes_ex(
+        &mut self,
+        sub_shape_start_idx: u32,
+        position_ptr: *const Vec3A,
+        rotation_ptr: *const Quat,
+        count: u32,
+        position_stride: u32,
+        rotation_stride: u32,
+    ) {
+        self.as_mut().ModifyShapes(
+            sub_shape_start_idx,
+            count,
+            position_ptr as *const XVec3,
+            rotation_ptr as *const XQuat,
+            position_stride,
+            rotation_stride,
+        );
+    }
 }
