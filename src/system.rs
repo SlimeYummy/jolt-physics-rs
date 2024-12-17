@@ -10,10 +10,17 @@ use crate::error::{JoltError, JoltResult};
 pub(crate) mod ffi {
     #[repr(u8)]
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum BodyType {
+        RigidBody,
+        SoftBody,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     enum MotionType {
-        Static = 0,
-        Kinematic = 1,
-        Dynamic = 2,
+        Static,
+        Kinematic,
+        Dynamic,
     }
 
     #[repr(u8)]
@@ -87,10 +94,11 @@ pub(crate) mod ffi {
         type Vec3 = crate::base::ffi::Vec3;
         type Quat = crate::base::ffi::Quat;
         type Mat44 = crate::base::ffi::Mat44;
-        type Isometry = crate::base::ffi::Isometry;
         type BodyID = crate::base::ffi::BodyID;
+        type Shape = crate::base::ffi::Shape;
         type XRefPhysicsSystem = crate::base::ffi::XRefPhysicsSystem;
 
+        type BodyType;
         type MotionType;
         type MotionQuality;
         type AllowedDOFs;
@@ -109,12 +117,45 @@ pub(crate) mod ffi {
         type XBodyInterface;
         unsafe fn CreateBodyInterface(system: *mut XPhysicsSystem, lock: bool) -> *mut XBodyInterface;
         type BodyCreationSettings;
+
         fn CreateBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings) -> BodyID;
+        fn CreateBodyWithID(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            settings: &BodyCreationSettings,
+        ) -> BodyID;
         fn CreateAddBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings, active: Activation)
             -> BodyID;
+        fn DestroyBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID);
         fn AddBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID, active: Activation);
+        fn RemoveBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID);
+        fn IsAdded(self: &XBodyInterface, body_id: &BodyID) -> bool;
+
+        fn ActivateBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID);
+        unsafe fn ActivateBodies(self: Pin<&mut XBodyInterface>, body_ids: *const BodyID, count: i32);
+        fn DeactivateBody(self: Pin<&mut XBodyInterface>, body_id: &BodyID);
+        unsafe fn DeactivateBodies(self: Pin<&mut XBodyInterface>, body_ids: *const BodyID, count: i32);
+        fn IsActive(self: &XBodyInterface, body_id: &BodyID) -> bool;
+        fn ResetSleepTimer(self: Pin<&mut XBodyInterface>, body_id: &BodyID);
+
+        unsafe fn SetShape(
+            self: &XBodyInterface,
+            body_id: &BodyID,
+            shape: *const Shape,
+            update_mass_properties: bool,
+            activation: Activation,
+        );
+        fn NotifyShapeChanged(
+            self: &XBodyInterface,
+            body_id: &BodyID,
+            previous_center_of_mass: Vec3,
+            update_mass_properties: bool,
+            activation: Activation,
+        );
+
         fn SetObjectLayer(self: Pin<&mut XBodyInterface>, body_id: &BodyID, layer: u16);
         fn GetObjectLayer(self: &XBodyInterface, body_id: &BodyID) -> u16;
+
         fn SetPositionAndRotation(
             self: Pin<&mut XBodyInterface>,
             body_id: &BodyID,
@@ -129,7 +170,7 @@ pub(crate) mod ffi {
             rotation: Quat,
             active: Activation,
         );
-        fn GetPositionAndRotation(self: &XBodyInterface, body_id: &BodyID) -> Isometry;
+        fn GetPositionAndRotation(self: &XBodyInterface, body_id: &BodyID, position: &mut Vec3, rotation: &mut Quat);
         fn SetPosition(self: Pin<&mut XBodyInterface>, body_id: &BodyID, position: Vec3, active: Activation);
         fn GetPosition(self: &XBodyInterface, body_id: &BodyID) -> Vec3;
         fn GetCenterOfMassPosition(self: &XBodyInterface, body_id: &BodyID) -> Vec3;
@@ -137,9 +178,103 @@ pub(crate) mod ffi {
         fn GetRotation(self: &XBodyInterface, body_id: &BodyID) -> Quat;
         fn GetWorldTransform(self: &XBodyInterface, body_id: &BodyID) -> Mat44;
         fn GetCenterOfMassTransform(self: &XBodyInterface, body_id: &BodyID) -> Mat44;
+
+        fn MoveKinematic(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            target_position: Vec3,
+            target_rotation: Quat,
+            delta_time: f32,
+        );
+
+        fn SetLinearAndAngularVelocity(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            linear_velocity: Vec3,
+            angular_velocity: Vec3,
+        );
+        fn GetLinearAndAngularVelocity(
+            self: &XBodyInterface,
+            body_id: &BodyID,
+            linear_velocity: &mut Vec3,
+            angular_velocity: &mut Vec3,
+        );
+        fn SetLinearVelocity(self: Pin<&mut XBodyInterface>, body_id: &BodyID, linear_velocity: Vec3);
+        fn GetLinearVelocity(self: &XBodyInterface, body_id: &BodyID) -> Vec3;
+        fn AddLinearVelocity(self: Pin<&mut XBodyInterface>, body_id: &BodyID, linear_velocity: Vec3);
+        fn AddLinearAndAngularVelocity(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            linear_velocity: Vec3,
+            angular_velocity: Vec3,
+        );
+        fn SetAngularVelocity(self: Pin<&mut XBodyInterface>, body_id: &BodyID, angular_velocity: Vec3);
+        fn GetAngularVelocity(self: &XBodyInterface, body_id: &BodyID) -> Vec3;
+        fn GetPointVelocity(self: &XBodyInterface, body_id: &BodyID, point: Vec3) -> Vec3;
+        fn SetPositionRotationAndVelocity(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            position: Vec3,
+            rotation: Quat,
+            linear_velocity: Vec3,
+            angular_velocity: Vec3,
+        );
+
+        fn AddForce(self: Pin<&mut XBodyInterface>, body_id: &BodyID, force: Vec3, activation: Activation);
+        #[rust_name = "AddForceEx"]
+        fn AddForce(self: Pin<&mut XBodyInterface>, body_id: &BodyID, force: Vec3, point: Vec3, activation: Activation);
+        fn AddTorque(self: Pin<&mut XBodyInterface>, body_id: &BodyID, torque: Vec3, activation: Activation);
+        fn AddForceAndTorque(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            force: Vec3,
+            torque: Vec3,
+            activation: Activation,
+        );
+
+        fn AddImpulse(self: Pin<&mut XBodyInterface>, body_id: &BodyID, impulse: Vec3);
+        #[rust_name = "AddImpulseEx"]
+        fn AddImpulse(self: Pin<&mut XBodyInterface>, body_id: &BodyID, impulse: Vec3, point: Vec3);
+        fn AddAngularImpulse(self: Pin<&mut XBodyInterface>, body_id: &BodyID, impulse: Vec3);
+        fn ApplyBuoyancyImpulse(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            surface_position: Vec3,
+            surface_normal: Vec3,
+            buoyancy: f32,
+            linear_drag: f32,
+            angular_drag: f32,
+            fluid_velocity: Vec3,
+            gravity: Vec3,
+            delta_time: f32,
+        ) -> bool;
+
+        fn GetBodyType(self: &XBodyInterface, body_id: &BodyID) -> BodyType;
+        fn SetMotionType(
+            self: Pin<&mut XBodyInterface>,
+            body_id: &BodyID,
+            motion_type: MotionType,
+            activation: Activation,
+        );
+        fn GetMotionType(self: &XBodyInterface, body_id: &BodyID) -> MotionType;
+        fn SetMotionQuality(self: Pin<&mut XBodyInterface>, body_id: &BodyID, motion_quality: MotionQuality);
+        fn GetMotionQuality(self: &XBodyInterface, body_id: &BodyID) -> MotionQuality;
+        fn GetInverseInertia(self: &XBodyInterface, body_id: &BodyID) -> Mat44;
+        fn SetRestitution(self: Pin<&mut XBodyInterface>, body_id: &BodyID, restitution: f32);
+        fn GetRestitution(self: &XBodyInterface, body_id: &BodyID) -> f32;
+        fn SetFriction(self: Pin<&mut XBodyInterface>, body_id: &BodyID, friction: f32);
+        fn GetFriction(self: &XBodyInterface, body_id: &BodyID) -> f32;
+        fn SetGravityFactor(self: Pin<&mut XBodyInterface>, body_id: &BodyID, gravity_factor: f32);
+        fn GetGravityFactor(self: &XBodyInterface, body_id: &BodyID) -> f32;
+        fn SetUseManifoldReduction(self: Pin<&mut XBodyInterface>, body_id: &BodyID, use_reduction: bool);
+        fn GetUseManifoldReduction(self: &XBodyInterface, body_id: &BodyID) -> bool;
+        fn GetUserData(self: &XBodyInterface, body_id: &BodyID) -> u64;
+        fn SetUserData(self: &XBodyInterface, body_id: &BodyID, user_data: u64);
+        fn InvalidateContactCache(self: Pin<&mut XBodyInterface>, body_id: &BodyID);
     }
 }
 
+pub type BodyType = ffi::BodyType;
 pub type MotionType = ffi::MotionType;
 pub type MotionQuality = ffi::MotionQuality;
 pub type AllowedDOFs = ffi::AllowedDOFs;
@@ -480,6 +615,16 @@ impl BodyInterface {
         Ok(body_id)
     }
 
+    pub fn create_body_with_id(&mut self, body_id: BodyID, settings: &BodySettings) -> JoltResult<BodyID> {
+        let res_body_id = self.as_mut().CreateBodyWithID(&body_id, unsafe {
+            mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings)
+        });
+        if res_body_id.is_invalid() {
+            return Err(JoltError::CreateBody);
+        }
+        Ok(res_body_id)
+    }
+
     pub fn create_add_body(&mut self, settings: &BodySettings, active: bool) -> JoltResult<BodyID> {
         let body_id = self.as_mut().CreateAddBody(
             unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) },
@@ -492,8 +637,77 @@ impl BodyInterface {
     }
 
     #[inline]
+    pub fn destroy_body(&mut self, body_id: BodyID) {
+        self.as_mut().DestroyBody(&body_id);
+    }
+
+    #[inline]
     pub fn add_body(&mut self, body_id: BodyID, active: bool) {
         self.as_mut().AddBody(&body_id, active.into())
+    }
+
+    #[inline]
+    pub fn remove_body(&mut self, body_id: BodyID) {
+        self.as_mut().RemoveBody(&body_id)
+    }
+
+    #[inline]
+    pub fn is_added(&self, body_id: BodyID) -> bool {
+        self.as_ref().IsAdded(&body_id)
+    }
+
+    #[inline]
+    pub fn activate_body(&mut self, body_id: BodyID) {
+        self.as_mut().ActivateBody(&body_id)
+    }
+
+    #[inline]
+    pub fn activate_bodies(&mut self, body_ids: &[BodyID]) {
+        unsafe { self.as_mut().ActivateBodies(body_ids.as_ptr(), body_ids.len() as i32) }
+    }
+
+    #[inline]
+    pub fn deactivate_body(&mut self, body_id: BodyID) {
+        self.as_mut().DeactivateBody(&body_id)
+    }
+
+    #[inline]
+    pub fn deactivate_bodies(&mut self, body_ids: &[BodyID]) {
+        unsafe { self.as_mut().DeactivateBodies(body_ids.as_ptr(), body_ids.len() as i32) }
+    }
+
+    #[inline]
+    pub fn is_active(&self, body_id: BodyID) -> bool {
+        self.as_ref().IsActive(&body_id)
+    }
+
+    #[inline]
+    pub fn reset_sleep_timer(&mut self, body_id: BodyID) {
+        self.as_mut().ResetSleepTimer(&body_id)
+    }
+
+    #[inline]
+    pub fn set_shape(&mut self, body_id: BodyID, shape: RefShape, update_mass_properties: bool, active: bool) {
+        unsafe {
+            self.as_mut()
+                .SetShape(&body_id, shape.as_ptr(), update_mass_properties.into(), active.into())
+        }
+    }
+
+    #[inline]
+    pub fn notify_shape_changed(
+        &mut self,
+        body_id: BodyID,
+        previous_center_of_mass: Vec3A,
+        update_mass_properties: bool,
+        active: bool,
+    ) {
+        self.as_mut().NotifyShapeChanged(
+            &body_id,
+            previous_center_of_mass.into(),
+            update_mass_properties.into(),
+            active.into(),
+        )
     }
 
     #[inline]
@@ -526,8 +740,11 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_position_rotation(&self, body_id: BodyID) -> (Vec3A, Quat) {
-        let isometry = self.as_ref().GetPositionAndRotation(&body_id);
-        (isometry.position, isometry.rotation)
+        let mut position = XVec3::default();
+        let mut rotation = XQuat::default();
+        self.as_ref()
+            .GetPositionAndRotation(&body_id, &mut position, &mut rotation);
+        (position.0, rotation.0)
     }
 
     #[inline]
@@ -563,5 +780,238 @@ impl BodyInterface {
     #[inline]
     pub fn get_center_of_mass_transform(&self, body_id: BodyID) -> Mat4 {
         self.as_ref().GetCenterOfMassTransform(&body_id).0
+    }
+
+    #[inline]
+    pub fn move_kinematic(&mut self, body_id: BodyID, target_position: Vec3A, target_rotation: Quat, delta_time: f32) {
+        self.as_mut()
+            .MoveKinematic(&body_id, target_position.into(), target_rotation.into(), delta_time)
+    }
+
+    #[inline]
+    pub fn set_linear_and_angular_velocity(
+        &mut self,
+        body_id: BodyID,
+        linear_velocity: Vec3A,
+        angular_velocity: Vec3A,
+    ) {
+        self.as_mut()
+            .SetLinearAndAngularVelocity(&body_id, linear_velocity.into(), angular_velocity.into())
+    }
+
+    #[inline]
+    pub fn get_linear_and_angular_velocity(&self, body_id: BodyID) -> (Vec3A, Vec3A) {
+        let mut linear_velocity = XVec3::default();
+        let mut angular_velocity = XVec3::default();
+        self.as_ref()
+            .GetLinearAndAngularVelocity(&body_id, &mut linear_velocity, &mut angular_velocity);
+        (linear_velocity.0, angular_velocity.0)
+    }
+
+    #[inline]
+    pub fn set_linear_velocity(&mut self, body_id: BodyID, velocity: Vec3A) {
+        self.as_mut().SetLinearVelocity(&body_id, velocity.into())
+    }
+
+    #[inline]
+    pub fn get_linear_velocity(&self, body_id: BodyID) -> Vec3A {
+        self.as_ref().GetLinearVelocity(&body_id).0
+    }
+
+    #[inline]
+    pub fn add_linear_velocity(&mut self, body_id: BodyID, velocity: Vec3A) {
+        self.as_mut().AddLinearVelocity(&body_id, velocity.into())
+    }
+
+    #[inline]
+    pub fn add_linear_and_angular_velocity(
+        &mut self,
+        body_id: BodyID,
+        linear_velocity: Vec3A,
+        angular_velocity: Vec3A,
+    ) {
+        self.as_mut()
+            .AddLinearAndAngularVelocity(&body_id, linear_velocity.into(), angular_velocity.into())
+    }
+
+    #[inline]
+    pub fn set_angular_velocity(&mut self, body_id: BodyID, velocity: Vec3A) {
+        self.as_mut().SetAngularVelocity(&body_id, velocity.into())
+    }
+
+    #[inline]
+    pub fn get_angular_velocity(&self, body_id: BodyID) -> Vec3A {
+        self.as_ref().GetAngularVelocity(&body_id).0
+    }
+
+    #[inline]
+    pub fn get_point_velocity(&self, body_id: BodyID, point: Vec3A) -> Vec3A {
+        self.as_ref().GetPointVelocity(&body_id, point.into()).0
+    }
+
+    #[inline]
+    pub fn set_position_rotation_and_velocity(
+        &mut self,
+        body_id: BodyID,
+        position: Vec3A,
+        rotation: Quat,
+        linear_velocity: Vec3A,
+        angular_velocity: Vec3A,
+    ) {
+        self.as_mut().SetPositionRotationAndVelocity(
+            &body_id,
+            position.into(),
+            rotation.into(),
+            linear_velocity.into(),
+            angular_velocity.into(),
+        )
+    }
+
+    #[inline]
+    pub fn add_force(&mut self, body_id: BodyID, force: Vec3A, active: bool) {
+        self.as_mut().AddForce(&body_id, force.into(), active.into())
+    }
+
+    #[inline]
+    pub fn add_force_ex(&mut self, body_id: BodyID, force: Vec3A, point: Vec3A, active: bool) {
+        self.as_mut()
+            .AddForceEx(&body_id, force.into(), point.into(), active.into())
+    }
+
+    #[inline]
+    pub fn add_torque(&mut self, body_id: BodyID, torque: Vec3A, active: bool) {
+        self.as_mut().AddTorque(&body_id, torque.into(), active.into())
+    }
+
+    #[inline]
+    pub fn add_force_and_torque(&mut self, body_id: BodyID, force: Vec3A, torque: Vec3A, active: bool) {
+        self.as_mut()
+            .AddForceAndTorque(&body_id, force.into(), torque.into(), active.into())
+    }
+
+    #[inline]
+    pub fn add_impulse(&mut self, body_id: BodyID, impulse: Vec3A) {
+        self.as_mut().AddImpulse(&body_id, impulse.into())
+    }
+
+    #[inline]
+    pub fn add_impulse_ex(&mut self, body_id: BodyID, impulse: Vec3A, point: Vec3A) {
+        self.as_mut().AddImpulseEx(&body_id, impulse.into(), point.into())
+    }
+
+    #[inline]
+    pub fn add_angular_impulse(&mut self, body_id: BodyID, impulse: Vec3A) {
+        self.as_mut().AddAngularImpulse(&body_id, impulse.into())
+    }
+
+    #[inline]
+    pub fn apply_buoyancy_impulse(
+        &mut self,
+        body_id: &BodyID,
+        surface_position: Vec3A,
+        surface_normal: Vec3A,
+        buoyancy: f32,
+        linear_drag: f32,
+        angular_drag: f32,
+        fluid_velocity: Vec3A,
+        gravity: Vec3A,
+        delta_time: f32,
+    ) -> bool {
+        self.as_mut().ApplyBuoyancyImpulse(
+            body_id,
+            surface_position.into(),
+            surface_normal.into(),
+            buoyancy,
+            linear_drag,
+            angular_drag,
+            fluid_velocity.into(),
+            gravity.into(),
+            delta_time,
+        )
+    }
+
+    #[inline]
+    pub fn get_body_type(&self, body_id: BodyID) -> BodyType {
+        self.as_ref().GetBodyType(&body_id)
+    }
+
+    #[inline]
+    pub fn set_motion_type(&mut self, body_id: BodyID, motion_type: MotionType, active: bool) {
+        self.as_mut().SetMotionType(&body_id, motion_type, active.into())
+    }
+
+    #[inline]
+    pub fn get_motion_type(&self, body_id: BodyID) -> MotionType {
+        self.as_ref().GetMotionType(&body_id)
+    }
+
+    #[inline]
+    pub fn set_motion_quality(&mut self, body_id: BodyID, motion_quality: MotionQuality) {
+        self.as_mut().SetMotionQuality(&body_id, motion_quality)
+    }
+
+    #[inline]
+    pub fn get_motion_quality(&self, body_id: BodyID) -> MotionQuality {
+        self.as_ref().GetMotionQuality(&body_id)
+    }
+
+    #[inline]
+    pub fn get_inverse_inertia(&self, body_id: BodyID) -> Mat4 {
+        self.as_ref().GetInverseInertia(&body_id).0
+    }
+
+    #[inline]
+    pub fn set_restitution(&mut self, body_id: BodyID, restitution: f32) {
+        self.as_mut().SetRestitution(&body_id, restitution)
+    }
+
+    #[inline]
+    pub fn get_restitution(&self, body_id: BodyID) -> f32 {
+        self.as_ref().GetRestitution(&body_id)
+    }
+
+    #[inline]
+    pub fn set_friction(&mut self, body_id: BodyID, friction: f32) {
+        self.as_mut().SetFriction(&body_id, friction)
+    }
+
+    #[inline]
+    pub fn get_friction(&self, body_id: BodyID) -> f32 {
+        self.as_ref().GetFriction(&body_id)
+    }
+
+    #[inline]
+    pub fn set_gravity_factor(&mut self, body_id: BodyID, gravity_factor: f32) {
+        self.as_mut().SetGravityFactor(&body_id, gravity_factor)
+    }
+
+    #[inline]
+    pub fn get_gravity_factor(&self, body_id: BodyID) -> f32 {
+        self.as_ref().GetGravityFactor(&body_id)
+    }
+
+    #[inline]
+    pub fn set_use_manifold_reduction(&mut self, body_id: BodyID, use_reduction: bool) {
+        self.as_mut().SetUseManifoldReduction(&body_id, use_reduction)
+    }
+
+    #[inline]
+    pub fn get_use_manifold_reduction(&self, body_id: BodyID) -> bool {
+        self.as_ref().GetUseManifoldReduction(&body_id)
+    }
+
+    #[inline]
+    pub fn get_user_data(&self, body_id: BodyID) -> u64 {
+        self.as_ref().GetUserData(&body_id)
+    }
+
+    #[inline]
+    pub fn set_user_data(&self, body_id: BodyID, user_data: u64) {
+        self.as_ref().SetUserData(&body_id, user_data)
+    }
+
+    #[inline]
+    pub fn invalidate_contact_cache(&mut self, body_id: BodyID) {
+        self.as_mut().InvalidateContactCache(&body_id)
     }
 }

@@ -395,7 +395,7 @@ struct JoltArray {
 
 struct StaticCompoundSettings {
 	uint64 userData;
-	rust::Slice<SubShapeSettings> subShape;
+	rust::Slice<SubShapeSettings> subShapes;
 };
 static_assert(sizeof(StaticCompoundSettings) == 24, "StaticCompoundSettings size");
 
@@ -403,9 +403,9 @@ XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& st) {
 	StaticCompoundShapeSettings settings;
 	settings.mUserData = st.userData;
 	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
-	subShapes->size = st.subShape.size();
-	subShapes->capacity = st.subShape.size();
-	subShapes->elements = st.subShape.data();
+	subShapes->size = st.subShapes.size();
+	subShapes->capacity = st.subShapes.size();
+	subShapes->elements = st.subShapes.data();
 	auto result = settings.Create();
 	subShapes->size = 0;
 	subShapes->capacity = 0;
@@ -418,17 +418,17 @@ XRefShape CreateShapeStaticCompound(const StaticCompoundSettings& st) {
 
 struct MutableCompoundSettings {
 	uint64 userData;
-	rust::Slice<SubShapeSettings> subShape;
+	rust::Slice<SubShapeSettings> subShapes;
 };
 static_assert(sizeof(MutableCompoundSettings) == 24, "MutableCompoundSettings size");
 
-XRefShape CreateShapeStaticCompound(const MutableCompoundSettings& st) {
+XRefShape CreateShapeMutableCompound(const MutableCompoundSettings& st) {
 	MutableCompoundShapeSettings settings;
 	settings.mUserData = st.userData;
 	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
-	subShapes->size = st.subShape.size();
-	subShapes->capacity = st.subShape.size();
-	subShapes->elements = st.subShape.data();
+	subShapes->size = st.subShapes.size();
+	subShapes->capacity = st.subShapes.size();
+	subShapes->elements = st.subShapes.data();
 	auto result = settings.Create();
 	subShapes->size = 0;
 	subShapes->capacity = 0;
@@ -438,7 +438,3 @@ XRefShape CreateShapeStaticCompound(const MutableCompoundSettings& st) {
 	}
 	return CreateRefT<Shape, XRefShape>(result.Get());
 }
-
-// const SubShape* XStaticCompoundShape::GetSubShape(uint inIdx) const {
-// 	return (SubShape*)&AsRefConst<CompoundShape>(this)->GetSubShape(inIdx);
-// }

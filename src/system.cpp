@@ -148,15 +148,16 @@ BodyID XBodyInterface::CreateBody(const BodyCreationSettings& settings) {
 	return body->GetID();
 }
 
-BodyID XBodyInterface::CreateAddBody(const BodyCreationSettings& settings, EActivation activation) {
-	return BodyInterface::CreateAndAddBody(settings, activation);
+BodyID XBodyInterface::CreateBodyWithID(const BodyID &bodyId, const BodyCreationSettings& settings) {
+	auto body = BodyInterface::CreateBodyWithID(bodyId, settings);
+	if (body == nullptr) {
+		return BodyID();
+	}
+	return body->GetID();
 }
 
-Isometry XBodyInterface::GetPositionAndRotation(const BodyID& bodyId) const {
-	Vec3 position = Vec3::sZero();
-	Quat rotation = Quat::sIdentity();
-	BodyInterface::GetPositionAndRotation(bodyId, position, rotation);
-	return Isometry{position, rotation};
+BodyID XBodyInterface::CreateAddBody(const BodyCreationSettings& settings, EActivation activation) {
+	return BodyInterface::CreateAndAddBody(settings, activation);
 }
 
 XBodyInterface* CreateBodyInterface(XPhysicsSystem* system, bool lock) {
