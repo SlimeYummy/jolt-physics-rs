@@ -116,7 +116,7 @@ pub struct XDebugApp(Box<dyn DebugApp>);
 
 impl XDebugApp {
     pub fn get_physics_system(&mut self) -> *mut ffi::XPhysicsSystem {
-        unsafe { self.0.as_mut().get_physics_system().ptr() }
+        self.0.as_mut().get_physics_system().as_mut_ptr()
     }
 
     fn update_frame(

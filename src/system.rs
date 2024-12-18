@@ -2,6 +2,8 @@ use glam::{Mat4, Quat, Vec3A};
 use static_assertions::const_assert_eq;
 use std::mem;
 use std::pin::Pin;
+use std::ptr::NonNull;
+use std::usize;
 
 use crate::base::*;
 use crate::error::{JoltError, JoltResult};
@@ -96,7 +98,6 @@ pub(crate) mod ffi {
         type Mat44 = crate::base::ffi::Mat44;
         type BodyID = crate::base::ffi::BodyID;
         type Shape = crate::base::ffi::Shape;
-        type XRefPhysicsSystem = crate::base::ffi::XRefPhysicsSystem;
 
         type BodyType;
         type MotionType;
@@ -109,7 +110,7 @@ pub(crate) mod ffi {
         fn GlobalFinalize();
 
         type XPhysicsSystem = crate::base::ffi::XPhysicsSystem;
-        unsafe fn CreatePhysicSystem(contacts: *mut XContactCollector) -> XRefPhysicsSystem;
+        unsafe fn CreatePhysicSystem(contacts: *mut XContactCollector) -> *mut XPhysicsSystem;
         fn Prepare(self: Pin<&mut XPhysicsSystem>);
         fn Update(self: Pin<&mut XPhysicsSystem>, delta: f32) -> u32;
         fn GetGravity(self: &XPhysicsSystem) -> Vec3;
@@ -351,7 +352,7 @@ pub struct BodySettings {
     pub inertia_multiplier: f32,
     pub mass_properties: MassProperties,
     _shape_settings: usize,
-    pub shape: RefShape,
+    pub shape: Option<RefShape>,
 }
 const_assert_eq!(mem::size_of::<BodySettings>(), 256);
 
@@ -388,7 +389,7 @@ impl Default for BodySettings {
             inertia_multiplier: 1.0,
             mass_properties: MassProperties::default(),
             _shape_settings: 0,
-            shape: RefShape::invalid(),
+            shape: None,
         }
     }
 }
@@ -400,7 +401,7 @@ impl BodySettings {
             rotation,
             object_layer: layer,
             motion_type,
-            shape,
+            shape: Some(shape),
             ..Default::default()
         }
     }
@@ -411,7 +412,7 @@ impl BodySettings {
             rotation,
             object_layer: layer,
             motion_type: MotionType::Static,
-            shape,
+            shape: Some(shape),
             ..Default::default()
         }
     }
@@ -429,7 +430,7 @@ impl BodySettings {
             object_layer: layer,
             motion_type,
             is_sensor: true,
-            shape,
+            shape: Some(shape),
             ..Default::default()
         }
     }
@@ -458,9 +459,9 @@ impl PhysicsSystem {
     pub fn new() -> Box<PhysicsSystem> {
         let mut system = Box::new(PhysicsSystem {
             contacts: XContactCollector::new(256, 128),
-            system: RefPhysicsSystem::invalid(),
+            system: unsafe { mem::transmute(usize::MAX) },
         });
-        system.system = RefPhysicsSystem(unsafe { ffi::CreatePhysicSystem(&mut system.contacts) });
+        unsafe { system.system.0 = NonNull::new_unchecked(ffi::CreatePhysicSystem(&mut system.contacts)) };
         system
     }
 
@@ -471,17 +472,17 @@ impl PhysicsSystem {
 
     #[inline]
     fn system(&self) -> &ffi::XPhysicsSystem {
-        self.system.as_ref().unwrap()
+        self.system.as_ref()
     }
 
     #[inline]
     fn system_mut(&mut self) -> Pin<&mut ffi::XPhysicsSystem> {
-        unsafe { Pin::new_unchecked(self.system.as_mut().unwrap()) }
+        unsafe { Pin::new_unchecked(self.system.as_mut()) }
     }
 
     #[inline]
     pub(crate) fn system_ptr(&mut self) -> *mut ffi::XPhysicsSystem {
-        unsafe { self.system.ptr() }
+        self.system.as_mut_ptr()
     }
 
     #[inline]
@@ -687,7 +688,7 @@ impl BodyInterface {
     }
 
     #[inline]
-    pub fn set_shape(&mut self, body_id: BodyID, shape: RefShape, update_mass_properties: bool, active: bool) {
+    pub fn set_shape(&mut self, body_id: BodyID, shape: &RefShape, update_mass_properties: bool, active: bool) {
         unsafe {
             self.as_mut()
                 .SetShape(&body_id, shape.as_ptr(), update_mass_properties.into(), active.into())

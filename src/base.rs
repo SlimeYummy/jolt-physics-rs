@@ -1,31 +1,14 @@
-#![allow(dead_code)]
-
 use cxx::{type_id, ExternType};
 use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
 use std::mem;
 use std::pin::Pin;
+use std::ptr::NonNull;
 
+#[allow(dead_code)]
 #[cxx::bridge()]
 pub mod ffi {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    struct XRefShape {
-        ptr: *mut u8,
-    }
-    impl Vec<XRefShape> {}
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    struct XRefPhysicsMaterial {
-        ptr: *mut u8,
-    }
-    impl Vec<XRefPhysicsMaterial> {}
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    struct XRefPhysicsSystem {
-        ptr: *mut u8,
-    }
-
     impl Vec<Vec3> {}
     impl Vec<Float3> {}
     impl Vec<Int3> {}
@@ -49,19 +32,19 @@ pub mod ffi {
         type BodyID = crate::base::BodyID;
 
         type Shape;
-        fn DropRefShape(shape: XRefShape);
-        fn CloneRefShape(shape: XRefShape) -> XRefShape;
-        fn CountRefShape(shape: XRefShape) -> u32;
+        unsafe fn DropRefShape(shape: *mut Shape);
+        unsafe fn CloneRefShape(shape: *mut Shape) -> *mut Shape;
+        unsafe fn CountRefShape(shape: *mut Shape) -> u32;
 
         type PhysicsMaterial;
-        fn DropRefPhysicsMaterial(material: XRefPhysicsMaterial);
-        fn CloneRefPhysicsMaterial(material: XRefPhysicsMaterial) -> XRefPhysicsMaterial;
-        fn CountRefPhysicsMaterial(material: XRefPhysicsMaterial) -> u32;
+        unsafe fn DropRefPhysicsMaterial(material: *mut PhysicsMaterial);
+        unsafe fn CloneRefPhysicsMaterial(material: *mut PhysicsMaterial) -> *mut PhysicsMaterial;
+        unsafe fn CountRefPhysicsMaterial(material: *mut PhysicsMaterial) -> u32;
 
         type XPhysicsSystem;
-        fn DropRefPhysicsSystem(system: XRefPhysicsSystem);
-        fn CloneRefPhysicsSystem(system: XRefPhysicsSystem) -> XRefPhysicsSystem;
-        fn CountRefPhysicsSystem(system: XRefPhysicsSystem) -> u32;
+        unsafe fn DropRefPhysicsSystem(system: *mut XPhysicsSystem);
+        unsafe fn CloneRefPhysicsSystem(system: *mut XPhysicsSystem) -> *mut XPhysicsSystem;
+        unsafe fn CountRefPhysicsSystem(system: *mut XPhysicsSystem) -> u32;
     }
 }
 
@@ -289,222 +272,181 @@ impl From<BodyID> for u32 {
     }
 }
 
-const_assert_eq!(mem::size_of::<ffi::XRefShape>(), mem::size_of::<usize>());
-
+/// In C++ code, Shape* is actually a smart pointer with a reference count.
+/// Currently, we don't have a perfect representation of this in Rust.
+/// So we're marking all `&mut self` functions as unsafe for now.
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct RefShape(pub(crate) ffi::XRefShape);
+pub struct RefShape(pub(crate) NonNull<ffi::Shape>);
+
+const_assert_eq!(mem::size_of::<RefShape>(), mem::size_of::<usize>());
+const_assert_eq!(mem::size_of::<Option<RefShape>>(), 8);
+const_assert_eq!(unsafe { mem::transmute::<Option<RefShape>, usize>(None) }, 0);
 
 impl Clone for RefShape {
     #[inline]
     fn clone(&self) -> RefShape {
-        RefShape(ffi::CloneRefShape(self.0))
+        unsafe { ffi::CloneRefShape(self.0.as_ptr()) };
+        RefShape(self.0)
     }
 }
 
 impl Drop for RefShape {
     fn drop(&mut self) {
         #[cfg(feature = "debug-print")]
-        if !self.0.ptr.is_null() {
-            println!("DropRefShape::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
-        }
-        ffi::DropRefShape(self.0);
-        self.0.ptr = std::ptr::null_mut();
+        println!("DropRefShape::drop {:?} {}", self.0.as_ptr(), self.ref_count() - 1);
+        unsafe { ffi::DropRefShape(self.0.as_ptr()) };
     }
 }
 
 impl RefShape {
     #[inline]
-    pub fn invalid() -> RefShape {
-        RefShape(ffi::XRefShape {
-            ptr: std::ptr::null_mut(),
-        })
-    }
-
-    #[inline]
-    pub fn is_valid(&self) -> bool {
-        !self.0.ptr.is_null()
-    }
-
-    #[inline]
-    pub fn is_invalid(&self) -> bool {
-        self.0.ptr.is_null()
+    pub(crate) unsafe fn new(shape: *mut ffi::Shape) -> RefShape {
+        assert!(!shape.is_null());
+        Self(NonNull::new_unchecked(shape))
     }
 
     #[inline]
     pub fn ref_count(&self) -> u32 {
-        ffi::CountRefShape(self.0)
+        unsafe { ffi::CountRefShape(self.0.as_ptr()) }
     }
 
     #[inline]
     pub(crate) fn as_ref(&self) -> &ffi::Shape {
-        unsafe { &*(self.0.ptr as *const ffi::Shape) }
+        unsafe { self.0.as_ref() }
     }
 
     #[inline]
     pub(crate) fn as_mut(&mut self) -> Pin<&mut ffi::Shape> {
-        unsafe { Pin::new_unchecked(&mut *(self.0.ptr as *mut ffi::Shape)) }
+        unsafe { Pin::new_unchecked(self.0.as_mut()) }
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub(crate) fn as_ptr(&self) -> *const ffi::Shape {
+        self.0.as_ptr()
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::Shape {
+        self.0.as_ptr()
     }
 
     #[inline]
     pub(crate) unsafe fn as_ref_t<T>(&self) -> &T {
-        unsafe { &*(self.0.ptr as *const T) }
+        unsafe { &*(self.0.as_ptr() as *const T) }
     }
 
     #[inline]
     pub(crate) unsafe fn as_mut_t<T>(&mut self) -> Pin<&mut T> {
-        unsafe { Pin::new_unchecked(&mut *(self.0.ptr as *mut T)) }
-    }
-
-    #[inline]
-    pub(crate) fn as_ptr(&self) -> *const ffi::Shape {
-        self.0.ptr as *const ffi::Shape
-    }
-
-    #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::Shape {
-        self.0.ptr as *mut ffi::Shape
+        unsafe { Pin::new_unchecked(&mut *(self.0.as_ptr() as *mut T)) }
     }
 }
 
-const_assert_eq!(mem::size_of::<ffi::XRefPhysicsMaterial>(), mem::size_of::<usize>());
-
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct RefPhysicsMaterial(pub(crate) ffi::XRefPhysicsMaterial);
+pub struct RefPhysicsMaterial(pub(crate) NonNull<ffi::PhysicsMaterial>);
+
+const_assert_eq!(mem::size_of::<RefPhysicsMaterial>(), mem::size_of::<usize>());
+const_assert_eq!(mem::size_of::<Option<RefPhysicsMaterial>>(), 8);
+const_assert_eq!(unsafe { mem::transmute::<Option<RefPhysicsMaterial>, usize>(None) }, 0);
 
 impl Clone for RefPhysicsMaterial {
     #[inline]
     fn clone(&self) -> RefPhysicsMaterial {
-        RefPhysicsMaterial(ffi::CloneRefPhysicsMaterial(self.0))
+        unsafe { ffi::CloneRefPhysicsMaterial(self.0.as_ptr()) };
+        RefPhysicsMaterial(self.0)
     }
 }
 
 impl Drop for RefPhysicsMaterial {
     fn drop(&mut self) {
         #[cfg(feature = "debug-print")]
-        if !self.0.ptr.is_null() {
-            println!("DropRefPhysicsMaterial::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
-        }
-        ffi::DropRefPhysicsMaterial(self.0);
-        self.0.ptr = std::ptr::null_mut();
+        println!(
+            "DropRefPhysicsMaterial::drop {:?} {}",
+            self.0.as_ptr(),
+            self.ref_count() - 1
+        );
+        unsafe { ffi::DropRefPhysicsMaterial(self.0.as_ptr()) };
     }
 }
 
 impl RefPhysicsMaterial {
     #[inline]
-    pub fn invalid() -> RefPhysicsMaterial {
-        RefPhysicsMaterial(ffi::XRefPhysicsMaterial {
-            ptr: std::ptr::null_mut(),
-        })
-    }
-
-    #[inline]
-    pub fn is_valid(&self) -> bool {
-        !self.0.ptr.is_null()
-    }
-
-    #[inline]
-    pub fn is_invalid(&self) -> bool {
-        self.0.ptr.is_null()
-    }
-
-    #[inline]
     pub fn ref_count(&self) -> u32 {
-        ffi::CountRefPhysicsMaterial(self.0)
+        unsafe { ffi::CountRefPhysicsMaterial(self.0.as_ptr()) }
     }
 
     #[inline]
-    pub fn as_ref(&self) -> Option<&ffi::PhysicsMaterial> {
-        if self.0.ptr.is_null() {
-            return None;
-        }
-        Some(unsafe { &*(self.0.ptr as *const ffi::PhysicsMaterial) })
+    pub fn as_ref(&self) -> &ffi::PhysicsMaterial {
+        unsafe { self.0.as_ref() }
     }
 
     #[inline]
-    pub fn as_mut(&mut self) -> Option<&mut ffi::PhysicsMaterial> {
-        if self.0.ptr.is_null() {
-            return None;
-        }
-        Some(unsafe { &mut *(self.0.ptr as *mut ffi::PhysicsMaterial) })
+    pub fn as_mut(&mut self) -> &mut ffi::PhysicsMaterial {
+        unsafe { self.0.as_mut() }
     }
 
+    #[allow(dead_code)]
     #[inline]
-    pub fn as_usize(&self) -> usize {
-        self.0.ptr as usize
+    pub(crate) fn as_ptr(&self) -> *const ffi::PhysicsMaterial {
+        self.0.as_ptr()
     }
 
-    /// # Safety
-    /// JoltPhysics underlying PhysicsMaterial object pointer
+    #[allow(dead_code)]
     #[inline]
-    pub unsafe fn ptr(&mut self) -> *mut ffi::PhysicsMaterial {
-        self.0.ptr as *mut ffi::PhysicsMaterial
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::PhysicsMaterial {
+        self.0.as_ptr()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct RefPhysicsSystem(pub(crate) ffi::XRefPhysicsSystem);
+pub struct RefPhysicsSystem(pub(crate) NonNull<ffi::XPhysicsSystem>);
+
+const_assert_eq!(mem::size_of::<RefPhysicsSystem>(), mem::size_of::<usize>());
+const_assert_eq!(mem::size_of::<Option<RefPhysicsSystem>>(), 8);
+const_assert_eq!(unsafe { mem::transmute::<Option<RefPhysicsSystem>, usize>(None) }, 0);
 
 impl Clone for RefPhysicsSystem {
     #[inline]
     fn clone(&self) -> RefPhysicsSystem {
-        RefPhysicsSystem(ffi::CloneRefPhysicsSystem(self.0))
+        unsafe { ffi::CloneRefPhysicsSystem(self.0.as_ptr()) };
+        RefPhysicsSystem(self.0)
     }
 }
 
 impl Drop for RefPhysicsSystem {
     fn drop(&mut self) {
         #[cfg(feature = "debug-print")]
-        if !self.0.ptr.is_null() {
-            println!("DropRefPhysicsSystem::drop {:?} {}", self.0.ptr, self.ref_count() - 1);
-        }
-        ffi::DropRefPhysicsSystem(self.0);
-        self.0.ptr = std::ptr::null_mut();
+        println!("DropRefPhysicsSystem::drop {:?} {}", self.0.as_ptr(), self.ref_count());
+        unsafe { ffi::DropRefPhysicsSystem(self.0.as_ptr()) };
     }
 }
 
 impl RefPhysicsSystem {
     #[inline]
-    pub fn invalid() -> RefPhysicsSystem {
-        RefPhysicsSystem(ffi::XRefPhysicsSystem {
-            ptr: std::ptr::null_mut(),
-        })
-    }
-
-    #[inline]
-    pub fn is_valid(&self) -> bool {
-        !self.0.ptr.is_null()
-    }
-
-    #[inline]
-    pub fn is_invalid(&self) -> bool {
-        self.0.ptr.is_null()
-    }
-
-    #[inline]
     pub fn ref_count(&self) -> u32 {
-        ffi::CountRefPhysicsSystem(self.0)
+        unsafe { ffi::CountRefPhysicsSystem(self.0.as_ptr()) }
     }
 
     #[inline]
-    pub fn as_ref(&self) -> Option<&ffi::XPhysicsSystem> {
-        if self.0.ptr.is_null() {
-            return None;
-        }
-        Some(unsafe { &*(self.0.ptr as *const ffi::XPhysicsSystem) })
+    pub fn as_ref(&self) -> &ffi::XPhysicsSystem {
+        unsafe { self.0.as_ref() }
     }
 
     #[inline]
-    pub fn as_mut(&mut self) -> Option<&mut ffi::XPhysicsSystem> {
-        if self.0.ptr.is_null() {
-            return None;
-        }
-        Some(unsafe { &mut *(self.0.ptr as *mut ffi::XPhysicsSystem) })
+    pub fn as_mut(&mut self) -> &mut ffi::XPhysicsSystem {
+        unsafe { self.0.as_mut() }
     }
 
-    /// # Safety
-    /// JoltPhysics underlying XPhysicsSystem object pointer
+    #[allow(dead_code)]
     #[inline]
-    pub unsafe fn ptr(&mut self) -> *mut ffi::XPhysicsSystem {
-        self.0.ptr as *mut ffi::XPhysicsSystem
+    pub(crate) fn as_ptr(&self) -> *const ffi::XPhysicsSystem {
+        self.0.as_ptr()
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::XPhysicsSystem {
+        self.0.as_ptr()
     }
 }
