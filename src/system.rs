@@ -3,7 +3,6 @@ use static_assertions::const_assert_eq;
 use std::mem;
 use std::pin::Pin;
 use std::ptr::NonNull;
-use std::usize;
 
 use crate::base::*;
 use crate::error::{JoltError, JoltResult};
@@ -459,7 +458,7 @@ impl PhysicsSystem {
     pub fn new() -> Box<PhysicsSystem> {
         let mut system = Box::new(PhysicsSystem {
             contacts: XContactCollector::new(256, 128),
-            system: unsafe { mem::transmute(usize::MAX) },
+            system: unsafe { mem::transmute::<usize, RefPhysicsSystem>(usize::MAX) },
         });
         unsafe { system.system.0 = NonNull::new_unchecked(ffi::CreatePhysicSystem(&mut system.contacts)) };
         system
@@ -691,7 +690,7 @@ impl BodyInterface {
     pub fn set_shape(&mut self, body_id: BodyID, shape: &RefShape, update_mass_properties: bool, active: bool) {
         unsafe {
             self.as_mut()
-                .SetShape(&body_id, shape.as_ptr(), update_mass_properties.into(), active.into())
+                .SetShape(&body_id, shape.as_ptr(), update_mass_properties, active.into())
         }
     }
 
@@ -706,7 +705,7 @@ impl BodyInterface {
         self.as_mut().NotifyShapeChanged(
             &body_id,
             previous_center_of_mass.into(),
-            update_mass_properties.into(),
+            update_mass_properties,
             active.into(),
         )
     }
