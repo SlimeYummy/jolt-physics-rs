@@ -148,12 +148,34 @@ pub mod ffi {
         fn MakeScaleValid(self: &Shape, scale: Vec3) -> Vec3;
 
         type StaticCompoundShape;
+        fn GetType(self: &StaticCompoundShape) -> ShapeType;
+        fn GetSubType(self: &StaticCompoundShape) -> ShapeSubType;
+        fn GetUserData(self: &StaticCompoundShape) -> u64;
+        fn SetUserData(self: Pin<&mut StaticCompoundShape>, data: u64);
+        fn GetCenterOfMass(self: &StaticCompoundShape) -> Vec3;
+        fn MustBeStatic(self: &StaticCompoundShape) -> bool;
+        fn GetLocalBounds(self: &StaticCompoundShape) -> AABox;
+        fn GetInnerRadius(self: &StaticCompoundShape) -> f32;
+        fn GetVolume(self: &StaticCompoundShape) -> f32;
+        fn IsValidScale(self: &StaticCompoundShape, scale: Vec3) -> bool;
+        fn MakeScaleValid(self: &StaticCompoundShape, scale: Vec3) -> Vec3;
         fn GetNumSubShapes(self: &StaticCompoundShape) -> u32;
         unsafe fn GetSubShape(self: &StaticCompoundShape, index: u32) -> &CompoundShapeSubShape;
         fn GetCompoundUserData(self: &StaticCompoundShape, idx: u32) -> u32;
         fn SetCompoundUserData(self: Pin<&mut StaticCompoundShape>, idx: u32, data: u32);
 
         type MutableCompoundShape;
+        fn GetType(self: &MutableCompoundShape) -> ShapeType;
+        fn GetSubType(self: &MutableCompoundShape) -> ShapeSubType;
+        fn GetUserData(self: &MutableCompoundShape) -> u64;
+        fn SetUserData(self: Pin<&mut MutableCompoundShape>, data: u64);
+        fn GetCenterOfMass(self: &MutableCompoundShape) -> Vec3;
+        fn MustBeStatic(self: &MutableCompoundShape) -> bool;
+        fn GetLocalBounds(self: &MutableCompoundShape) -> AABox;
+        fn GetInnerRadius(self: &MutableCompoundShape) -> f32;
+        fn GetVolume(self: &MutableCompoundShape) -> f32;
+        fn IsValidScale(self: &MutableCompoundShape, scale: Vec3) -> bool;
+        fn MakeScaleValid(self: &MutableCompoundShape, scale: Vec3) -> Vec3;
         fn GetNumSubShapes(self: &MutableCompoundShape) -> u32;
         unsafe fn GetSubShape(self: &MutableCompoundShape, index: u32) -> &CompoundShapeSubShape;
         fn GetCompoundUserData(self: &MutableCompoundShape, idx: u32) -> u32;
@@ -773,19 +795,12 @@ impl SubShape {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct StaticCompoundSettings<'t> {
     pub user_data: u64,
     pub sub_shapes: &'t [SubShapeSettings],
 }
 
-impl<'t> Default for StaticCompoundSettings<'t> {
-    fn default() -> StaticCompoundSettings<'t> {
-        StaticCompoundSettings {
-            user_data: 0,
-            sub_shapes: &[],
-        }
-    }
-}
 
 impl StaticCompoundSettings<'_> {
     pub fn new(sub_shapes: &[SubShapeSettings]) -> StaticCompoundSettings<'_> {
@@ -798,19 +813,12 @@ impl StaticCompoundSettings<'_> {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct MutableCompoundSettings<'t> {
     pub user_data: u64,
     pub sub_shapes: &'t [SubShapeSettings],
 }
 
-impl<'t> Default for MutableCompoundSettings<'t> {
-    fn default() -> MutableCompoundSettings<'t> {
-        MutableCompoundSettings {
-            user_data: 0,
-            sub_shapes: &[],
-        }
-    }
-}
 
 impl MutableCompoundSettings<'_> {
     pub fn new(sub_shapes: &[SubShapeSettings]) -> MutableCompoundSettings<'_> {
@@ -1018,67 +1026,67 @@ pub fn create_mutable_compound_shape(settings: &MutableCompoundSettings) -> Jolt
 }
 
 macro_rules! shape_methods {
-    ($type:ty, $ref:path, $mut:path) => {
+    ($type:ty) => {
         impl $type {
             #[inline]
             pub fn get_type(&self) -> ShapeType {
-                $ref(self).GetType()
+                self.as_ref().GetType()
             }
 
             #[inline]
             pub fn get_sub_type(&self) -> ShapeSubType {
-                $ref(self).GetSubType()
+                self.as_ref().GetSubType()
             }
 
             #[inline]
             pub fn get_user_data(&self) -> u64 {
-                $ref(self).GetUserData()
+                self.as_ref().GetUserData()
             }
 
             #[inline]
             pub unsafe fn set_user_data(&mut self, data: u64) {
-                $mut(self).SetUserData(data);
+                self.as_mut().SetUserData(data);
             }
 
             #[inline]
             pub fn get_center_of_mass(&self) -> Vec3A {
-                $ref(self).GetCenterOfMass().0
+                self.as_ref().GetCenterOfMass().0
             }
 
             #[inline]
             pub fn must_be_static(&self) -> bool {
-                $ref(self).MustBeStatic()
+                self.as_ref().MustBeStatic()
             }
 
             #[inline]
             pub fn get_local_bounds(&self) -> AABox {
-                $ref(self).GetLocalBounds()
+                self.as_ref().GetLocalBounds()
             }
 
             #[inline]
             pub fn get_inner_radius(&self) -> f32 {
-                $ref(self).GetInnerRadius()
+                self.as_ref().GetInnerRadius()
             }
 
             #[inline]
             pub fn get_volume(&self) -> f32 {
-                $ref(self).GetVolume()
+                self.as_ref().GetVolume()
             }
 
             #[inline]
             pub fn is_valid_scale(&self, scale: Vec3A) -> bool {
-                $ref(self).IsValidScale(scale.into())
+                self.as_ref().IsValidScale(scale.into())
             }
 
             #[inline]
             pub fn make_scale_valid(&self, scale: Vec3A) -> Vec3A {
-                $ref(self).MakeScaleValid(scale.into()).0
+                self.as_ref().MakeScaleValid(scale.into()).0
             }
         }
     };
 }
 
-shape_methods!(RefShape, RefShape::as_ref, RefShape::as_mut);
+shape_methods!(RefShape);
 
 /// In C++ code, Shape* is actually a smart pointer with a reference count.
 /// Currently, we don't have a perfect representation of this in Rust.
@@ -1093,23 +1101,7 @@ impl From<RefStaticCompoundShape> for RefShape {
     }
 }
 
-impl RefStaticCompoundShape {
-    #[inline]
-    fn as_shape_ref(&self) -> &ffi::Shape {
-        self.0.as_ref()
-    }
-
-    #[inline]
-    fn as_shape_mut(&mut self) -> Pin<&mut ffi::Shape> {
-        self.0.as_mut()
-    }
-}
-
-shape_methods!(
-    RefStaticCompoundShape,
-    RefStaticCompoundShape::as_shape_ref,
-    RefStaticCompoundShape::as_shape_mut
-);
+shape_methods!(RefStaticCompoundShape);
 
 impl RefStaticCompoundShape {
     #[inline]
@@ -1156,23 +1148,7 @@ impl From<RefMutableCompoundShape> for RefShape {
     }
 }
 
-impl RefMutableCompoundShape {
-    #[inline]
-    fn as_shape_ref(&self) -> &ffi::Shape {
-        self.0.as_ref()
-    }
-
-    #[inline]
-    fn as_shape_mut(&mut self) -> Pin<&mut ffi::Shape> {
-        self.0.as_mut()
-    }
-}
-
-shape_methods!(
-    RefMutableCompoundShape,
-    RefMutableCompoundShape::as_shape_ref,
-    RefMutableCompoundShape::as_shape_mut
-);
+shape_methods!(RefMutableCompoundShape);
 
 impl RefMutableCompoundShape {
     #[inline]

@@ -1,3 +1,6 @@
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::missing_safety_doc)]
+
 mod base;
 mod character;
 mod consts;
