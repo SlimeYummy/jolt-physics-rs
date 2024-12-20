@@ -376,15 +376,15 @@ impl RefPhysicsMaterial {
         unsafe { ffi::CountRefPhysicsMaterial(self.0.as_ptr()) }
     }
 
-    #[inline]
-    pub fn as_ref(&self) -> &ffi::PhysicsMaterial {
-        unsafe { self.0.as_ref() }
-    }
+    // #[inline]
+    // pub(crate) fn as_ref(&self) -> &ffi::PhysicsMaterial {
+    //     unsafe { self.0.as_ref() }
+    // }
 
-    #[inline]
-    pub fn as_mut(&mut self) -> &mut ffi::PhysicsMaterial {
-        unsafe { self.0.as_mut() }
-    }
+    // #[inline]
+    // pub(crate) fn as_mut(&mut self) -> &mut ffi::PhysicsMaterial {
+    //     unsafe { self.0.as_mut() }
+    // }
 
     #[allow(dead_code)]
     #[inline]
@@ -429,12 +429,12 @@ impl RefPhysicsSystem {
     }
 
     #[inline]
-    pub fn as_ref(&self) -> &ffi::XPhysicsSystem {
+    pub(crate) fn as_ref(&self) -> &ffi::XPhysicsSystem {
         unsafe { self.0.as_ref() }
     }
 
     #[inline]
-    pub fn as_mut(&mut self) -> &mut ffi::XPhysicsSystem {
+    pub(crate) fn as_mut(&mut self) -> &mut ffi::XPhysicsSystem {
         unsafe { self.0.as_mut() }
     }
 
