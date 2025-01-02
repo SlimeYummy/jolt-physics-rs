@@ -6,11 +6,11 @@
 static_assert(sizeof(CharacterVirtual::ExtendedUpdateSettings) == 64, "ExtendedUpdateSettings size");
 
 //
-// XCharacterCommon
+// XCharacter
 //
 
-XCharacterCommon::XCharacterCommon(
-	XPhysicsSystem* system,
+XCharacter::XCharacter(
+	Ref<XPhysicsSystem> system,
 	const CharacterSettings* settings,
 	Vec3 position,
 	Quat rotation,
@@ -21,17 +21,17 @@ XCharacterCommon::XCharacterCommon(
 	RENDERER_ONLY(_system->AddRenderable(this));
 }
 
-XCharacterCommon::~XCharacterCommon() {
+XCharacter::~XCharacter() {
 	RENDERER_ONLY(_system->RemoveRenderable(this));
 	Character::RemoveFromPhysicsSystem();
-	PRINT_ONLY(printf("~XCharacterCommon %d\n", _system->GetRefCount()));
+	PRINT_ONLY(printf("~XCharacter %d\n", _system->GetRefCount() - 1));
 }
 
 #if defined(JPH_DEBUG_RENDERER)
-void XCharacterCommon::Render(DebugRenderer* render) const {}
+void XCharacter::Render(DebugRenderer* render) const {}
 #endif
 
-struct XCharacterCommonSettings {
+struct XCharacterSettings {
 	Vec3 up;
 	Plane supportingVolume;
 	float maxSlopeAngle;
@@ -41,11 +41,11 @@ struct XCharacterCommonSettings {
 	float friction;
 	float gravityFactor;
 };
-static_assert(sizeof(XCharacterCommonSettings) == 64, "XCharacterCommonSettings size");
+static_assert(sizeof(XCharacterSettings) == 64, "XCharacterSettings size");
 
-unique_ptr<XCharacterCommon> CreateCharacterCommon(
+XCharacter* CreateCharacter(
 	XPhysicsSystem* system,
-	const XCharacterCommonSettings& st,
+	const XCharacterSettings& st,
 	Vec3 position,
 	Quat rotation,
 	uint64 userData
@@ -59,21 +59,22 @@ unique_ptr<XCharacterCommon> CreateCharacterCommon(
 	settings.mMass = st.mass;
 	settings.mFriction = st.friction;
 	settings.mGravityFactor = st.gravityFactor;
-	return make_unique<XCharacterCommon>(system, &settings, position, rotation, userData);
+	Ref<XCharacter> character = Ref(new XCharacter(Ref(system), &settings, position, rotation, userData));
+	return LeakRefT<XCharacter>(character);
 }
 
-unique_ptr<XCharacterCommon> CreateAddCharacterCommon(
+XCharacter* CreateAddCharacter(
 	XPhysicsSystem* system,
-	const XCharacterCommonSettings& settings,
+	const XCharacterSettings& settings,
 	Vec3 position,
 	Quat rotation,
 	uint64 userData,
 	EActivation activation,
 	bool lock
 ) {
-	auto chara = CreateCharacterCommon(system, settings, position, rotation, userData);
-	chara->AddToPhysicsSystem(activation, lock);
-	return chara;
+	auto character = CreateCharacter(system, settings, position, rotation, userData);
+	character->AddToPhysicsSystem(activation, lock);
+	return character;
 }
 
 //
@@ -81,7 +82,7 @@ unique_ptr<XCharacterCommon> CreateAddCharacterCommon(
 //
 
 XCharacterVirtual::XCharacterVirtual(
-	XPhysicsSystem* system,
+	Ref<XPhysicsSystem> system,
 	const CharacterVirtualSettings* settings,
 	Vec3 position,
 	Quat rotation
@@ -93,7 +94,7 @@ XCharacterVirtual::XCharacterVirtual(
 
 XCharacterVirtual::~XCharacterVirtual() {
 	RENDERER_ONLY(_system->RemoveRenderable(this));
-	PRINT_ONLY(printf("~XCharacterVirtual %d\n", _system->GetRefCount()));
+	PRINT_ONLY(printf("~XCharacterVirtual %d\n", _system->GetRefCount() - 1));
 }
 
 void XCharacterVirtual::Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity) {
@@ -179,8 +180,8 @@ bool XCharacterVirtual::SetShape(ObjectLayer chara_layer, const Shape* shape, fl
 #if defined(JPH_DEBUG_RENDERER)
 void XCharacterVirtual::Render(DebugRenderer* debugRenderer) const {
 	const CharacterVirtual* chara = dynamic_cast<const CharacterVirtual*>(this);
-	Mat44 transform = chara->GetCenterOfMassTransform();
-	chara->GetShape()->Draw(debugRenderer, transform, Vec3::sReplicate(1.0f), Color::sGreen, false, true);
+	Mat44 com = chara->GetCenterOfMassTransform();
+	chara->GetShape()->Draw(debugRenderer, com, Vec3::sReplicate(1.0f), Color::sGreen, false, true);
 }
 #endif
 
@@ -198,11 +199,6 @@ void XCharacterVirtual::Render(DebugRenderer* debugRenderer) const {
 // 		{},
 // 		{}
 // 	);
-// }
-
-// void XCharacterVirtual::Render(DebugRenderer* render) const {
-// 	RMat44 com = this->GetCenterOfMassTransform();
-// 	this->GetShape()->Draw(mDebugRenderer, com, Vec3::sReplicate(1.0f), Color::sGreen, false, true);
 // }
 
 
@@ -258,7 +254,7 @@ struct XCharacterVirtualSettings {
 };
 static_assert(sizeof(XCharacterVirtualSettings) == 128, "XCharacterVirtualSettings size");
 
-unique_ptr<XCharacterVirtual> CreateCharacterVirtual(
+XCharacterVirtual* CreateCharacterVirtual(
 	XPhysicsSystem* system,
 	const XCharacterVirtualSettings& st,
 	Vec3 position,
@@ -282,7 +278,7 @@ unique_ptr<XCharacterVirtual> CreateCharacterVirtual(
 	settings.mMaxNumHits = st.maxNumHits;
 	settings.mHitReductionCosMaxAngle = st.hitReductionCosMaxAngle;
 	settings.mPenetrationRecoverySpeed = st.penetrationRecoverySpeed;
-	auto chara = make_unique<XCharacterVirtual>(system, &settings, position, rotation);
-	chara->SetListener(chara.get());
-	return chara;
+	Ref<XCharacterVirtual> character = Ref(new XCharacterVirtual(Ref(system), &settings, position, rotation));
+	return LeakRefT<XCharacterVirtual>(character);
+	return character;
 }
