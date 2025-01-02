@@ -6,10 +6,12 @@ edition = "2021"
 [dependencies]
 cxx = { version = "1.0", features = ["default", "c++17"] }
 glam = { version = "0.27", features = ["approx", "serde"] }
+glam-ext = { path = "../glam-ext", features = ["approx", "serde"] }
 libc = "0.2"
 serde = { version = "1.0", features = ["derive", "rc"] }
 static_assertions = "1.1"
 thiserror = "1.0"
+vtable = "0.2"
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
