@@ -1,15 +1,15 @@
 #include "jolt-physics-rs/src/ffi.h"
 #include "jolt-physics-rs/src/shape.rs.h"
 
-struct SphereSettings {
+struct XSphereShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
 	float radius;
 };
-static_assert(sizeof(SphereSettings) == 24, "SphereSettings size");
+static_assert(sizeof(XSphereShapeSettings) == 24, "XSphereShapeSettings size");
 
-Shape* CreateShapeSphere(const SphereSettings& st) {
+Shape* CreateSphereShape(const XSphereShapeSettings& st) {
 	SphereShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -22,16 +22,16 @@ Shape* CreateShapeSphere(const SphereSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct BoxSettings {
+struct XBoxShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
 	float halfX, halfY, halfZ;
 	float convexRadius;
 };
-static_assert(sizeof(BoxSettings) == 40, "BoxSettings size");
+static_assert(sizeof(XBoxShapeSettings) == 40, "XBoxShapeSettings size");
 
-Shape* CreateShapeBox(const BoxSettings& st) {
+Shape* CreateBoxShape(const XBoxShapeSettings& st) {
 	BoxShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -45,16 +45,16 @@ Shape* CreateShapeBox(const BoxSettings& st) {
 	return LeakRefT<Shape>(std::move(result.Get()));
 }
 
-struct CapsuleSettings {
+struct XCapsuleShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
 	float halfHeight;
 	float radius;
 };
-static_assert(sizeof(CapsuleSettings) == 32, "CapsuleSettings size");
+static_assert(sizeof(XCapsuleShapeSettings) == 32, "XCapsuleShapeSettings size");
 
-Shape* CreateShapeCapsule(const CapsuleSettings& st) {
+Shape* CreateCapsuleShape(const XCapsuleShapeSettings& st) {
 	CapsuleShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -68,7 +68,7 @@ Shape* CreateShapeCapsule(const CapsuleSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct TaperedCapsuleSettings {
+struct XTaperedCapsuleShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
@@ -76,9 +76,9 @@ struct TaperedCapsuleSettings {
 	float topRadius;
 	float bottomRadius;
 };
-static_assert(sizeof(TaperedCapsuleSettings) == 32, "TaperedCapsuleSettings size");
+static_assert(sizeof(XTaperedCapsuleShapeSettings) == 32, "XTaperedCapsuleShapeSettings size");
 
-Shape* CreateShapeTaperedCapsule(const TaperedCapsuleSettings& st) {
+Shape* CreateTaperedCapsuleShape(const XTaperedCapsuleShapeSettings& st) {
 	TaperedCapsuleShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -93,7 +93,7 @@ Shape* CreateShapeTaperedCapsule(const TaperedCapsuleSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct CylinderSettings {
+struct XCylinderShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
@@ -101,9 +101,9 @@ struct CylinderSettings {
 	float radius;
 	float convexRadius;
 };
-static_assert(sizeof(CylinderSettings) == 32, "CylinderSettings size");
+static_assert(sizeof(XCylinderShapeSettings) == 32, "XCylinderShapeSettings size");
 
-Shape* CreateShapeCylinder(const CylinderSettings& st) {
+Shape* CreateCylinderShape(const XCylinderShapeSettings& st) {
 	CylinderShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -118,7 +118,7 @@ Shape* CreateShapeCylinder(const CylinderSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct TaperedCylinderSettings {
+struct XTaperedCylinderShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
@@ -127,9 +127,9 @@ struct TaperedCylinderSettings {
 	float bottomRadius;
 	float convexRadius;
 };
-static_assert(sizeof(TaperedCylinderSettings) == 40, "TaperedCylinderSettings size");
+static_assert(sizeof(XTaperedCylinderShapeSettings) == 40, "XTaperedCylinderShapeSettings size");
 
-Shape* CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
+Shape* CreateTaperedCylinderShape(const XTaperedCylinderShapeSettings& st) {
 	TaperedCylinderShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -145,7 +145,7 @@ Shape* CreateShapeTaperedCylinder(const TaperedCylinderSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct ConvexHullSettings {
+struct XConvexHullShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
@@ -154,9 +154,9 @@ struct ConvexHullSettings {
 	float maxErrorConvexRadius;
 	float hullTolerance;
 };
-static_assert(sizeof(ConvexHullSettings) == 56, "ConvexHullSettings size");
+static_assert(sizeof(XConvexHullShapeSettings) == 56, "XConvexHullShapeSettings size");
 
-Shape* CreateShapeConvexHull(const ConvexHullSettings& st) {
+Shape* CreateConvexHullShape(const XConvexHullShapeSettings& st) {
 	ConvexHullShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -172,7 +172,7 @@ Shape* CreateShapeConvexHull(const ConvexHullSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct TriangleSettings {
+struct XTriangleShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	float density;
@@ -181,9 +181,9 @@ struct TriangleSettings {
 	Vec3 v2;
 	Vec3 v3;
 };
-static_assert(sizeof(TriangleSettings) == 80, "TriangleSettings size");
+static_assert(sizeof(XTriangleShapeSettings) == 80, "XTriangleShapeSettings size");
 
-Shape* CreateShapeTriangle(const TriangleSettings& st) {
+Shape* CreateTriangleShape(const XTriangleShapeSettings& st) {
 	TriangleShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -199,15 +199,15 @@ Shape* CreateShapeTriangle(const TriangleSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct PlaneSettings {
+struct XPlaneShapeSettings {
 	uint64 userData;
 	RefConst<PhysicsMaterial> material;
 	Plane plane;
 	float halfExtent;
 };
-static_assert(sizeof(PlaneSettings) == 48, "PlaneSettings size");
+static_assert(sizeof(XPlaneShapeSettings) == 48, "XPlaneShapeSettings size");
 
-Shape* CreateShapePlane(const PlaneSettings& st) {
+Shape* CreatePlaneShape(const XPlaneShapeSettings& st) {
 	PlaneShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mMaterial = st.material;
@@ -220,7 +220,7 @@ Shape* CreateShapePlane(const PlaneSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct MeshSettings {
+struct XMeshShapeSettings {
 	uint64 userData;
 	rust::Slice<Float3> triangleVertices;
 	rust::Slice<IndexedTriangle> indexedTriangles;
@@ -228,9 +228,9 @@ struct MeshSettings {
 	uint32 maxTrianglesPerLeaf;
 	float activeEdgeCosThresholdAngle;
 };
-static_assert(sizeof(MeshSettings) == 64, "MeshSettings size");
+static_assert(sizeof(XMeshShapeSettings) == 64, "XMeshShapeSettings size");
 
-Shape* CreateShapeMesh(const MeshSettings& st) {
+Shape* CreateMeshShape(const XMeshShapeSettings& st) {
 	MeshShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mTriangleVertices.assign(st.triangleVertices.begin(), st.triangleVertices.end());
@@ -248,7 +248,7 @@ Shape* CreateShapeMesh(const MeshSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct HeightFieldSettings {
+struct XHeightFieldShapeSettings {
 	uint64 userData;
 	Vec3 offset;
 	Vec3 scale;
@@ -262,9 +262,9 @@ struct HeightFieldSettings {
 	rust::Slice<PhysicsMaterial*> materials;
 	float activeEdgeCosThresholdAngle;
 };
-static_assert(sizeof(HeightFieldSettings) == 128, "HeightFieldSettings size");
+static_assert(sizeof(XHeightFieldShapeSettings) == 128, "XHeightFieldShapeSettings size");
 
-Shape* CreateShapeHeightField(const HeightFieldSettings& st) {
+Shape* CreateHeightFieldShape(const XHeightFieldShapeSettings& st) {
 	if (st.heightSamples.size() != st.sampleCount * st.sampleCount) {
 		return nullptr;
 	}
@@ -292,13 +292,13 @@ Shape* CreateShapeHeightField(const HeightFieldSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct EmptySettings {
+struct XEmptyShapeSettings {
 	uint64 userData;
 	Vec3 centerOfMass;
 };
-static_assert(sizeof(EmptySettings) == 32, "EmptySettings size");
+static_assert(sizeof(XEmptyShapeSettings) == 32, "XEmptyShapeSettings size");
 
-Shape* CreateShapeEmpty(const EmptySettings& st) {
+Shape* CreateEmptyShape(const XEmptyShapeSettings& st) {
 	EmptyShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mCenterOfMass = st.centerOfMass;
@@ -309,14 +309,14 @@ Shape* CreateShapeEmpty(const EmptySettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct ScaledSettings {
+struct XScaledShapeSettings {
 	uint64 userData;
 	RefConst<Shape> innerShape;
 	Vec3 scale;
 };
-static_assert(sizeof(ScaledSettings) == 32, "ScaledSettings size");
+static_assert(sizeof(XScaledShapeSettings) == 32, "XScaledShapeSettings size");
 
-Shape* CreateShapeScaled(const ScaledSettings& st) {
+Shape* CreateScaledShape(const XScaledShapeSettings& st) {
 	ScaledShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mInnerShapePtr = st.innerShape;
@@ -329,15 +329,15 @@ Shape* CreateShapeScaled(const ScaledSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct RotatedTranslatedSettings {
+struct XRotatedTranslatedShapeSettings {
 	uint64 userData;
 	RefConst<Shape> innerShape;
 	Vec3 position;
 	Quat rotation;
 };
-static_assert(sizeof(RotatedTranslatedSettings) == 48, "RotatedTranslatedSettings size");
+static_assert(sizeof(XRotatedTranslatedShapeSettings) == 48, "XRotatedTranslatedShapeSettings size");
 
-Shape* CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
+Shape* CreateRotatedTranslatedShape(const XRotatedTranslatedShapeSettings& st) {
 	RotatedTranslatedShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mInnerShapePtr = st.innerShape;
@@ -350,14 +350,14 @@ Shape* CreateShapeRotatedTranslated(const RotatedTranslatedSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct OffsetCenterOfMassSettings {
+struct XOffsetCenterOfMassShapeSettings {
 	uint64 userData;
 	RefConst<Shape> innerShape;
 	Vec3 offset;
 };
-static_assert(sizeof(OffsetCenterOfMassSettings) == 32, "OffsetCenterOfMassSettings size");
+static_assert(sizeof(XOffsetCenterOfMassShapeSettings) == 32, "XOffsetCenterOfMassShapeSettings size");
 
-Shape* CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
+Shape* CreateOffsetCenterOfMassShape(const XOffsetCenterOfMassShapeSettings& st) {
 	OffsetCenterOfMassShapeSettings settings;
 	settings.mUserData = st.userData;
 	settings.mInnerShapePtr = st.innerShape;
@@ -369,29 +369,29 @@ Shape* CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& st) {
 	return LeakRefT<Shape>(result.Get());
 }
 
-struct SubShapeSettings {
+struct XSubShapeSettings {
 	void* _shape;
 	RefConst<Shape> shape;
 	Vec3 position;
 	Quat rotation;
 	uint32 userData;
 };
-static_assert(sizeof(SubShapeSettings) == 64, "SubShapeSettings size");
+static_assert(sizeof(XSubShapeSettings) == 64, "XSubShapeSettings size");
 
 struct JoltArray {
 	size_t size;
 	size_t capacity;
-	SubShapeSettings* elements;
+	XSubShapeSettings* elements;
 };
-static_assert(sizeof(JoltArray) == sizeof(Array<SubShapeSettings>));
+static_assert(sizeof(JoltArray) == sizeof(Array<XSubShapeSettings>));
 
-struct StaticCompoundSettings {
+struct XStaticCompoundShapeSettings {
 	uint64 userData;
-	rust::Slice<SubShapeSettings> subShapes;
+	rust::Slice<XSubShapeSettings> subShapes;
 };
-static_assert(sizeof(StaticCompoundSettings) == 24, "StaticCompoundSettings size");
+static_assert(sizeof(XStaticCompoundShapeSettings) == 24, "XStaticCompoundShapeSettings size");
 
-Shape* CreateShapeStaticCompound(const StaticCompoundSettings& st) {
+StaticCompoundShape* CreateStaticCompoundShape(const XStaticCompoundShapeSettings& st) {
 	StaticCompoundShapeSettings settings;
 	settings.mUserData = st.userData;
 	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
@@ -405,16 +405,16 @@ Shape* CreateShapeStaticCompound(const StaticCompoundSettings& st) {
 	if (result.HasError()) {
 		return nullptr;
 	}
-	return LeakRefT<Shape>(result.Get());
+	return (StaticCompoundShape*)LeakRefT<Shape>(result.Get());
 }
 
-struct MutableCompoundSettings {
+struct XMutableCompoundShapeSettings {
 	uint64 userData;
-	rust::Slice<SubShapeSettings> subShapes;
+	rust::Slice<XSubShapeSettings> subShapes;
 };
-static_assert(sizeof(MutableCompoundSettings) == 24, "MutableCompoundSettings size");
+static_assert(sizeof(XMutableCompoundShapeSettings) == 24, "XMutableCompoundShapeSettings size");
 
-Shape* CreateShapeMutableCompound(const MutableCompoundSettings& st) {
+MutableCompoundShape* CreateMutableCompoundShape(const XMutableCompoundShapeSettings& st) {
 	MutableCompoundShapeSettings settings;
 	settings.mUserData = st.userData;
 	JoltArray* subShapes = (JoltArray*)&settings.mSubShapes;
@@ -428,5 +428,5 @@ Shape* CreateShapeMutableCompound(const MutableCompoundSettings& st) {
 	if (result.HasError()) {
 		return nullptr;
 	}
-	return LeakRefT<Shape>(result.Get());
+	return (MutableCompoundShape*)LeakRefT<Shape>(result.Get());
 }
