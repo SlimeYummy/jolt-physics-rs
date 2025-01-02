@@ -2,9 +2,7 @@
 #include "jolt-physics-rs/src/shape.rs.h"
 #include "jolt-physics-rs/src/system.rs.h"
 
-static_assert(sizeof(BodyCreationSettings) == 256, "BodyCreationSettings size");
-static_assert(sizeof(CollisionGroup) == 16, "CollisionGroup size");
-static_assert(sizeof(MassProperties) == 80, "MassProperties size");
+static_assert(sizeof(PhysicsSettings) == 84, "PhysicsSettings size");
 
 // Callback for traces, connect this to your own trace function if you have one
 static void TraceImpl(const char* inFMT, ...)
@@ -34,36 +32,6 @@ static bool AssertFailedImpl(const char* inExpression, const char* inMessage, co
 
 #endif // JPH_ENABLE_ASSERTS
 
-CxxContactCollector::CxxContactCollector(XContactCollector* collector) {
-	this->_collector = collector;
-}
-
-ValidateResult CxxContactCollector::OnContactValidate(const Body& body1, const Body& body2, RVec3Arg baseOffset, const CollideShapeResult& result) {
-	// cout << "Contact validate callback" << endl;
-	// Allows you to ignore a contact before it is created (using layers to not make objects collide is cheaper!)
-	return ValidateResult::AcceptAllContactsForThisBodyPair;
-}
-
-void CxxContactCollector::OnContactAdded(const Body& body1, const Body& body2, const ContactManifold& manifold, ContactSettings& settings) {
-	this->_collector->start_hit_event(body1.GetID(), body2.GetID());
-}
-
-void CxxContactCollector::OnContactPersisted(const Body& body1, const Body& body2, const ContactManifold& manifold, ContactSettings& settings) {
-	// cout << "A contact was persisted" << endl;
-}
-
-void CxxContactCollector::OnContactRemoved(const SubShapeIDPair& pair) {
-	this->_collector->stop_hit_event(pair.GetBody1ID(), pair.GetBody2ID());
-}
-
-// void MyBodyActivationListener::OnBodyActivated(const BodyID& inBodyID, uint64 inBodyUserData) {
-// 	cout << "A body got activated" << endl;
-// }
-
-// void MyBodyActivationListener::OnBodyDeactivated(const BodyID& inBodyID, uint64 inBodyUserData) {
-// 	cout << "A body went to sleep" << endl;
-// }
-
 void GlobalInitialize() {
 	RegisterDefaultAllocator();
 	Trace = TraceImpl;
@@ -84,43 +52,49 @@ void GlobalFinalize() {
 // PhysicsSystem
 //
 
-XPhysicsSystem::XPhysicsSystem(XContactCollector* contacts):
+XPhysicsSystem::XPhysicsSystem():
 	_allocator(TempAllocatorImpl(10 * 1024 * 1024)),
 	_jobSys(JobSystemThreadPool(cMaxPhysicsJobs, cMaxPhysicsBarriers, 2)),
-	_phySys(PhysicsSystem()),
-	_contacts(contacts)
-{}
-
-Ref<XPhysicsSystem> XPhysicsSystem::Create(XContactCollector* contacts) {
-	Ref<XPhysicsSystem> system = Ref(new XPhysicsSystem(contacts));
-
+	_phySys(PhysicsSystem())
+{
 	const uint cMaxBodies = 20480;
 	const uint cNumBodyMutexes = 0;
 	const uint cMaxBodyPairs = 20480;
 	const uint cMaxContactConstraints = 5120;
 
-	system->_phySys.Init(
+	_phySys.Init(
 		cMaxBodies,
 		cNumBodyMutexes,
 		cMaxBodyPairs,
 		cMaxContactConstraints,
-		system->_bpLayerItf,
-		system->_objBpLayerFilter,
-		system->_objObjLayerFilter
+		_bpLayerItf,
+		_objBpLayerFilter,
+		_objObjLayerFilter
 	);
-
-	// system->_phySys.SetBodyActivationListener(&system->body_activation_listener);
-	system->_phySys.SetContactListener(&system->_contacts);
-
-	return system;
-}
-
-void XPhysicsSystem::Prepare() {
-	this->_phySys.OptimizeBroadPhase();
 }
 
 uint32 XPhysicsSystem::Update(float delta) {
 	return (uint32)this->_phySys.Update(delta, 1, &this->Allocator(), &this->JobSys());
+}
+
+void XPhysicsSystem::GetBodies(rust::Vec<BodyID>& bodies) const {
+	BodyIDVector tmp;
+	this->_phySys.GetBodies(tmp);
+	bodies.clear();
+	bodies.reserve(tmp.size());
+	for (BodyID body_id : tmp) {
+		bodies.push_back(body_id);
+	}
+}
+
+void XPhysicsSystem::GetActiveBodies(EBodyType bodyType, rust::Vec<BodyID>& bodies) const {
+	BodyIDVector tmp;
+	this->_phySys.GetActiveBodies(bodyType, tmp);
+	bodies.clear();
+	bodies.reserve(tmp.size());
+	for (BodyID body_id : tmp) {
+		bodies.push_back(body_id);
+	}
 }
 
 #if defined(JPH_DEBUG_RENDERER)
@@ -131,8 +105,8 @@ void XPhysicsSystem::DebugRender(DebugRenderer* debugRenderer) {
 }
 #endif
 
-XPhysicsSystem* CreatePhysicSystem(XContactCollector* contacts) {
-	auto system = XPhysicsSystem::Create(contacts);
+XPhysicsSystem* CreatePhysicSystem() {
+	Ref<XPhysicsSystem> system = Ref(new XPhysicsSystem());
 	return LeakRefT<XPhysicsSystem>(system);
 }
 
