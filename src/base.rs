@@ -1,24 +1,173 @@
-use cxx::{type_id, ExternType};
+use cxx::{kind, type_id, ExternType};
 use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
 use std::mem;
-use std::pin::Pin;
+use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 
 #[allow(dead_code)]
 #[cxx::bridge()]
-pub mod ffi {
+pub(crate) mod ffi {
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum ShapeType {
+        Convex,
+        Compound,
+        Decorated,
+        Mesh,
+        HeightField,
+        SoftBody,
+
+        User1,
+        User2,
+        User3,
+        User4,
+
+        Plane,
+        Empty,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum ShapeSubType {
+        // Convex shapes
+        Sphere,
+        Box,
+        Triangle,
+        Capsule,
+        TaperedCapsule,
+        Cylinder,
+        ConvexHull,
+
+        // Compound shapes
+        StaticCompound,
+        MutableCompound,
+
+        // Decorated shapes
+        RotatedTranslated,
+        Scaled,
+        OffsetCenterOfMass,
+
+        // Other shapes
+        Mesh,
+        HeightField,
+        SoftBody,
+
+        // User defined shapes
+        User1,
+        User2,
+        User3,
+        User4,
+        User5,
+        User6,
+        User7,
+        User8,
+
+        // User defined convex shapes
+        UserConvex1,
+        UserConvex2,
+        UserConvex3,
+        UserConvex4,
+        UserConvex5,
+        UserConvex6,
+        UserConvex7,
+        UserConvex8,
+
+        // Other shapes
+        Plane,
+        TaperedCylinder,
+        Empty,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum BodyType {
+        RigidBody,
+        SoftBody,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum MotionType {
+        Static,
+        Kinematic,
+        Dynamic,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum MotionQuality {
+        Discrete,
+        LinearCast,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum AllowedDOFs {
+        None = 0b000000,
+        All = 0b111111,
+        TranslationX = 0b000001,
+        TranslationY = 0b000010,
+        TranslationZ = 0b000100,
+        RotationX = 0b001000,
+        RotationY = 0b010000,
+        RotationZ = 0b100000,
+        Plane2D = 0b100011,
+    }
+
+    #[repr(u8)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum OverrideMassProperties {
+        CalculateMassAndInertia,
+        CalculateInertia,
+        MassAndInertiaProvided,
+    }
+
+    #[repr(u32)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum Activation {
+        Activate,
+        DontActivate,
+    }
+
+    #[repr(u32)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum CanSleep {
+        CannotSleep,
+        CanSleep,
+    }
+
     impl Vec<Vec3> {}
+    impl Vec<Vec4> {}
+    impl Vec<Quat> {}
+    impl Vec<Mat44> {}
     impl Vec<Float3> {}
     impl Vec<Int3> {}
     impl Vec<Plane> {}
     impl Vec<AABox> {}
     impl Vec<IndexedTriangle> {}
+    impl Vec<BodyID> {}
+    impl Vec<SubShapeID> {}
+
+    struct FatVTablePointer {
+        vtable: *const u8,
+        data: *const u8,
+    }
 
     unsafe extern "C++" {
         include!("rust/cxx.h");
         include!("jolt-physics-rs/src/ffi.h");
+
+        type ShapeType;
+        type ShapeSubType;
+        type BodyType;
+        type MotionType;
+        type MotionQuality;
+        type AllowedDOFs;
+        type OverrideMassProperties;
+        type Activation;
+        type CanSleep;
 
         type Vec3 = crate::base::XVec3;
         type Vec4 = crate::base::XVec4;
@@ -30,31 +179,59 @@ pub mod ffi {
         type AABox = crate::base::AABox;
         type IndexedTriangle = crate::base::IndexedTriangle;
         type BodyID = crate::base::BodyID;
+        type SubShapeID = crate::base::SubShapeID;
+    }
+}
 
-        type Shape;
-        unsafe fn DropRefShape(shape: *mut Shape);
-        unsafe fn CloneRefShape(shape: *mut Shape) -> *mut Shape;
-        unsafe fn CountRefShape(shape: *mut Shape) -> u32;
+pub type ShapeType = ffi::ShapeType;
+pub type ShapeSubType = ffi::ShapeSubType;
+pub type BodyType = ffi::BodyType;
+pub type MotionType = ffi::MotionType;
+pub type MotionQuality = ffi::MotionQuality;
+pub type AllowedDOFs = ffi::AllowedDOFs;
+pub type OverrideMassProperties = ffi::OverrideMassProperties;
 
-        type PhysicsMaterial;
-        unsafe fn DropRefPhysicsMaterial(material: *mut PhysicsMaterial);
-        unsafe fn CloneRefPhysicsMaterial(material: *mut PhysicsMaterial) -> *mut PhysicsMaterial;
-        unsafe fn CountRefPhysicsMaterial(material: *mut PhysicsMaterial) -> u32;
+impl From<bool> for ffi::Activation {
+    #[inline]
+    fn from(value: bool) -> ffi::Activation {
+        match value {
+            true => ffi::Activation::Activate,
+            false => ffi::Activation::DontActivate,
+        }
+    }
+}
 
-        type XPhysicsSystem;
-        unsafe fn DropRefPhysicsSystem(system: *mut XPhysicsSystem);
-        unsafe fn CloneRefPhysicsSystem(system: *mut XPhysicsSystem) -> *mut XPhysicsSystem;
-        unsafe fn CountRefPhysicsSystem(system: *mut XPhysicsSystem) -> u32;
+impl From<ffi::Activation> for bool {
+    #[inline]
+    fn from(value: ffi::Activation) -> bool {
+        value == ffi::Activation::Activate
+    }
+}
+
+impl From<bool> for ffi::CanSleep {
+    #[inline]
+    fn from(value: bool) -> ffi::CanSleep {
+        match value {
+            true => ffi::CanSleep::CanSleep,
+            false => ffi::CanSleep::CannotSleep,
+        }
+    }
+}
+
+impl From<ffi::CanSleep> for bool {
+    #[inline]
+    fn from(value: ffi::CanSleep) -> bool {
+        value == ffi::CanSleep::CanSleep
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XVec3(pub Vec3A);
+pub struct XVec3(pub(crate) Vec3A);
 const_assert_eq!(mem::size_of::<XVec3>(), 16);
 
 unsafe impl ExternType for XVec3 {
     type Id = type_id!("Vec3");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl From<Vec3A> for XVec3 {
@@ -65,12 +242,12 @@ impl From<Vec3A> for XVec3 {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XVec4(pub Vec4);
+pub struct XVec4(pub(crate) Vec4);
 const_assert_eq!(mem::size_of::<XVec4>(), 16);
 
 unsafe impl ExternType for XVec4 {
     type Id = type_id!("Vec4");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl From<Vec4> for XVec4 {
@@ -81,12 +258,12 @@ impl From<Vec4> for XVec4 {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XQuat(pub Quat);
+pub struct XQuat(pub(crate) Quat);
 const_assert_eq!(mem::size_of::<XQuat>(), 16);
 
 unsafe impl ExternType for XQuat {
     type Id = type_id!("Quat");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl From<Quat> for XQuat {
@@ -97,12 +274,12 @@ impl From<Quat> for XQuat {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XMat4(pub Mat4);
+pub struct XMat4(pub(crate) Mat4);
 const_assert_eq!(mem::size_of::<XMat4>(), 64);
 
 unsafe impl ExternType for XMat4 {
     type Id = type_id!("Mat44");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl From<Mat4> for XMat4 {
@@ -113,21 +290,21 @@ impl From<Mat4> for XMat4 {
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XFloat3(Vec3);
+pub struct XFloat3(pub(crate) Vec3);
 const_assert_eq!(mem::size_of::<XFloat3>(), 12);
 
 unsafe impl ExternType for XFloat3 {
     type Id = type_id!("Float3");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XInt3(IVec3);
+pub struct XInt3(pub(crate) IVec3);
 const_assert_eq!(mem::size_of::<XInt3>(), 12);
 
 unsafe impl ExternType for XInt3 {
     type Id = type_id!("Int3");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 #[repr(C, align(16))]
@@ -140,7 +317,7 @@ const_assert_eq!(mem::size_of::<Plane>(), 16);
 
 unsafe impl ExternType for Plane {
     type Id = type_id!("Plane");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl Default for Plane {
@@ -167,7 +344,7 @@ const_assert_eq!(mem::size_of::<AABox>(), 32);
 
 unsafe impl ExternType for AABox {
     type Id = type_id!("AABox");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl AABox {
@@ -188,7 +365,7 @@ const_assert_eq!(mem::size_of::<IndexedTriangle>(), 20);
 
 unsafe impl ExternType for IndexedTriangle {
     type Id = type_id!("IndexedTriangle");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl IndexedTriangle {
@@ -227,34 +404,70 @@ impl<'de> Deserialize<'de> for IndexedTriangle {
     }
 }
 
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SubShapeID(pub u32);
+const_assert_eq!(mem::size_of::<SubShapeID>(), 4);
+
+unsafe impl ExternType for SubShapeID {
+    type Id = type_id!("SubShapeID");
+    type Kind = kind::Trivial;
+}
+
+impl SubShapeID {
+    pub const EMPTY: SubShapeID = SubShapeID(0);
+
+    #[inline]
+    pub fn new(id: u32) -> SubShapeID {
+        SubShapeID(id)
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        *self == Self::EMPTY
+    }
+}
+
+impl From<u32> for SubShapeID {
+    #[inline]
+    fn from(id: u32) -> SubShapeID {
+        SubShapeID(id)
+    }
+}
+
+impl From<SubShapeID> for u32 {
+    #[inline]
+    fn from(id: SubShapeID) -> u32 {
+        id.0
+    }
+}
+
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BodyID(pub u32);
 const_assert_eq!(mem::size_of::<BodyID>(), 4);
 
 unsafe impl ExternType for BodyID {
     type Id = type_id!("BodyID");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 impl BodyID {
+    pub const INVALID: BodyID = BodyID(0xFFFF_FFFF);
+
     #[inline]
     pub fn new(id: u32) -> BodyID {
         BodyID(id)
     }
 
     #[inline]
-    pub fn invalid() -> BodyID {
-        BodyID(0xFFFF_FFFF)
-    }
-
-    #[inline]
     pub fn is_valid(&self) -> bool {
-        self.0 != 0xFFFF_FFFF
+        *self != Self::INVALID
     }
 
     #[inline]
     pub fn is_invalid(&self) -> bool {
-        self.0 == 0xFFFF_FFFF
+        *self == Self::INVALID
     }
 }
 
@@ -272,181 +485,127 @@ impl From<BodyID> for u32 {
     }
 }
 
-/// In C++ code, Shape* is actually a smart pointer with a reference count.
-/// Currently, we don't have a perfect representation of this in Rust.
-/// So we're marking all `&mut self` functions as unsafe for now.
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct RefShape(pub(crate) NonNull<ffi::Shape>);
+pub unsafe trait JRefTarget {
+    type JRefRaw;
 
-const_assert_eq!(mem::size_of::<RefShape>(), mem::size_of::<usize>());
-const_assert_eq!(mem::size_of::<Option<RefShape>>(), 8);
-const_assert_eq!(unsafe { mem::transmute::<Option<RefShape>, usize>(None) }, 0);
-
-impl Clone for RefShape {
-    #[inline]
-    fn clone(&self) -> RefShape {
-        unsafe { ffi::CloneRefShape(self.0.as_ptr()) };
-        RefShape(self.0)
-    }
+    fn name() -> &'static str;
+    fn from_ptr(raw: *const Self::JRefRaw) -> *const Self;
+    fn from_non_null(raw: NonNull<Self::JRefRaw>) -> NonNull<Self>;
+    unsafe fn clone_ref(&mut self) -> NonNull<Self>;
+    unsafe fn drop_ref(&mut self);
+    fn count_ref(&self) -> u32;
 }
 
-impl Drop for RefShape {
-    fn drop(&mut self) {
-        #[cfg(feature = "debug-print")]
-        println!("DropRefShape::drop {:?} {}", self.0.as_ptr(), self.ref_count() - 1);
-        unsafe { ffi::DropRefShape(self.0.as_ptr()) };
-    }
-}
+#[derive(Debug)]
+pub struct JMut<T: JRefTarget>(pub(crate) NonNull<T>);
 
-impl RefShape {
+impl<T: JRefTarget> JMut<T> {
     #[inline]
-    pub(crate) unsafe fn new(shape: *mut ffi::Shape) -> RefShape {
-        assert!(!shape.is_null());
-        Self(NonNull::new_unchecked(shape))
+    pub(crate) fn new(raw: NonNull<T::JRefRaw>) -> JMut<T> {
+        JMut(T::from_non_null(raw))
     }
 
     #[inline]
-    pub fn ref_count(&self) -> u32 {
-        unsafe { ffi::CountRefShape(self.0.as_ptr()) }
+    pub(crate) unsafe fn new_unchecked(raw: *mut T::JRefRaw) -> JMut<T> {
+        JMut::new(NonNull::new_unchecked(raw))
     }
-
+    
     #[inline]
-    pub(crate) fn as_ref(&self) -> &ffi::Shape {
+    pub fn as_ref(&self) -> &T {
         unsafe { self.0.as_ref() }
     }
 
     #[inline]
-    pub(crate) fn as_mut(&mut self) -> Pin<&mut ffi::Shape> {
-        unsafe { Pin::new_unchecked(self.0.as_mut()) }
-    }
-
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn as_ptr(&self) -> *const ffi::Shape {
-        self.0.as_ptr()
-    }
-
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::Shape {
-        self.0.as_ptr()
-    }
-
-    #[inline]
-    pub(crate) unsafe fn as_ref_t<T>(&self) -> &T {
-        unsafe { &*(self.0.as_ptr() as *const T) }
-    }
-
-    #[inline]
-    pub(crate) unsafe fn as_mut_t<T>(&mut self) -> Pin<&mut T> {
-        unsafe { Pin::new_unchecked(&mut *(self.0.as_ptr() as *mut T)) }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct RefPhysicsMaterial(pub(crate) NonNull<ffi::PhysicsMaterial>);
-
-const_assert_eq!(mem::size_of::<RefPhysicsMaterial>(), mem::size_of::<usize>());
-const_assert_eq!(mem::size_of::<Option<RefPhysicsMaterial>>(), 8);
-const_assert_eq!(unsafe { mem::transmute::<Option<RefPhysicsMaterial>, usize>(None) }, 0);
-
-impl Clone for RefPhysicsMaterial {
-    #[inline]
-    fn clone(&self) -> RefPhysicsMaterial {
-        unsafe { ffi::CloneRefPhysicsMaterial(self.0.as_ptr()) };
-        RefPhysicsMaterial(self.0)
-    }
-}
-
-impl Drop for RefPhysicsMaterial {
-    fn drop(&mut self) {
-        #[cfg(feature = "debug-print")]
-        println!(
-            "DropRefPhysicsMaterial::drop {:?} {}",
-            self.0.as_ptr(),
-            self.ref_count() - 1
-        );
-        unsafe { ffi::DropRefPhysicsMaterial(self.0.as_ptr()) };
-    }
-}
-
-impl RefPhysicsMaterial {
-    #[inline]
-    pub fn ref_count(&self) -> u32 {
-        unsafe { ffi::CountRefPhysicsMaterial(self.0.as_ptr()) }
-    }
-
-    // #[inline]
-    // pub(crate) fn as_ref(&self) -> &ffi::PhysicsMaterial {
-    //     unsafe { self.0.as_ref() }
-    // }
-
-    // #[inline]
-    // pub(crate) fn as_mut(&mut self) -> &mut ffi::PhysicsMaterial {
-    //     unsafe { self.0.as_mut() }
-    // }
-
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn as_ptr(&self) -> *const ffi::PhysicsMaterial {
-        self.0.as_ptr()
-    }
-
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::PhysicsMaterial {
-        self.0.as_ptr()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct RefPhysicsSystem(pub(crate) NonNull<ffi::XPhysicsSystem>);
-
-const_assert_eq!(mem::size_of::<RefPhysicsSystem>(), mem::size_of::<usize>());
-const_assert_eq!(mem::size_of::<Option<RefPhysicsSystem>>(), 8);
-const_assert_eq!(unsafe { mem::transmute::<Option<RefPhysicsSystem>, usize>(None) }, 0);
-
-impl Clone for RefPhysicsSystem {
-    #[inline]
-    fn clone(&self) -> RefPhysicsSystem {
-        unsafe { ffi::CloneRefPhysicsSystem(self.0.as_ptr()) };
-        RefPhysicsSystem(self.0)
-    }
-}
-
-impl Drop for RefPhysicsSystem {
-    fn drop(&mut self) {
-        #[cfg(feature = "debug-print")]
-        println!("DropRefPhysicsSystem::drop {:?} {}", self.0.as_ptr(), self.ref_count());
-        unsafe { ffi::DropRefPhysicsSystem(self.0.as_ptr()) };
-    }
-}
-
-impl RefPhysicsSystem {
-    #[inline]
-    pub fn ref_count(&self) -> u32 {
-        unsafe { ffi::CountRefPhysicsSystem(self.0.as_ptr()) }
-    }
-
-    #[inline]
-    pub(crate) fn as_ref(&self) -> &ffi::XPhysicsSystem {
-        unsafe { self.0.as_ref() }
-    }
-
-    #[inline]
-    pub(crate) fn as_mut(&mut self) -> &mut ffi::XPhysicsSystem {
+    pub fn as_mut(&mut self) -> &mut T {
         unsafe { self.0.as_mut() }
     }
 
-    #[allow(dead_code)]
     #[inline]
-    pub(crate) fn as_ptr(&self) -> *const ffi::XPhysicsSystem {
-        self.0.as_ptr()
+    pub fn into_ref(self) -> JRef<T> {
+        let jref = JRef(self.0);
+        mem::forget(self);
+        jref
     }
 
-    #[allow(dead_code)]
     #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut ffi::XPhysicsSystem {
-        self.0.as_ptr()
+    pub unsafe fn leak_ref(&mut self) -> JRef<T> {
+        JRef(self.clone_ref())
+    }
+}
+
+impl<T: JRefTarget> Drop for JMut<T> {
+    fn drop(&mut self) {
+        #[cfg(feature = "debug-print")]
+        println!("JMut<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
+        unsafe { (*self.0.as_ptr()).drop_ref() };
+    }
+}
+
+impl<T: JRefTarget> Deref for JMut<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl<T: JRefTarget> DerefMut for JMut<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { self.0.as_mut() }
+    }
+}
+
+#[derive(Debug)]
+pub struct JRef<T: JRefTarget>(pub(crate) NonNull<T>);
+
+impl<T: JRefTarget> JRef<T> {
+    #[inline]
+    pub(crate) fn new(raw: NonNull<T::JRefRaw>) -> JRef<T> {
+        JRef(T::from_non_null(raw))
+    }
+
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut T::JRefRaw) -> JRef<T> {
+        JRef::new(NonNull::new_unchecked(raw))
+    }
+    
+    #[inline]
+    pub fn as_ref(&self) -> &T {
+        unsafe { &self.0.as_ref() }
+    }
+}
+
+impl<T: JRefTarget> Clone for JRef<T> {
+    #[inline]
+    fn clone(&self) -> JRef<T> {
+        unsafe { JRef((*self.0.as_ptr()).clone_ref()) }
+    }
+}
+
+impl<T: JRefTarget> Drop for JRef<T> {
+    fn drop(&mut self) {
+        #[cfg(feature = "debug-print")]
+        println!("JRef<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
+        unsafe { (*self.0.as_ptr()).drop_ref() };
+    }
+}
+
+impl<T: JRefTarget> From<JMut<T>> for JRef<T> {
+    #[inline]
+    fn from(jmut: JMut<T>) -> JRef<T> {
+        let jref = JRef(jmut.0);
+        mem::forget(jmut);
+        jref
+    }
+}
+
+impl<T: JRefTarget> Deref for JRef<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        unsafe { &self.0.as_ref() }
     }
 }
