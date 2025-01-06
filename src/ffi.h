@@ -75,6 +75,16 @@ constexpr float MARGIN_FACTOR = 0.08f;
 // base
 //
 
+typedef EShapeType ShapeType;
+typedef EShapeSubType ShapeSubType;
+typedef EBodyType BodyType;
+typedef EMotionType MotionType;
+typedef EMotionQuality MotionQuality;
+typedef EAllowedDOFs AllowedDOFs;
+typedef EOverrideMassProperties OverrideMassProperties;
+typedef EActivation Activation;
+typedef ECanSleep CanSleep;
+
 static_assert(sizeof(Vec3) == 16, "Vec3 size");
 static_assert(sizeof(Vec4) == 16, "Vec4 size");
 static_assert(sizeof(Quat) == 16, "Quat size");
@@ -112,75 +122,80 @@ template <class T> T* CloneRef(T* rs_ptr) {
 }
 
 template <class T>
-uint32 CountRef(T* rs_ptr) {
+uint32 RefCountRef(const T* rs_ptr) {
 	return rs_ptr == nullptr ? 0 : (*reinterpret_cast<RefConst<T>*>(&rs_ptr))->GetRefCount();
 }
 
 class XPhysicsSystem;
 
-typedef EShapeType ShapeType;
-typedef EShapeSubType ShapeSubType;
-
 #include "jolt-physics-rs/src/base.rs.h"
 #include "jolt-physics-rs/src/layer.rs.h"
-
-inline void DropRefShape(Shape* ptr) { DropRef<Shape>(ptr); }
-inline Shape* CloneRefShape(Shape* ptr) { return CloneRef<Shape>(ptr); }
-inline uint32 CountRefShape(Shape* ptr) { return CountRef<Shape>(ptr); }
-
-inline void DropRefPhysicsMaterial(PhysicsMaterial* ptr) { DropRef<PhysicsMaterial>(ptr); }
-inline PhysicsMaterial* CloneRefPhysicsMaterial(PhysicsMaterial* ptr) { return CloneRef<PhysicsMaterial>(ptr); }
-inline uint32 CountRefPhysicsMaterial(PhysicsMaterial* ptr) { return CountRef<PhysicsMaterial>(ptr); }
 
 //
 // shape
 //
 
-struct SphereSettings;
-Shape* CreateShapeSphere(const SphereSettings& settings);
-struct BoxSettings;
-Shape* CreateShapeBox(const BoxSettings& settings);
-struct CapsuleSettings;
-Shape* CreateShapeCapsule(const CapsuleSettings& settings);
-struct TaperedCapsuleSettings;
-Shape* CreateShapeTaperedCapsule(const TaperedCapsuleSettings& settings);
-struct CylinderSettings;
-Shape* CreateShapeCylinder(const CylinderSettings& settings);
-struct TaperedCylinderSettings;
-Shape* CreateShapeTaperedCylinder(const TaperedCylinderSettings& settings);
-struct ConvexHullSettings;
-Shape* CreateShapeConvexHull(const ConvexHullSettings& settings);
-struct TriangleSettings;
-Shape* CreateShapeTriangle(const TriangleSettings& settings);
-struct PlaneSettings;
-Shape* CreateShapePlane(const PlaneSettings& settings);
-struct MeshSettings;
-Shape* CreateShapeMesh(const MeshSettings& settings);
-struct HeightFieldSettings;
-Shape* CreateShapeHeightField(const HeightFieldSettings& settings);
-struct EmptySettings;
-Shape* CreateShapeEmpty(const EmptySettings& settings);
+inline void DropPhysicsMaterial(PhysicsMaterial* ptr) { DropRef<PhysicsMaterial>(ptr); }
+inline PhysicsMaterial* ClonePhysicsMaterial(PhysicsMaterial* ptr) { return CloneRef<PhysicsMaterial>(ptr); }
+inline uint32 CountRefPhysicsMaterial(const PhysicsMaterial* ptr) { return RefCountRef<PhysicsMaterial>(ptr); }
 
-struct ScaledSettings;
-Shape* CreateShapeScaled(const ScaledSettings& settings);
-struct RotatedTranslatedSettings;
-Shape* CreateShapeRotatedTranslated(const RotatedTranslatedSettings& settings);
-struct OffsetCenterOfMassSettings;
-Shape* CreateShapeOffsetCenterOfMass(const OffsetCenterOfMassSettings& settings);
+inline void DropShape(Shape* ptr) { DropRef<Shape>(ptr); }
+inline Shape* CloneShape(Shape* ptr) { return CloneRef<Shape>(ptr); }
+inline uint32 CountRefShape(const Shape* ptr) { return RefCountRef<Shape>(ptr); }
 
-struct SubShapeSettings;
-struct StaticCompoundSettings;
-Shape* CreateShapeStaticCompound(const StaticCompoundSettings& settings);
-struct MutableCompoundSettings;
-Shape* CreateShapeMutableCompound(const MutableCompoundSettings& settings);
-typedef CompoundShape::SubShape CompoundShapeSubShape;
-static_assert(sizeof(CompoundShape::SubShape) == 40, "CompoundShape::SubShape size");
+inline void DropStaticCompoundShape(StaticCompoundShape* ptr) { DropRef<StaticCompoundShape>(ptr); }
+inline StaticCompoundShape* CloneStaticCompoundShape(StaticCompoundShape* ptr) { return CloneRef<StaticCompoundShape>(ptr); }
+inline uint32 CountRefStaticCompoundShape(const StaticCompoundShape* ptr) { return RefCountRef<StaticCompoundShape>(ptr); }
+
+inline void DropMutableCompoundShape(MutableCompoundShape* ptr) { DropRef<MutableCompoundShape>(ptr); }
+inline MutableCompoundShape* CloneMutableCompoundShape(MutableCompoundShape* ptr) { return CloneRef<MutableCompoundShape>(ptr); }
+inline uint32 CountRefMutableCompoundShape(const MutableCompoundShape* ptr) { return RefCountRef<MutableCompoundShape>(ptr); }
+
+struct XSphereShapeSettings;
+Shape* CreateSphereShape(const XSphereShapeSettings& settings);
+struct XBoxShapeSettings;
+Shape* CreateBoxShape(const XBoxShapeSettings& settings);
+struct XCapsuleShapeSettings;
+Shape* CreateCapsuleShape(const XCapsuleShapeSettings& settings);
+struct XTaperedCapsuleShapeSettings;
+Shape* CreateTaperedCapsuleShape(const XTaperedCapsuleShapeSettings& settings);
+struct XCylinderShapeSettings;
+Shape* CreateCylinderShape(const XCylinderShapeSettings& settings);
+struct XTaperedCylinderShapeSettings;
+Shape* CreateTaperedCylinderShape(const XTaperedCylinderShapeSettings& settings);
+struct XConvexHullShapeSettings;
+Shape* CreateConvexHullShape(const XConvexHullShapeSettings& settings);
+struct XTriangleShapeSettings;
+Shape* CreateTriangleShape(const XTriangleShapeSettings& settings);
+struct XPlaneShapeSettings;
+Shape* CreatePlaneShape(const XPlaneShapeSettings& settings);
+struct XMeshShapeSettings;
+Shape* CreateMeshShape(const XMeshShapeSettings& settings);
+struct XHeightFieldShapeSettings;
+Shape* CreateHeightFieldShape(const XHeightFieldShapeSettings& settings);
+struct XEmptyShapeSettings;
+Shape* CreateEmptyShape(const XEmptyShapeSettings& settings);
+
+struct XScaledShapeSettings;
+Shape* CreateScaledShape(const XScaledShapeSettings& settings);
+struct XRotatedTranslatedShapeSettings;
+Shape* CreateRotatedTranslatedShape(const XRotatedTranslatedShapeSettings& settings);
+struct XOffsetCenterOfMassShapeSettings;
+Shape* CreateOffsetCenterOfMassShape(const XOffsetCenterOfMassShapeSettings& settings);
+
+struct XSubShapeSettings;
+struct XStaticCompoundShapeSettings;
+StaticCompoundShape* CreateStaticCompoundShape(const XStaticCompoundShapeSettings& settings);
+struct XMutableCompoundShapeSettings;
+MutableCompoundShape* CreateMutableCompoundShape(const XMutableCompoundShapeSettings& settings);
+typedef CompoundShape::SubShape XCompoundSubShape;
+static_assert(sizeof(XCompoundSubShape) == 40, "XCompoundSubShape size");
 
 //
 // system
 //
 
-class DebugRenderable {
+class XDebugRenderable {
 public:
 	RENDERER_ONLY(virtual void Render(DebugRenderer* render) const {};)
 };
@@ -201,27 +216,11 @@ public:
 	virtual bool ShouldCollide(ObjectLayer obj1, ObjectLayer obj2) const override { return RsObjObjLayerFilter(obj1, obj2); }
 };
 
-struct XContactCollector;
-class CxxContactCollector: public ContactListener {
-private:
-	XContactCollector* _collector;
-public:
-	CxxContactCollector(XContactCollector* collector);
-	virtual ValidateResult OnContactValidate(const Body& body1, const Body& body2, RVec3Arg baseOffset, const CollideShapeResult& result) override;
-	virtual void OnContactAdded(const Body& body1, const Body& body2, const ContactManifold& manifold, ContactSettings& settings) override;
-	virtual void OnContactPersisted(const Body& body1, const Body& body2, const ContactManifold& manifold, ContactSettings& settings) override;
-	virtual void OnContactRemoved(const SubShapeIDPair& pair) override;
-};
-
-typedef EBodyType BodyType;
-typedef EMotionType MotionType;
-typedef EMotionQuality MotionQuality;
-typedef EAllowedDOFs AllowedDOFs;
-typedef EOverrideMassProperties OverrideMassProperties;
-typedef EActivation Activation;
-
 void GlobalInitialize();
 void GlobalFinalize();
+
+using XBodyStats = BodyManager::BodyStats;
+static_assert(sizeof(XBodyStats) == 36, "XBodyStats size");
 
 class XPhysicsSystem: public RefTarget<XPhysicsSystem> {
 private:
@@ -233,34 +232,30 @@ private:
 	ObjectVsBroadPhaseLayerFilterImpl _objBpLayerFilter;
 	ObjectLayerPairFilterImpl _objObjLayerFilter;
 
-	CxxContactCollector _contacts;
-	RENDERER_ONLY(unordered_set<DebugRenderable*> _renderables;)
-
-private:
-	XPhysicsSystem(XContactCollector* contacts);
+	RENDERER_ONLY(unordered_set<XDebugRenderable*> _renderables;)
 
 public:
-	~XPhysicsSystem() { PRINT_ONLY(printf("~XPhysicsSystem\n")); }
-	static Ref<XPhysicsSystem> Create(XContactCollector* contacts);
+	XPhysicsSystem();
+	~XPhysicsSystem() { PRINT_ONLY(printf("~XPhysicsSystem %d\n", GetRefCount())); }
 	PhysicsSystem& PhySys() { return this->_phySys; }
 	JobSystemThreadPool& JobSys() { return this->_jobSys; }
 	TempAllocatorImpl& Allocator() { return this->_allocator; }
 	BodyInterface& BodyItf(bool lock) { return lock ? this->_phySys.GetBodyInterface() : this->_phySys.GetBodyInterfaceNoLock(); }
 
 public:
-	void Prepare();
+	PhysicsSystem* GetPhysicsSystem() { return &this->_phySys; }
 	uint32 Update(float delta);
-	BodyID CreateBody(const BodyCreationSettings& settings, bool lock);
-	Vec3 GetGravity() const { return this->_phySys.GetGravity(); }
-	RENDERER_ONLY(void AddRenderable(DebugRenderable* renderable) { _renderables.insert(renderable); })
-	RENDERER_ONLY(void RemoveRenderable(DebugRenderable* renderable) { _renderables.erase(renderable); })
+	void GetBodies(rust::Vec<BodyID>& bodies) const;
+	void GetActiveBodies(EBodyType bodyType, rust::Vec<BodyID>& bodies) const;
+	RENDERER_ONLY(void AddRenderable(XDebugRenderable* renderable) { _renderables.insert(renderable); })
+	RENDERER_ONLY(void RemoveRenderable(XDebugRenderable* renderable) { _renderables.erase(renderable); })
 	RENDERER_ONLY(void DebugRender(DebugRenderer* debugRenderer);)
 };
 
-XPhysicsSystem* CreatePhysicSystem(XContactCollector* contacts);
-inline void DropRefPhysicsSystem(XPhysicsSystem* ptr) { DropRef<XPhysicsSystem>(ptr); }
-inline XPhysicsSystem* CloneRefPhysicsSystem(XPhysicsSystem* ptr) { return CloneRef<XPhysicsSystem>(ptr); }
-inline uint32 CountRefPhysicsSystem(XPhysicsSystem* ptr) { return CountRef<XPhysicsSystem>(ptr); }
+XPhysicsSystem* CreatePhysicSystem();
+inline void DropXPhysicsSystem(XPhysicsSystem* ptr) { DropRef<XPhysicsSystem>(ptr); }
+inline XPhysicsSystem* CloneXPhysicsSystem(XPhysicsSystem* ptr) { return CloneRef<XPhysicsSystem>(ptr); }
+inline uint32 CountRefXPhysicsSystem(const XPhysicsSystem* ptr) { return RefCountRef<XPhysicsSystem>(ptr); }
 
 class XBodyInterface: public BodyInterface {
 public:
@@ -280,40 +275,44 @@ typedef Character::EGroundState GroundState;
 typedef EBackFaceMode BackFaceMode;
 typedef CharacterVirtual::ExtendedUpdateSettings ExtendedUpdateSettings;
 
-class XCharacterCommon: public Character, public DebugRenderable {
+class XCharacter: public Character, public XDebugRenderable {
 private:
-	XPhysicsSystem* _system;
+	Ref<XPhysicsSystem> _system;
 public:
-	XCharacterCommon(XPhysicsSystem* system, const CharacterSettings* settings, Vec3 position, Quat rotation, uint64 userData);
-	~XCharacterCommon() override;
-	// TODO: CheckCollision()
+	XCharacter(Ref<XPhysicsSystem> system, const CharacterSettings* settings, Vec3 position, Quat rotation, uint64 userData);
+	~XCharacter() override;
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
 };
 
-struct XCharacterCommonSettings;
-unique_ptr<XCharacterCommon> CreateCharacterCommon(
+struct XCharacterSettings;
+XCharacter* CreateCharacter(
 	XPhysicsSystem* system,
-	const XCharacterCommonSettings& settings,
+	const XCharacterSettings& settings,
 	Vec3 position,
 	Quat rotation,
 	uint64 userData
 );
-unique_ptr<XCharacterCommon> CreateAddCharacterCommon(
+XCharacter* CreateAddCharacter(
 	XPhysicsSystem* system,
-	const XCharacterCommonSettings& settings,
+	const XCharacterSettings& settings,
 	Vec3 position,
 	Quat rotation,
 	uint64 userData,
 	EActivation activation,
 	bool lock
 );
+inline void DropXCharacter(XCharacter* ptr) { DropRef<XCharacter>(ptr); }
+inline XCharacter* CloneXCharacter(XCharacter* ptr) { return CloneRef<XCharacter>(ptr); }
+inline uint32 CountRefXCharacter(const XCharacter* ptr) { return RefCountRef<XCharacter>(ptr); }
 
-class XCharacterVirtual: public CharacterVirtual, public CharacterContactListener, public DebugRenderable {
+class XCharacterVirtual: public CharacterVirtual, public CharacterContactListener, public XDebugRenderable {
 private:
-	XPhysicsSystem* _system;
+	Ref<XPhysicsSystem> _system;
+
 public:
-	XCharacterVirtual(XPhysicsSystem* system, const CharacterVirtualSettings* settings, Vec3 position, Quat rotation);
+	XCharacterVirtual(Ref<XPhysicsSystem> system, const CharacterVirtualSettings* settings, Vec3 position, Quat rotation);
 	~XCharacterVirtual() override;
+	// void SetListener(FatVTablePointer);
 	void Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity);
 	bool CanWalkStairs(Vec3 velocity) const { return CharacterVirtual::CanWalkStairs(velocity); }
 	bool WalkStairs(ObjectLayer chara_layer, float deltaTime, Vec3 stepUp, Vec3 stepForward, Vec3 stepForwardTest, Vec3 stepDownExtra);
@@ -349,19 +348,32 @@ public:
 };
 
 struct XCharacterVirtualSettings;
-unique_ptr<XCharacterVirtual> CreateCharacterVirtual(
+XCharacterVirtual* CreateCharacterVirtual(
 	XPhysicsSystem* system,
 	const XCharacterVirtualSettings& settings,
 	Vec3 position,
 	Quat rotation
 );
+inline void DropXCharacterVirtual(XCharacterVirtual* ptr) { DropRef<XCharacterVirtual>(ptr); }
+inline XCharacterVirtual* CloneXCharacterVirtual(XCharacterVirtual* ptr) { return CloneRef<XCharacterVirtual>(ptr); }
+inline uint32 CountRefXCharacterVirtual(const XCharacterVirtual* ptr) { return RefCountRef<XCharacterVirtual>(ptr); }
 
 //
 // Debug
 //
 
 #if defined(JPH_DEBUG_RENDERER)
-
 struct XDebugApp;
 void RunDebugApplication(rust::Box<XDebugApp> rs_app);
 #endif
+
+//
+// Unit tests
+//
+
+void TestCharacterContactListener(
+	CharacterContactListener* listener,
+	XPhysicsSystem* system,
+	XCharacterVirtual* chara1,
+	XCharacterVirtual* chara2
+);
