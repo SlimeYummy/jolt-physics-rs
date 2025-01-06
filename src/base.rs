@@ -2,6 +2,7 @@ use cxx::{kind, type_id, ExternType};
 use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
+use core::fmt;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
@@ -150,11 +151,6 @@ pub(crate) mod ffi {
     impl Vec<BodyID> {}
     impl Vec<SubShapeID> {}
 
-    struct FatVTablePointer {
-        vtable: *const u8,
-        data: *const u8,
-    }
-
     unsafe extern "C++" {
         include!("rust/cxx.h");
         include!("jolt-physics-rs/src/ffi.h");
@@ -169,12 +165,12 @@ pub(crate) mod ffi {
         type Activation;
         type CanSleep;
 
-        type Vec3 = crate::base::XVec3;
-        type Vec4 = crate::base::XVec4;
-        type Quat = crate::base::XQuat;
-        type Mat44 = crate::base::XMat4;
-        type Float3 = crate::base::XFloat3;
-        type Int3 = crate::base::XInt3;
+        type Vec3 = crate::base::JVec3;
+        type Vec4 = crate::base::JVec4;
+        type Quat = crate::base::JQuat;
+        type Mat44 = crate::base::JMat4;
+        type Float3 = crate::base::Float3;
+        type Int3 = crate::base::Int3;
         type Plane = crate::base::Plane;
         type AABox = crate::base::AABox;
         type IndexedTriangle = crate::base::IndexedTriangle;
@@ -225,84 +221,264 @@ impl From<ffi::CanSleep> for bool {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XVec3(pub(crate) Vec3A);
-const_assert_eq!(mem::size_of::<XVec3>(), 16);
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union JVec3 {
+    _jolt: [f32; 4],
+    glam: Vec3A,
+}
+const_assert_eq!(mem::size_of::<JVec3>(), 16);
 
-unsafe impl ExternType for XVec3 {
+unsafe impl ExternType for JVec3 {
     type Id = type_id!("Vec3");
     type Kind = kind::Trivial;
 }
 
-impl From<Vec3A> for XVec3 {
-    #[inline]
-    fn from(v: Vec3A) -> XVec3 {
-        XVec3(v)
+impl JVec3 {
+    #[inline(always)]
+    fn glam(&self) -> Vec3A {
+        unsafe { self.glam }
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XVec4(pub(crate) Vec4);
-const_assert_eq!(mem::size_of::<XVec4>(), 16);
+impl Default for JVec3 {
+    #[inline]
+    fn default() -> Self {
+        JVec3 { glam: Vec3A::ZERO }
+    }
+}
 
-unsafe impl ExternType for XVec4 {
+impl PartialEq for JVec3 {
+    #[inline]
+    fn eq(&self, other: &JVec3) -> bool {
+        self.glam() == other.glam()
+    }
+}
+
+impl PartialEq<Vec3A> for JVec3 {
+    #[inline]
+    fn eq(&self, other: &Vec3A) -> bool {
+        self.glam() == *other
+    }
+}
+
+impl fmt::Debug for JVec3 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.glam().fmt(f)
+    }
+}
+
+impl From<Vec3A> for JVec3 {
+    #[inline]
+    fn from(v: Vec3A) -> JVec3 {
+        JVec3 { glam: v }
+    }
+}
+
+impl From<JVec3> for Vec3A {
+    #[inline]
+    fn from(v: JVec3) -> Vec3A {
+        v.glam()
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union JVec4 {
+    _jolt: [f32; 4],
+    glam: Vec4,
+}
+const_assert_eq!(mem::size_of::<JVec4>(), 16);
+
+unsafe impl ExternType for JVec4 {
     type Id = type_id!("Vec4");
     type Kind = kind::Trivial;
 }
 
-impl From<Vec4> for XVec4 {
-    #[inline]
-    fn from(v: Vec4) -> XVec4 {
-        XVec4(v)
+impl JVec4 {
+    #[inline(always)]
+    fn glam(&self) -> Vec4 {
+        unsafe { self.glam }
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XQuat(pub(crate) Quat);
-const_assert_eq!(mem::size_of::<XQuat>(), 16);
+impl Default for JVec4 {
+    #[inline]
+    fn default() -> Self {
+        JVec4 { glam: Vec4::ZERO }
+    }
+}
 
-unsafe impl ExternType for XQuat {
+impl PartialEq for JVec4 {
+    #[inline]
+    fn eq(&self, other: &JVec4) -> bool {
+        self.glam() == other.glam()
+    }
+}
+
+impl PartialEq<Vec4> for JVec4 {
+    #[inline]
+    fn eq(&self, other: &Vec4) -> bool {
+        self.glam() == *other
+    }
+}
+
+impl fmt::Debug for JVec4 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.glam().fmt(f)
+    }
+}
+
+impl From<Vec4> for JVec4 {
+    #[inline]
+    fn from(v: Vec4) -> JVec4 {
+        JVec4 { glam: v }
+    }
+}
+
+impl From<JVec4> for Vec4 {
+    #[inline]
+    fn from(v: JVec4) -> Vec4 {
+        v.glam()
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union JQuat {
+    _jolt: [f32; 4],
+    glam: Quat,
+}
+const_assert_eq!(mem::size_of::<JQuat>(), 16);
+
+unsafe impl ExternType for JQuat {
     type Id = type_id!("Quat");
     type Kind = kind::Trivial;
 }
 
-impl From<Quat> for XQuat {
-    #[inline]
-    fn from(q: Quat) -> XQuat {
-        XQuat(q)
+impl JQuat {
+    #[inline(always)]
+    fn glam(&self) -> Quat {
+        unsafe { self.glam }
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XMat4(pub(crate) Mat4);
-const_assert_eq!(mem::size_of::<XMat4>(), 64);
+impl Default for JQuat {
+    #[inline]
+    fn default() -> Self {
+        JQuat { glam: Quat::IDENTITY }
+    }
+}
 
-unsafe impl ExternType for XMat4 {
+impl PartialEq for JQuat {
+    #[inline]
+    fn eq(&self, other: &JQuat) -> bool {
+        self.glam() == other.glam()
+    }
+}
+
+impl PartialEq<Quat> for JQuat {
+    #[inline]
+    fn eq(&self, other: &Quat) -> bool {
+        self.glam() == *other
+    }
+}
+
+impl fmt::Debug for JQuat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.glam().fmt(f)
+    }
+}
+
+impl From<Quat> for JQuat {
+    #[inline]
+    fn from(q: Quat) -> JQuat {
+        JQuat { glam: q }
+    }
+}
+
+impl From<JQuat> for Quat {
+    #[inline]
+    fn from(q: JQuat) -> Quat {
+        q.glam()
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union JMat4 {
+    _jolt: [f32; 16],
+    glam: Mat4,
+}
+const_assert_eq!(mem::size_of::<JMat4>(), 64);
+
+unsafe impl ExternType for JMat4 {
     type Id = type_id!("Mat44");
     type Kind = kind::Trivial;
 }
 
-impl From<Mat4> for XMat4 {
+impl JMat4 {
+    #[inline(always)]
+    fn glam(&self) -> Mat4 {
+        unsafe { self.glam }
+    }
+}
+
+impl Default for JMat4 {
     #[inline]
-    fn from(m: Mat4) -> XMat4 {
-        XMat4(m)
+    fn default() -> Self {
+        JMat4 { glam: Mat4::IDENTITY }
+    }
+}
+
+impl PartialEq for JMat4 {
+    #[inline]
+    fn eq(&self, other: &JMat4) -> bool {
+        self.glam() == other.glam()
+    }
+}
+
+impl PartialEq<Mat4> for JMat4 {
+    #[inline]
+    fn eq(&self, other: &Mat4) -> bool {
+        self.glam() == *other
+    }
+}
+
+impl fmt::Debug for JMat4 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.glam().fmt(f)
+    }
+}
+
+impl From<Mat4> for JMat4 {
+    #[inline]
+    fn from(m: Mat4) -> JMat4 {
+        JMat4 { glam: m }
+    }
+}
+
+impl From<JMat4> for Mat4 {
+    #[inline]
+    fn from(m: JMat4) -> Mat4 {
+        m.glam()
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XFloat3(pub(crate) Vec3);
-const_assert_eq!(mem::size_of::<XFloat3>(), 12);
+pub struct Float3(pub(crate) Vec3);
+const_assert_eq!(mem::size_of::<Float3>(), 12);
 
-unsafe impl ExternType for XFloat3 {
+unsafe impl ExternType for Float3 {
     type Id = type_id!("Float3");
     type Kind = kind::Trivial;
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub struct XInt3(pub(crate) IVec3);
-const_assert_eq!(mem::size_of::<XInt3>(), 12);
+pub struct Int3(pub(crate) IVec3);
+const_assert_eq!(mem::size_of::<Int3>(), 12);
 
-unsafe impl ExternType for XInt3 {
+unsafe impl ExternType for Int3 {
     type Id = type_id!("Int3");
     type Kind = kind::Trivial;
 }
