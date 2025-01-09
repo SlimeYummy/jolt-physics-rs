@@ -1,11 +1,18 @@
-use cxx::UniquePtr;
+use core::fmt;
+use cxx::{kind, type_id, ExternType};
 use glam::{Mat4, Quat, Vec3, Vec3A};
+use jolt_macros::vtable;
 use static_assertions::const_assert_eq;
-use std::mem;
+use std::marker::PhantomData;
 use std::pin::Pin;
+use std::ptr::NonNull;
+use std::{mem, ptr};
 
-use crate::base::*;
-use crate::system::PhysicsSystem;
+use crate::base::{BodyID, JMut, JQuat, JRef, JRefTarget, JVec3, ObjectLayer, Plane, SubShapeID};
+use crate::body::Body;
+use crate::shape::{PhysicsMaterial, Shape};
+use crate::system::{BodyActivationListener, ContactListener, PhysicsSystem};
+use crate::vtable::{VBox, VData, VPair};
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
@@ -33,76 +40,91 @@ pub(crate) mod ffi {
         type Quat = crate::base::ffi::Quat;
         type Mat44 = crate::base::ffi::Mat44;
         type BodyID = crate::base::ffi::BodyID;
+        type SubShapeID = crate::base::ffi::SubShapeID;
         type Activation = crate::system::ffi::Activation;
         type Shape = crate::shape::ffi::Shape;
+        type PhysicsMaterial = crate::shape::ffi::PhysicsMaterial;
         type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
 
         type GroundState;
         type BackFaceMode;
-        type XCharacterCommonSettings;
-        type XCharacterVirtualSettings;
-        type ExtendedUpdateSettings;
+        type XCharacterSettings = crate::character::CharacterSettings;
+        type XCharacterVirtualSettings = crate::character::CharacterVirtualSettings;
+        #[allow(dead_code)]
+        type CharacterContactSettings = crate::character::CharacterContactSettings;
+        type ExtendedUpdateSettings = crate::character::ExtendedUpdateSettings;
+        type CharacterContactListener;
 
-        type XCharacterCommon;
-        unsafe fn CreateCharacterCommon(
+        type XCharacter;
+        unsafe fn CreateCharacter(
             system: *mut XPhysicsSystem,
-            settings: &XCharacterCommonSettings,
+            settings: &XCharacterSettings,
             position: Vec3,
             rotation: Quat,
             user_data: u64,
-        ) -> UniquePtr<XCharacterCommon>;
-        unsafe fn CreateAddCharacterCommon(
+        ) -> *mut XCharacter;
+        unsafe fn CreateAddCharacter(
             system: *mut XPhysicsSystem,
-            settings: &XCharacterCommonSettings,
+            settings: &XCharacterSettings,
             position: Vec3,
             rotation: Quat,
             user_data: u64,
             activation: Activation,
             lock: bool,
-        ) -> UniquePtr<XCharacterCommon>;
-        fn SetMaxSlopeAngle(self: Pin<&mut XCharacterCommon>, angle: f32);
-        fn GetCosMaxSlopeAngle(self: &XCharacterCommon) -> f32;
-        fn SetUp(self: Pin<&mut XCharacterCommon>, up: Vec3);
-        fn GetUp(self: &XCharacterCommon) -> Vec3;
-        fn IsSlopeTooSteep(self: &XCharacterCommon, normal: Vec3) -> bool;
-        fn GetGroundState(self: &XCharacterCommon) -> GroundState;
-        fn IsSupported(self: &XCharacterCommon) -> bool;
-        unsafe fn GetShape(self: &XCharacterCommon) -> *const Shape;
-        fn GetGroundPosition(self: &XCharacterCommon) -> Vec3;
-        fn GetGroundNormal(self: &XCharacterCommon) -> Vec3;
-        fn GetGroundVelocity(self: &XCharacterCommon) -> Vec3;
-        fn GetGroundBodyID(self: &XCharacterCommon) -> BodyID;
-        fn GetBodyID(self: &XCharacterCommon) -> BodyID;
-        fn AddToPhysicsSystem(self: Pin<&mut XCharacterCommon>, activation: Activation, lock: bool);
-        fn RemoveFromPhysicsSystem(self: Pin<&mut XCharacterCommon>, lock: bool);
-        fn Activate(self: Pin<&mut XCharacterCommon>, lock: bool);
-        fn PostSimulation(self: Pin<&mut XCharacterCommon>, max_distance: f32, lock: bool);
-        fn SetLinearAndAngularVelocity(self: Pin<&mut XCharacterCommon>, linear: Vec3, angular: Vec3, lock: bool);
-        fn GetLinearVelocity(self: &XCharacterCommon, lock: bool) -> Vec3;
-        fn SetLinearVelocity(self: Pin<&mut XCharacterCommon>, velocity: Vec3, lock: bool);
-        fn AddLinearVelocity(self: Pin<&mut XCharacterCommon>, velocity: Vec3, lock: bool);
-        fn AddImpulse(self: Pin<&mut XCharacterCommon>, impulse: Vec3, lock: bool);
-        fn GetPositionAndRotation(self: &XCharacterCommon, position: &mut Vec3, rotation: &mut Quat, lock: bool);
+        ) -> *mut XCharacter;
+        unsafe fn DropXCharacter(character: *mut XCharacter);
+        unsafe fn CloneXCharacter(character: *mut XCharacter) -> *mut XCharacter;
+        unsafe fn CountRefXCharacter(character: *const XCharacter) -> u32;
+
+        fn SetMaxSlopeAngle(self: Pin<&mut XCharacter>, angle: f32);
+        fn GetCosMaxSlopeAngle(self: &XCharacter) -> f32;
+        fn SetUp(self: Pin<&mut XCharacter>, up: Vec3);
+        fn GetUp(self: &XCharacter) -> Vec3;
+        fn IsSlopeTooSteep(self: &XCharacter, normal: Vec3) -> bool;
+        unsafe fn GetShape(self: &XCharacter) -> *const Shape;
+        fn GetGroundState(self: &XCharacter) -> GroundState;
+        fn IsSupported(self: &XCharacter) -> bool;
+        fn GetGroundPosition(self: &XCharacter) -> Vec3;
+        fn GetGroundNormal(self: &XCharacter) -> Vec3;
+        fn GetGroundVelocity(self: &XCharacter) -> Vec3;
+        fn GetGroundMaterial(self: &XCharacter) -> *const PhysicsMaterial;
+        fn GetGroundBodyID(self: &XCharacter) -> BodyID;
+        fn GetGroundSubShapeID(self: &XCharacter) -> SubShapeID;
+        fn GetGroundUserData(self: &XCharacter) -> u64;
+
+        fn AddToPhysicsSystem(self: Pin<&mut XCharacter>, activation: Activation, lock: bool);
+        fn RemoveFromPhysicsSystem(self: Pin<&mut XCharacter>, lock: bool);
+        fn Activate(self: Pin<&mut XCharacter>, lock: bool);
+        fn PostSimulation(self: Pin<&mut XCharacter>, max_distance: f32, lock: bool);
+        fn SetLinearAndAngularVelocity(self: Pin<&mut XCharacter>, linear: Vec3, angular: Vec3, lock: bool);
+        fn GetLinearVelocity(self: &XCharacter, lock: bool) -> Vec3;
+        fn SetLinearVelocity(self: Pin<&mut XCharacter>, velocity: Vec3, lock: bool);
+        fn AddLinearVelocity(self: Pin<&mut XCharacter>, velocity: Vec3, lock: bool);
+        fn AddImpulse(self: Pin<&mut XCharacter>, impulse: Vec3, lock: bool);
+        fn GetBodyID(self: &XCharacter) -> BodyID;
+        fn GetPositionAndRotation(self: &XCharacter, position: &mut Vec3, rotation: &mut Quat, lock: bool);
         fn SetPositionAndRotation(
-            self: &XCharacterCommon,
+            self: &XCharacter,
             position: Vec3,
             rotation: Quat,
             activation: Activation,
             lock: bool,
         );
-        fn GetPosition(self: &XCharacterCommon, lock: bool) -> Vec3;
-        fn SetPosition(self: Pin<&mut XCharacterCommon>, position: Vec3, activation: Activation, lock: bool);
-        fn GetRotation(self: &XCharacterCommon, lock: bool) -> Quat;
-        fn SetRotation(self: Pin<&mut XCharacterCommon>, rotation: Quat, activation: Activation, lock: bool);
-        fn GetCenterOfMassPosition(self: &XCharacterCommon, lock: bool) -> Vec3;
-        fn GetWorldTransform(self: &XCharacterCommon, lock: bool) -> Mat44;
-        fn SetLayer(self: Pin<&mut XCharacterCommon>, layer: u16, lock: bool);
+        fn GetPosition(self: &XCharacter, lock: bool) -> Vec3;
+        fn SetPosition(self: Pin<&mut XCharacter>, position: Vec3, activation: Activation, lock: bool);
+        fn GetRotation(self: &XCharacter, lock: bool) -> Quat;
+        fn SetRotation(self: Pin<&mut XCharacter>, rotation: Quat, activation: Activation, lock: bool);
+        fn GetCenterOfMassPosition(self: &XCharacter, lock: bool) -> Vec3;
+        fn GetWorldTransform(self: &XCharacter, lock: bool) -> Mat44;
+        fn SetLayer(self: Pin<&mut XCharacter>, layer: u32, lock: bool);
         unsafe fn SetShape(
-            self: Pin<&mut XCharacterCommon>,
+            self: Pin<&mut XCharacter>,
             shape: *const Shape,
             max_penetration_depth: f32,
             lock: bool,
         ) -> bool;
+        // GetTransformedShape
+        // CheckCollision
 
         type XCharacterVirtual;
         unsafe fn CreateCharacterVirtual(
@@ -110,25 +132,37 @@ pub(crate) mod ffi {
             settings: &XCharacterVirtualSettings,
             position: Vec3,
             rotation: Quat,
-        ) -> UniquePtr<XCharacterVirtual>;
+        ) -> *mut XCharacterVirtual;
+        unsafe fn DropXCharacterVirtual(character: *mut XCharacterVirtual);
+        unsafe fn CloneXCharacterVirtual(character: *mut XCharacterVirtual) -> *mut XCharacterVirtual;
+        unsafe fn CountRefXCharacterVirtual(character: *const XCharacterVirtual) -> u32;
+
         fn SetMaxSlopeAngle(self: Pin<&mut XCharacterVirtual>, angle: f32);
         fn GetCosMaxSlopeAngle(self: &XCharacterVirtual) -> f32;
         fn SetUp(self: Pin<&mut XCharacterVirtual>, up: Vec3);
         fn GetUp(self: &XCharacterVirtual) -> Vec3;
         fn IsSlopeTooSteep(self: &XCharacterVirtual, normal: Vec3) -> bool;
+        unsafe fn GetShape(self: &XCharacterVirtual) -> *const Shape;
         fn GetGroundState(self: &XCharacterVirtual) -> GroundState;
         fn IsSupported(self: &XCharacterVirtual) -> bool;
-        fn GetShape(self: &XCharacterVirtual) -> *const Shape;
         fn GetGroundPosition(self: &XCharacterVirtual) -> Vec3;
         fn GetGroundNormal(self: &XCharacterVirtual) -> Vec3;
         fn GetGroundVelocity(self: &XCharacterVirtual) -> Vec3;
+        fn GetGroundMaterial(self: &XCharacterVirtual) -> *const PhysicsMaterial;
         fn GetGroundBodyID(self: &XCharacterVirtual) -> BodyID;
+        fn GetGroundSubShapeID(self: &XCharacterVirtual) -> SubShapeID;
+        fn GetGroundUserData(self: &XCharacterVirtual) -> u64;
+
+        unsafe fn SetListener(self: Pin<&mut XCharacterVirtual>, listener: *mut CharacterContactListener);
+        unsafe fn GetListener(self: &XCharacterVirtual) -> *mut CharacterContactListener;
+        // SetCharacterVsCharacterCollision
         fn GetLinearVelocity(self: &XCharacterVirtual) -> Vec3;
         fn SetLinearVelocity(self: Pin<&mut XCharacterVirtual>, velocity: Vec3);
         fn GetPosition(self: &XCharacterVirtual) -> Vec3;
         fn SetPosition(self: Pin<&mut XCharacterVirtual>, position: Vec3);
         fn GetRotation(self: &XCharacterVirtual) -> Quat;
         fn SetRotation(self: Pin<&mut XCharacterVirtual>, rotation: Quat);
+        fn GetCenterOfMassPosition(self: &XCharacterVirtual) -> Vec3;
         fn GetWorldTransform(self: &XCharacterVirtual) -> Mat44;
         fn GetCenterOfMassTransform(self: &XCharacterVirtual) -> Mat44;
         fn GetMass(self: &XCharacterVirtual) -> f32;
@@ -137,6 +171,8 @@ pub(crate) mod ffi {
         fn SetMaxStrength(self: Pin<&mut XCharacterVirtual>, max_strength: f32);
         fn GetPenetrationRecoverySpeed(self: &XCharacterVirtual) -> f32;
         fn SetPenetrationRecoverySpeed(self: Pin<&mut XCharacterVirtual>, speed: f32);
+        fn GetEnhancedInternalEdgeRemoval(self: &XCharacterVirtual) -> bool;
+        fn SetEnhancedInternalEdgeRemoval(self: Pin<&mut XCharacterVirtual>, enabled: bool);
         fn GetCharacterPadding(self: &XCharacterVirtual) -> f32;
         fn GetMaxNumHits(self: &XCharacterVirtual) -> u32;
         fn SetMaxNumHits(self: Pin<&mut XCharacterVirtual>, max_hits: u32);
@@ -145,34 +181,40 @@ pub(crate) mod ffi {
         fn GetMaxHitsExceeded(self: &XCharacterVirtual) -> bool;
         fn GetShapeOffset(self: &XCharacterVirtual) -> Vec3;
         fn SetShapeOffset(self: Pin<&mut XCharacterVirtual>, offset: Vec3);
+        fn GetUserData(self: &XCharacterVirtual) -> u64;
+        fn SetUserData(self: Pin<&mut XCharacterVirtual>, user_data: u64);
+        fn GetInnerBodyID(self: &XCharacterVirtual) -> BodyID;
         fn CancelVelocityTowardsSteepSlopes(self: &XCharacterVirtual, desired_velocity: Vec3) -> Vec3;
-        fn Update(self: Pin<&mut XCharacterVirtual>, chara_layer: u16, delta_time: f32, gravity: Vec3);
+        fn Update(self: Pin<&mut XCharacterVirtual>, chara_layer: u32, delta_time: f32, gravity: Vec3);
         fn CanWalkStairs(self: &XCharacterVirtual, velocity: Vec3) -> bool;
         fn WalkStairs(
             self: Pin<&mut XCharacterVirtual>,
-            chara_layer: u16,
+            chara_layer: u32,
             delta_time: f32,
             step_up: Vec3,
             step_forward: Vec3,
             step_forward_test: Vec3,
             step_down_extra: Vec3,
         ) -> bool;
-        fn StickToFloor(self: Pin<&mut XCharacterVirtual>, chara_layer: u16, step_down: Vec3) -> bool;
+        fn StickToFloor(self: Pin<&mut XCharacterVirtual>, chara_layer: u32, step_down: Vec3) -> bool;
         fn ExtendedUpdate(
             self: Pin<&mut XCharacterVirtual>,
-            chara_layer: u16,
+            chara_layer: u32,
             delta_time: f32,
             gravity: Vec3,
             settings: &ExtendedUpdateSettings,
         );
-        fn RefreshContacts(self: Pin<&mut XCharacterVirtual>, chara_layer: u16);
+        fn RefreshContacts(self: Pin<&mut XCharacterVirtual>, chara_layer: u32);
         fn UpdateGroundVelocity(self: Pin<&mut XCharacterVirtual>);
         unsafe fn SetShape(
             self: Pin<&mut XCharacterVirtual>,
-            chara_layer: u16,
+            chara_layer: u32,
             shape: *const Shape,
             max_penetration_depth: f32,
         ) -> bool;
+        unsafe fn SetInnerBodyShape(self: Pin<&mut XCharacterVirtual>, shape: *const Shape);
+        // GetTransformedShape
+        // CheckCollision
     }
 }
 
@@ -181,21 +223,26 @@ pub type BackFaceMode = ffi::BackFaceMode;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct CharacterCommonSettings {
+pub struct CharacterSettings {
     up: Vec3A,
     supporting_volume: Plane,
     max_slope_angle: f32,
-    shape: Option<RefShape>,
-    layer: u16,
+    shape: Option<JRef<Shape>>,
+    layer: ObjectLayer,
     mass: f32,
     friction: f32,
     gravity_factor: f32,
 }
-const_assert_eq!(mem::size_of::<CharacterCommonSettings>(), 64);
+const_assert_eq!(mem::size_of::<CharacterSettings>(), 64);
 
-impl Default for CharacterCommonSettings {
-    fn default() -> CharacterCommonSettings {
-        CharacterCommonSettings {
+unsafe impl ExternType for CharacterSettings {
+    type Id = type_id!("XCharacterSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for CharacterSettings {
+    fn default() -> CharacterSettings {
+        CharacterSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
@@ -208,9 +255,9 @@ impl Default for CharacterCommonSettings {
     }
 }
 
-impl CharacterCommonSettings {
-    pub fn new(shape: RefShape, layer: u16) -> CharacterCommonSettings {
-        CharacterCommonSettings {
+impl CharacterSettings {
+    pub fn new(shape: JRef<Shape>, layer: ObjectLayer) -> CharacterSettings {
+        CharacterSettings {
             shape: Some(shape),
             layer,
             ..Default::default()
@@ -224,7 +271,7 @@ pub struct CharacterVirtualSettings {
     up: Vec3A,
     supporting_volume: Plane,
     max_slope_angle: f32,
-    shape: Option<RefShape>,
+    shape: Option<JRef<Shape>>,
     mass: f32,
     max_strength: f32,
     shape_offset: Vec3A,
@@ -240,6 +287,11 @@ pub struct CharacterVirtualSettings {
     penetration_recovery_speed: f32,
 }
 const_assert_eq!(mem::size_of::<CharacterVirtualSettings>(), 128);
+
+unsafe impl ExternType for CharacterVirtualSettings {
+    type Id = type_id!("XCharacterVirtualSettings");
+    type Kind = kind::Trivial;
+}
 
 impl Default for CharacterVirtualSettings {
     fn default() -> CharacterVirtualSettings {
@@ -266,10 +318,33 @@ impl Default for CharacterVirtualSettings {
 }
 
 impl CharacterVirtualSettings {
-    pub fn new(shape: RefShape) -> CharacterVirtualSettings {
+    pub fn new(shape: JRef<Shape>) -> CharacterVirtualSettings {
         CharacterVirtualSettings {
             shape: Some(shape),
             ..Default::default()
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CharacterContactSettings {
+    pub can_push_character: bool,
+    pub can_receive_impulses: bool,
+}
+const_assert_eq!(std::mem::size_of::<CharacterContactSettings>(), 2);
+
+unsafe impl ExternType for CharacterContactSettings {
+    type Id = type_id!("CharacterContactSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for CharacterContactSettings {
+    #[inline]
+    fn default() -> CharacterContactSettings {
+        CharacterContactSettings {
+            can_push_character: true,
+            can_receive_impulses: true,
         }
     }
 }
@@ -286,6 +361,11 @@ pub struct ExtendedUpdateSettings {
 }
 const_assert_eq!(mem::size_of::<ExtendedUpdateSettings>(), 64);
 
+unsafe impl ExternType for ExtendedUpdateSettings {
+    type Id = type_id!("ExtendedUpdateSettings");
+    type Kind = kind::Trivial;
+}
+
 impl Default for ExtendedUpdateSettings {
     fn default() -> ExtendedUpdateSettings {
         ExtendedUpdateSettings {
@@ -299,74 +379,104 @@ impl Default for ExtendedUpdateSettings {
     }
 }
 
-pub struct CharacterCommon {
-    chara: UniquePtr<ffi::XCharacterCommon>,
-    _system: RefPhysicsSystem,
-}
+pub struct Character(pub(crate) ffi::XCharacter);
 
-impl Drop for CharacterCommon {
-    fn drop(&mut self) {
-        self.chara = UniquePtr::null();
+impl fmt::Debug for Character {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Character")
+            .field("body_id", &self.get_body_id())
+            .field("position", &self.get_position(false))
+            .field("rotation", &self.get_rotation(false))
+            .field("up", &self.get_up())
+            .field("cos_max_slope_angle", &self.get_cos_max_slope_angle())
+            .field("shape", &self.get_shape())
+            .finish()
     }
 }
 
-impl CharacterCommon {
-    pub fn new(
-        system: &mut PhysicsSystem,
-        settings: &CharacterCommonSettings,
+unsafe impl JRefTarget for Character {
+    type JRefRaw = ffi::XCharacter;
+
+    #[inline]
+    fn name() -> &'static str {
+        "Character"
+    }
+
+    #[inline]
+    fn from_ptr(raw: *const ffi::XCharacter) -> *const Character {
+        raw as *const _
+    }
+
+    #[inline]
+    fn from_non_null(raw: NonNull<ffi::XCharacter>) -> NonNull<Character> {
+        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    }
+
+    #[inline]
+    unsafe fn clone_ref(&mut self) -> NonNull<Character> {
+        NonNull::new_unchecked(ffi::CloneXCharacter(&mut self.0) as *mut _)
+    }
+
+    #[inline]
+    unsafe fn drop_ref(&mut self) {
+        ffi::DropXCharacter(&mut self.0);
+    }
+
+    #[inline]
+    fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefXCharacter(&self.0) }
+    }
+}
+
+impl Character {
+    pub fn new<BAL: BodyActivationListener, CL: ContactListener>(
+        system: &mut PhysicsSystem<BAL, CL>,
+        settings: &CharacterSettings,
         position: Vec3A,
         rotation: Quat,
         user_data: u64,
-    ) -> CharacterCommon {
-        let chara = unsafe {
-            ffi::CreateCharacterCommon(
-                system.system_ptr(),
-                mem::transmute::<&CharacterCommonSettings, &ffi::XCharacterCommonSettings>(settings),
+    ) -> JMut<Character> {
+        unsafe {
+            JMut::new_unchecked(ffi::CreateCharacter(
+                system.as_x_ptr(),
+                mem::transmute::<&CharacterSettings, &ffi::XCharacterSettings>(settings),
                 position.into(),
                 rotation.into(),
                 user_data,
-            )
-        };
-        CharacterCommon {
-            chara,
-            _system: system.inner_ref().clone(),
+            ))
         }
     }
 
-    pub fn new_ex(
-        system: &mut PhysicsSystem,
-        settings: &CharacterCommonSettings,
+    pub fn new_add<BAL: BodyActivationListener, CL: ContactListener>(
+        system: &mut PhysicsSystem<BAL, CL>,
+        settings: &CharacterSettings,
         position: Vec3A,
         rotation: Quat,
         user_data: u64,
         active: bool,
         lock: bool,
-    ) -> CharacterCommon {
-        let chara = unsafe {
-            ffi::CreateAddCharacterCommon(
-                system.system_ptr(),
-                mem::transmute::<&CharacterCommonSettings, &ffi::XCharacterCommonSettings>(settings),
+    ) -> JMut<Character> {
+        unsafe {
+            JMut::new_unchecked(ffi::CreateAddCharacter(
+                system.as_x_ptr(),
+                mem::transmute::<&CharacterSettings, &ffi::XCharacterSettings>(settings),
                 position.into(),
                 rotation.into(),
                 user_data,
                 active.into(),
                 lock,
-            )
-        };
-        CharacterCommon {
-            chara,
-            _system: system.inner_ref().clone(),
+            ))
         }
     }
 
     #[inline]
-    fn as_ref(&self) -> &ffi::XCharacterCommon {
-        self.chara.as_ref().unwrap()
+    fn as_ref(&self) -> &ffi::XCharacter {
+        &self.0
     }
 
     #[inline]
-    fn as_mut(&mut self) -> Pin<&mut ffi::XCharacterCommon> {
-        self.chara.as_mut().unwrap()
+    fn as_mut(&mut self) -> Pin<&mut ffi::XCharacter> {
+        unsafe { Pin::new_unchecked(&mut self.0) }
     }
 
     #[inline]
@@ -386,12 +496,17 @@ impl CharacterCommon {
 
     #[inline]
     pub fn get_up(&self) -> Vec3A {
-        self.as_ref().GetUp().0
+        self.as_ref().GetUp().into()
     }
 
     #[inline]
     pub fn is_slope_too_steep(&self, normal: Vec3A) -> bool {
         self.as_ref().IsSlopeTooSteep(normal.into())
+    }
+
+    #[inline]
+    pub fn get_shape(&self) -> &Shape {
+        unsafe { &*Shape::from_ptr(self.as_ref().GetShape()) }
     }
 
     #[inline]
@@ -405,23 +520,23 @@ impl CharacterCommon {
     }
 
     #[inline]
-    pub fn get_shape(&self) -> RefShape {
-        unsafe { RefShape::new(self.as_ref().GetShape() as *mut _) }
-    }
-
-    #[inline]
     pub fn get_ground_position(&self) -> Vec3A {
-        self.as_ref().GetGroundPosition().0
+        self.as_ref().GetGroundPosition().into()
     }
 
     #[inline]
     pub fn get_ground_normal(&self) -> Vec3A {
-        self.as_ref().GetGroundNormal().0
+        self.as_ref().GetGroundNormal().into()
     }
 
     #[inline]
     pub fn get_ground_velocity(&self) -> Vec3A {
-        self.as_ref().GetGroundVelocity().0
+        self.as_ref().GetGroundVelocity().into()
+    }
+
+    #[inline]
+    pub fn get_ground_material(&self) -> &PhysicsMaterial {
+        unsafe { &*PhysicsMaterial::from_ptr(self.as_ref().GetGroundMaterial()) }
     }
 
     #[inline]
@@ -430,8 +545,13 @@ impl CharacterCommon {
     }
 
     #[inline]
-    pub fn get_body_id(&self) -> BodyID {
-        self.as_ref().GetBodyID()
+    pub fn get_ground_sub_shape_id(&self) -> SubShapeID {
+        self.as_ref().GetGroundSubShapeID()
+    }
+
+    #[inline]
+    pub fn get_ground_user_data(&self) -> u64 {
+        self.as_ref().GetGroundUserData()
     }
 
     #[inline]
@@ -461,6 +581,11 @@ impl CharacterCommon {
     }
 
     #[inline]
+    pub fn get_linear_velocity(&self, lock: bool) -> Vec3A {
+        self.as_ref().GetLinearVelocity(lock).into()
+    }
+
+    #[inline]
     pub fn set_linear_velocity(&mut self, velocity: Vec3A, lock: bool) {
         self.as_mut().SetLinearVelocity(velocity.into(), lock);
     }
@@ -476,11 +601,16 @@ impl CharacterCommon {
     }
 
     #[inline]
+    pub fn get_body_id(&self) -> BodyID {
+        self.as_ref().GetBodyID()
+    }
+
+    #[inline]
     pub fn get_position_and_rotation(&self, lock: bool) -> (Vec3A, Quat) {
-        let mut position = XVec3::default();
-        let mut rotation = XQuat::default();
+        let mut position = JVec3::default();
+        let mut rotation = JQuat::default();
         self.as_ref().GetPositionAndRotation(&mut position, &mut rotation, lock);
-        (position.0, rotation.0)
+        (position.into(), rotation.into())
     }
 
     #[inline]
@@ -491,7 +621,7 @@ impl CharacterCommon {
 
     #[inline]
     pub fn get_position(&self, lock: bool) -> Vec3A {
-        self.as_ref().GetPosition(lock).0
+        self.as_ref().GetPosition(lock).into()
     }
 
     #[inline]
@@ -501,7 +631,7 @@ impl CharacterCommon {
 
     #[inline]
     pub fn get_rotation(&self, lock: bool) -> Quat {
-        self.as_ref().GetRotation(lock).0
+        self.as_ref().GetRotation(lock).into()
     }
 
     #[inline]
@@ -510,71 +640,110 @@ impl CharacterCommon {
     }
 
     #[inline]
-    pub fn get_linear_velocity(&self, lock: bool) -> Vec3A {
-        self.as_ref().GetLinearVelocity(lock).0
-    }
-
-    #[inline]
     pub fn get_center_of_mass_position(&self, lock: bool) -> Vec3A {
-        self.as_ref().GetCenterOfMassPosition(lock).0
+        self.as_ref().GetCenterOfMassPosition(lock).into()
     }
 
     #[inline]
     pub fn get_world_transform(&self, lock: bool) -> Mat4 {
-        self.as_ref().GetWorldTransform(lock).0
+        self.as_ref().GetWorldTransform(lock).into()
     }
 
     #[inline]
-    pub fn set_layer(&mut self, layer: u16, lock: bool) {
+    pub fn set_layer(&mut self, layer: ObjectLayer, lock: bool) {
         self.as_mut().SetLayer(layer, lock);
     }
 
     #[inline]
-    pub fn set_shape(&mut self, shape: &mut RefShape, max_penetration_depth: f32, lock: bool) -> bool {
-        unsafe { self.as_mut().SetShape(shape.as_ptr(), max_penetration_depth, lock) }
+    pub fn set_shape(&mut self, shape: &Shape, max_penetration_depth: f32, lock: bool) -> bool {
+        unsafe { self.as_mut().SetShape(&shape.0, max_penetration_depth, lock) }
     }
 }
 
-pub struct CharacterVirtual {
-    chara: UniquePtr<ffi::XCharacterVirtual>,
-    _system: RefPhysicsSystem,
+pub struct CharacterVirtual<CCL: CharacterContactListener = ()> {
+    pub(crate) character: ffi::XCharacterVirtual,
+    _ccl_phantom: PhantomData<CCL>,
 }
 
-impl Drop for CharacterVirtual {
+impl<CCL: CharacterContactListener> fmt::Debug for CharacterVirtual<CCL> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CharacterVirtual")
+            .field("position", &self.get_position())
+            .field("rotation", &self.get_rotation())
+            .field("up", &self.get_up())
+            .field("cos_max_slope_angle", &self.get_cos_max_slope_angle())
+            .field("shape", &self.get_shape())
+            .field("user_data", &self.get_user_data())
+            .field("inner_body_id", &self.get_inner_body_id())
+            .finish()
+    }
+}
+
+impl<CCL: CharacterContactListener> Drop for CharacterVirtual<CCL> {
     fn drop(&mut self) {
-        self.chara = UniquePtr::null();
+        unsafe {
+            let ptr = self.as_ref().GetListener();
+            if !ptr.is_null() {
+                let _ = VBox::<CCL, CharacterContactListenerVTable>::from_raw(ptr as *mut _);
+            }
+            self.as_mut().SetListener(ptr::null_mut());
+        }
     }
 }
 
-impl CharacterVirtual {
-    pub fn new(
-        system: &mut PhysicsSystem,
+unsafe impl<CCL: CharacterContactListener> JRefTarget for CharacterVirtual<CCL> {
+    type JRefRaw = ffi::XCharacterVirtual;
+
+    fn name() -> &'static str {
+        "CharacterVirtual"
+    }
+
+    fn from_ptr(raw: *const ffi::XCharacterVirtual) -> *const CharacterVirtual<CCL> {
+        raw as *const _
+    }
+
+    fn from_non_null(raw: NonNull<ffi::XCharacterVirtual>) -> NonNull<CharacterVirtual<CCL>> {
+        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    }
+
+    unsafe fn clone_ref(&mut self) -> NonNull<CharacterVirtual<CCL>> {
+        NonNull::new_unchecked(ffi::CloneXCharacterVirtual(&mut self.character) as *mut _)
+    }
+
+    unsafe fn drop_ref(&mut self) {
+        ffi::DropXCharacterVirtual(&mut self.character);
+    }
+
+    fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefXCharacterVirtual(&self.character) }
+    }
+}
+
+impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
+    pub fn new<BAL: BodyActivationListener, CL: ContactListener>(
+        system: &mut PhysicsSystem<BAL, CL>,
         settings: &CharacterVirtualSettings,
         position: Vec3A,
         rotation: Quat,
-    ) -> CharacterVirtual {
-        let chara = unsafe {
-            ffi::CreateCharacterVirtual(
-                system.system_ptr(),
+    ) -> JMut<CharacterVirtual<CCL>> {
+        unsafe {
+            JMut::new_unchecked(ffi::CreateCharacterVirtual(
+                system.as_x_ptr(),
                 mem::transmute::<&CharacterVirtualSettings, &ffi::XCharacterVirtualSettings>(settings),
                 position.into(),
                 rotation.into(),
-            )
-        };
-        CharacterVirtual {
-            chara,
-            _system: system.inner_ref().clone(),
+            ))
         }
     }
 
     #[inline]
     fn as_ref(&self) -> &ffi::XCharacterVirtual {
-        self.chara.as_ref().unwrap()
+        &self.character
     }
 
     #[inline]
     fn as_mut(&mut self) -> Pin<&mut ffi::XCharacterVirtual> {
-        self.chara.as_mut().unwrap()
+        unsafe { Pin::new_unchecked(&mut self.character) }
     }
 
     #[inline]
@@ -594,12 +763,17 @@ impl CharacterVirtual {
 
     #[inline]
     pub fn get_up(&self) -> Vec3A {
-        self.as_ref().GetUp().0
+        self.as_ref().GetUp().into()
     }
 
     #[inline]
     pub fn is_slope_too_steep(&self, normal: Vec3A) -> bool {
         self.as_ref().IsSlopeTooSteep(normal.into())
+    }
+
+    #[inline]
+    pub fn get_shape(&self) -> &Shape {
+        unsafe { &*Shape::from_ptr(self.as_ref().GetShape()) }
     }
 
     #[inline]
@@ -613,23 +787,23 @@ impl CharacterVirtual {
     }
 
     #[inline]
-    pub fn get_shape(&self) -> RefShape {
-        unsafe { RefShape::new(self.as_ref().GetShape() as *mut _) }
-    }
-
-    #[inline]
     pub fn get_ground_position(&self) -> Vec3A {
-        self.as_ref().GetGroundPosition().0
+        self.as_ref().GetGroundPosition().into()
     }
 
     #[inline]
     pub fn get_ground_normal(&self) -> Vec3A {
-        self.as_ref().GetGroundNormal().0
+        self.as_ref().GetGroundNormal().into()
     }
 
     #[inline]
     pub fn get_ground_velocity(&self) -> Vec3A {
-        self.as_ref().GetGroundVelocity().0
+        self.as_ref().GetGroundVelocity().into()
+    }
+
+    #[inline]
+    pub fn get_ground_material(&self) -> &PhysicsMaterial {
+        unsafe { &*PhysicsMaterial::from_ptr(self.as_ref().GetGroundMaterial()) }
     }
 
     #[inline]
@@ -638,8 +812,56 @@ impl CharacterVirtual {
     }
 
     #[inline]
+    pub fn get_ground_sub_shape_id(&self) -> SubShapeID {
+        self.as_ref().GetGroundSubShapeID()
+    }
+
+    #[inline]
+    pub fn get_ground_user_data(&self) -> u64 {
+        self.as_ref().GetGroundUserData()
+    }
+
+    #[inline]
+    pub fn set_listener(&mut self, listener: Option<VBox<CCL, CharacterContactListenerVTable>>) {
+        unsafe {
+            let old = self.as_ref().GetListener() as *mut u8;
+            if !old.is_null() {
+                let _ = VBox::<CCL, CharacterContactListenerVTable>::from_raw(old as *mut _);
+            }
+            if let Some(listener) = listener {
+                self.as_mut()
+                    .SetListener(VBox::<CCL, CharacterContactListenerVTable>::into_raw(listener) as *mut _);
+            } else {
+                self.as_mut().SetListener(ptr::null_mut());
+            }
+        };
+    }
+
+    #[inline]
+    pub fn get_listener(&self) -> Option<&VPair<CCL, CharacterContactListenerVTable>> {
+        unsafe {
+            let current = self.as_ref().GetListener() as *const u8;
+            match current.is_null() {
+                true => None,
+                false => Some(&*(current as *const _)),
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_listener_mut(&mut self) -> Option<&mut VPair<CCL, CharacterContactListenerVTable>> {
+        unsafe {
+            let current = self.as_ref().GetListener() as *mut u8;
+            match current.is_null() {
+                true => None,
+                false => Some(&mut *(current as *mut _)),
+            }
+        }
+    }
+
+    #[inline]
     pub fn get_linear_velocity(&self) -> Vec3A {
-        self.as_ref().GetLinearVelocity().0
+        self.as_ref().GetLinearVelocity().into()
     }
 
     #[inline]
@@ -649,7 +871,7 @@ impl CharacterVirtual {
 
     #[inline]
     pub fn get_position(&self) -> Vec3A {
-        self.as_ref().GetPosition().0
+        self.as_ref().GetPosition().into()
     }
 
     #[inline]
@@ -659,7 +881,7 @@ impl CharacterVirtual {
 
     #[inline]
     pub fn get_rotation(&self) -> Quat {
-        self.as_ref().GetRotation().0
+        self.as_ref().GetRotation().into()
     }
 
     #[inline]
@@ -668,13 +890,18 @@ impl CharacterVirtual {
     }
 
     #[inline]
+    pub fn get_center_of_mass_position(&self) -> Vec3A {
+        self.as_ref().GetCenterOfMassPosition().into()
+    }
+
+    #[inline]
     pub fn get_world_transform(&self) -> Mat4 {
-        self.as_ref().GetWorldTransform().0
+        self.as_ref().GetWorldTransform().into()
     }
 
     #[inline]
     pub fn get_center_of_mass_transform(&self) -> Mat4 {
-        self.as_ref().GetCenterOfMassTransform().0
+        self.as_ref().GetCenterOfMassTransform().into()
     }
 
     #[inline]
@@ -705,6 +932,16 @@ impl CharacterVirtual {
     #[inline]
     pub fn set_penetration_recovery_speed(&mut self, speed: f32) {
         self.as_mut().SetPenetrationRecoverySpeed(speed);
+    }
+
+    #[inline]
+    pub fn get_enhanced_internal_edge_removal(&self) -> bool {
+        self.as_ref().GetEnhancedInternalEdgeRemoval()
+    }
+
+    #[inline]
+    pub fn set_enhanced_internal_edge_removal(&mut self, enabled: bool) {
+        self.as_mut().SetEnhancedInternalEdgeRemoval(enabled);
     }
 
     #[inline]
@@ -739,7 +976,7 @@ impl CharacterVirtual {
 
     #[inline]
     pub fn get_shape_offset(&self) -> Vec3A {
-        self.as_ref().GetShapeOffset().0
+        self.as_ref().GetShapeOffset().into()
     }
 
     #[inline]
@@ -748,14 +985,29 @@ impl CharacterVirtual {
     }
 
     #[inline]
-    pub fn cancel_velocity_towards_steep_slopes(&self, desired_velocity: Vec3A) -> Vec3A {
-        self.as_ref()
-            .CancelVelocityTowardsSteepSlopes(desired_velocity.into())
-            .0
+    pub fn get_user_data(&self) -> u64 {
+        self.as_ref().GetUserData()
     }
 
     #[inline]
-    pub fn update(&mut self, chara_layer: u16, delta_time: f32, gravity: Vec3A) {
+    pub fn set_user_data(&mut self, user_data: u64) {
+        self.as_mut().SetUserData(user_data);
+    }
+
+    #[inline]
+    pub fn get_inner_body_id(&self) -> BodyID {
+        self.as_ref().GetInnerBodyID()
+    }
+
+    #[inline]
+    pub fn cancel_velocity_towards_steep_slopes(&self, desired_velocity: Vec3A) -> Vec3A {
+        self.as_ref()
+            .CancelVelocityTowardsSteepSlopes(desired_velocity.into())
+            .into()
+    }
+
+    #[inline]
+    pub fn update(&mut self, chara_layer: ObjectLayer, delta_time: f32, gravity: Vec3A) {
         self.as_mut().Update(chara_layer, delta_time, gravity.into());
     }
 
@@ -767,7 +1019,7 @@ impl CharacterVirtual {
     #[inline]
     pub fn walk_stairs(
         &mut self,
-        chara_layer: u16,
+        chara_layer: ObjectLayer,
         delta_time: f32,
         step_up: Vec3A,
         step_forward: Vec3A,
@@ -785,14 +1037,14 @@ impl CharacterVirtual {
     }
 
     #[inline]
-    pub fn stick_to_floor(&mut self, chara_layer: u16, step_down: Vec3A) -> bool {
+    pub fn stick_to_floor(&mut self, chara_layer: ObjectLayer, step_down: Vec3A) -> bool {
         self.as_mut().StickToFloor(chara_layer, step_down.into())
     }
 
     #[inline]
     pub fn extended_update(
         &mut self,
-        chara_layer: u16,
+        chara_layer: ObjectLayer,
         delta_time: f32,
         gravity: Vec3A,
         settings: &ExtendedUpdateSettings,
@@ -804,7 +1056,7 @@ impl CharacterVirtual {
     }
 
     #[inline]
-    pub fn refresh_contacts(&mut self, chara_layer: u16) {
+    pub fn refresh_contacts(&mut self, chara_layer: ObjectLayer) {
         self.as_mut().RefreshContacts(chara_layer);
     }
 
@@ -814,10 +1066,12 @@ impl CharacterVirtual {
     }
 
     #[inline]
-    pub fn set_shape(&mut self, chara_layer: u16, shape: &mut RefShape, max_penetration_depth: f32) -> bool {
-        unsafe {
-            self.as_mut()
-                .SetShape(chara_layer, shape.as_ptr(), max_penetration_depth)
-        }
+    pub fn set_shape(&mut self, chara_layer: ObjectLayer, shape: &Shape, max_penetration_depth: f32) -> bool {
+        unsafe { self.as_mut().SetShape(chara_layer, &shape.0, max_penetration_depth) }
+    }
+
+    #[inline]
+    pub fn set_inner_body_shape(&mut self, shape: &Shape) {
+        unsafe { self.as_mut().SetInnerBodyShape(&shape.0) };
     }
 }

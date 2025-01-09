@@ -24,7 +24,7 @@ XCharacter::XCharacter(
 XCharacter::~XCharacter() {
 	RENDERER_ONLY(_system->RemoveRenderable(this));
 	Character::RemoveFromPhysicsSystem();
-	PRINT_ONLY(printf("~XCharacter %d\n", _system->GetRefCount() - 1));
+	PRINT_ONLY(printf("~XCharacter %d system %d\n", GetRefCount(), _system->GetRefCount() - 1));
 }
 
 #if defined(JPH_DEBUG_RENDERER)
@@ -94,7 +94,7 @@ XCharacterVirtual::XCharacterVirtual(
 
 XCharacterVirtual::~XCharacterVirtual() {
 	RENDERER_ONLY(_system->RemoveRenderable(this));
-	PRINT_ONLY(printf("~XCharacterVirtual %d\n", _system->GetRefCount() - 1));
+	PRINT_ONLY(printf("~XCharacterVirtual %d system %d\n", GetRefCount(), _system->GetRefCount() - 1));
 }
 
 void XCharacterVirtual::Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity) {
