@@ -1,139 +1,82 @@
+use core::fmt;
+use cxx::{kind, type_id, ExternType};
 use glam::{Quat, Vec3, Vec3A};
+#[cfg(features = "glam-ext")]
+use glam_ext::{Isometry3A, Transform3A};
 use static_assertions::const_assert_eq;
 use std::mem;
 use std::pin::Pin;
+use std::ptr::NonNull;
 
-use crate::base::*;
-use crate::consts::{DEFAULT_CONVEX_RADIUS, MAX_CONVEX_RADIUS, MIN_CONVEX_RADIUS};
+use crate::base::{AABox, IndexedTriangle, JMut, JQuat, JRef, JRefTarget, JVec3, Plane, ShapeSubType, ShapeType};
+use crate::consts::{DEFAULT_CONVEX_RADIUS, DEFAULT_ERROR_CONVEX_RADIUS, MAX_CONVEX_RADIUS, MIN_CONVEX_RADIUS};
 use crate::error::{JoltError, JoltResult};
 
 #[cxx::bridge()]
-pub mod ffi {
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum ShapeType {
-        Convex,
-        Compound,
-        Decorated,
-        Mesh,
-        HeightField,
-        SoftBody,
-
-        User1,
-        User2,
-        User3,
-        User4,
-
-        Plane,
-        Empty,
-    }
-
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum ShapeSubType {
-        // Convex shapes
-        Sphere,
-        Box,
-        Triangle,
-        Capsule,
-        TaperedCapsule,
-        Cylinder,
-        ConvexHull,
-
-        // Compound shapes
-        StaticCompound,
-        MutableCompound,
-
-        // Decorated shapes
-        RotatedTranslated,
-        Scaled,
-        OffsetCenterOfMass,
-
-        // Other shapes
-        Mesh,
-        HeightField,
-        SoftBody,
-
-        // User defined shapes
-        User1,
-        User2,
-        User3,
-        User4,
-        User5,
-        User6,
-        User7,
-        User8,
-
-        // User defined convex shapes
-        UserConvex1,
-        UserConvex2,
-        UserConvex3,
-        UserConvex4,
-        UserConvex5,
-        UserConvex6,
-        UserConvex7,
-        UserConvex8,
-
-        // Other shapes
-        Plane,
-        TaperedCylinder,
-        Empty,
-    }
-
+pub(crate) mod ffi {
     unsafe extern "C++" {
         include!("rust/cxx.h");
         include!("jolt-physics-rs/src/ffi.h");
 
-        type Shape = crate::base::ffi::Shape;
+        type ShapeType = crate::base::ffi::ShapeType;
+        type ShapeSubType = crate::base::ffi::ShapeSubType;
+
         type Vec3 = crate::base::ffi::Vec3;
         type Quat = crate::base::ffi::Quat;
         type AABox = crate::base::ffi::AABox;
 
-        type ShapeType;
-        type ShapeSubType;
+        type XSphereShapeSettings = crate::shape::SphereShapeSettings;
+        type XBoxShapeSettings = crate::shape::BoxShapeSettings;
+        type XCapsuleShapeSettings = crate::shape::CapsuleShapeSettings;
+        type XTaperedCapsuleShapeSettings = crate::shape::TaperedCapsuleShapeSettings;
+        type XCylinderShapeSettings = crate::shape::CylinderShapeSettings;
+        type XTaperedCylinderShapeSettings = crate::shape::TaperedCylinderShapeSettings;
+        type XConvexHullShapeSettings = crate::shape::ConvexHullShapeSettings<'static>;
+        type XTriangleShapeSettings = crate::shape::TriangleShapeSettings;
+        type XPlaneShapeSettings = crate::shape::PlaneShapeSettings;
+        type XMeshShapeSettings = crate::shape::MeshShapeSettings<'static>;
+        type XHeightFieldShapeSettings = crate::shape::HeightFieldShapeSettings<'static>;
+        type XEmptyShapeSettings = crate::shape::EmptyShapeSettings;
 
-        type SphereSettings;
-        type BoxSettings;
-        type CapsuleSettings;
-        type TaperedCapsuleSettings;
-        type CylinderSettings;
-        type TaperedCylinderSettings;
-        type ConvexHullSettings;
-        type TriangleSettings;
-        type PlaneSettings;
-        type MeshSettings;
-        type HeightFieldSettings;
-        type EmptySettings;
-
-        type ScaledSettings;
-        type RotatedTranslatedSettings;
-        type OffsetCenterOfMassSettings;
+        type XScaledShapeSettings = crate::shape::ScaledShapeSettings;
+        type XRotatedTranslatedShapeSettings = crate::shape::RotatedTranslatedShapeSettings;
+        type XOffsetCenterOfMassShapeSettings = crate::shape::OffsetCenterOfMassShapeSettings;
 
         #[allow(dead_code)]
-        type SubShapeSettings = crate::shape::SubShapeSettings;
-        type StaticCompoundSettings;
-        type MutableCompoundSettings;
-        type CompoundShapeSubShape;
+        type XSubShapeSettings = crate::shape::SubShapeSettings;
+        type XStaticCompoundShapeSettings = crate::shape::StaticCompoundShapeSettings<'static>;
+        type XMutableCompoundShapeSettings = crate::shape::MutableCompoundShapeSettings<'static>;
+        type XCompoundSubShape = crate::shape::CompoundSubShape;
 
-        fn CreateShapeSphere(settings: &SphereSettings) -> *mut Shape;
-        fn CreateShapeBox(settings: &BoxSettings) -> *mut Shape;
-        fn CreateShapeCapsule(settings: &CapsuleSettings) -> *mut Shape;
-        fn CreateShapeTaperedCapsule(settings: &TaperedCapsuleSettings) -> *mut Shape;
-        fn CreateShapeCylinder(settings: &CylinderSettings) -> *mut Shape;
-        fn CreateShapeTaperedCylinder(settings: &TaperedCylinderSettings) -> *mut Shape;
-        fn CreateShapeConvexHull(settings: &ConvexHullSettings) -> *mut Shape;
-        fn CreateShapeTriangle(settings: &TriangleSettings) -> *mut Shape;
-        fn CreateShapePlane(settings: &PlaneSettings) -> *mut Shape;
-        fn CreateShapeMesh(settings: &MeshSettings) -> *mut Shape;
-        fn CreateShapeHeightField(settings: &HeightFieldSettings) -> *mut Shape;
-        fn CreateShapeEmpty(settings: &EmptySettings) -> *mut Shape;
+        type PhysicsMaterial;
+        unsafe fn DropPhysicsMaterial(material: *mut PhysicsMaterial);
+        unsafe fn ClonePhysicsMaterial(material: *mut PhysicsMaterial) -> *mut PhysicsMaterial;
+        unsafe fn CountRefPhysicsMaterial(material: *const PhysicsMaterial) -> u32;
 
-        fn CreateShapeScaled(settings: &ScaledSettings) -> *mut Shape;
-        fn CreateShapeRotatedTranslated(settings: &RotatedTranslatedSettings) -> *mut Shape;
-        fn CreateShapeOffsetCenterOfMass(settings: &OffsetCenterOfMassSettings) -> *mut Shape;
+        type Shape;
+        unsafe fn DropShape(shape: *mut Shape);
+        unsafe fn CloneShape(shape: *mut Shape) -> *mut Shape;
+        unsafe fn CountRefShape(shape: *const Shape) -> u32;
 
-        fn CreateShapeStaticCompound(settings: &StaticCompoundSettings) -> *mut Shape;
-        fn CreateShapeMutableCompound(settings: &MutableCompoundSettings) -> *mut Shape;
+        fn CreateSphereShape(settings: &XSphereShapeSettings) -> *mut Shape;
+        fn CreateBoxShape(settings: &XBoxShapeSettings) -> *mut Shape;
+        fn CreateCapsuleShape(settings: &XCapsuleShapeSettings) -> *mut Shape;
+        fn CreateTaperedCapsuleShape(settings: &XTaperedCapsuleShapeSettings) -> *mut Shape;
+        fn CreateCylinderShape(settings: &XCylinderShapeSettings) -> *mut Shape;
+        fn CreateTaperedCylinderShape(settings: &XTaperedCylinderShapeSettings) -> *mut Shape;
+        fn CreateConvexHullShape(settings: &XConvexHullShapeSettings) -> *mut Shape;
+        fn CreateTriangleShape(settings: &XTriangleShapeSettings) -> *mut Shape;
+        fn CreatePlaneShape(settings: &XPlaneShapeSettings) -> *mut Shape;
+        fn CreateMeshShape(settings: &XMeshShapeSettings) -> *mut Shape;
+        fn CreateHeightFieldShape(settings: &XHeightFieldShapeSettings) -> *mut Shape;
+        fn CreateEmptyShape(settings: &XEmptyShapeSettings) -> *mut Shape;
+
+        fn CreateScaledShape(settings: &XScaledShapeSettings) -> *mut Shape;
+        fn CreateRotatedTranslatedShape(settings: &XRotatedTranslatedShapeSettings) -> *mut Shape;
+        fn CreateOffsetCenterOfMassShape(settings: &XOffsetCenterOfMassShapeSettings) -> *mut Shape;
+
+        fn CreateStaticCompoundShape(settings: &XStaticCompoundShapeSettings) -> *mut StaticCompoundShape;
+        fn CreateMutableCompoundShape(settings: &XMutableCompoundShapeSettings) -> *mut MutableCompoundShape;
 
         fn GetType(self: &Shape) -> ShapeType;
         fn GetSubType(self: &Shape) -> ShapeSubType;
@@ -148,6 +91,10 @@ pub mod ffi {
         fn MakeScaleValid(self: &Shape, scale: Vec3) -> Vec3;
 
         type StaticCompoundShape;
+        unsafe fn DropStaticCompoundShape(shape: *mut StaticCompoundShape);
+        unsafe fn CloneStaticCompoundShape(shape: *mut StaticCompoundShape) -> *mut StaticCompoundShape;
+        unsafe fn CountRefStaticCompoundShape(shape: *const StaticCompoundShape) -> u32;
+
         fn GetType(self: &StaticCompoundShape) -> ShapeType;
         fn GetSubType(self: &StaticCompoundShape) -> ShapeSubType;
         fn GetUserData(self: &StaticCompoundShape) -> u64;
@@ -160,11 +107,15 @@ pub mod ffi {
         fn IsValidScale(self: &StaticCompoundShape, scale: Vec3) -> bool;
         fn MakeScaleValid(self: &StaticCompoundShape, scale: Vec3) -> Vec3;
         fn GetNumSubShapes(self: &StaticCompoundShape) -> u32;
-        unsafe fn GetSubShape(self: &StaticCompoundShape, index: u32) -> &CompoundShapeSubShape;
+        unsafe fn GetSubShape(self: &StaticCompoundShape, index: u32) -> &XCompoundSubShape;
         fn GetCompoundUserData(self: &StaticCompoundShape, idx: u32) -> u32;
         fn SetCompoundUserData(self: Pin<&mut StaticCompoundShape>, idx: u32, data: u32);
 
         type MutableCompoundShape;
+        unsafe fn DropMutableCompoundShape(shape: *mut MutableCompoundShape);
+        unsafe fn CloneMutableCompoundShape(shape: *mut MutableCompoundShape) -> *mut MutableCompoundShape;
+        unsafe fn CountRefMutableCompoundShape(shape: *const MutableCompoundShape) -> u32;
+
         fn GetType(self: &MutableCompoundShape) -> ShapeType;
         fn GetSubType(self: &MutableCompoundShape) -> ShapeSubType;
         fn GetUserData(self: &MutableCompoundShape) -> u64;
@@ -177,7 +128,7 @@ pub mod ffi {
         fn IsValidScale(self: &MutableCompoundShape, scale: Vec3) -> bool;
         fn MakeScaleValid(self: &MutableCompoundShape, scale: Vec3) -> Vec3;
         fn GetNumSubShapes(self: &MutableCompoundShape) -> u32;
-        unsafe fn GetSubShape(self: &MutableCompoundShape, index: u32) -> &CompoundShapeSubShape;
+        unsafe fn GetSubShape(self: &MutableCompoundShape, index: u32) -> &XCompoundSubShape;
         fn GetCompoundUserData(self: &MutableCompoundShape, idx: u32) -> u32;
         fn SetCompoundUserData(self: Pin<&mut MutableCompoundShape>, idx: u32, data: u32);
         unsafe fn AddShape(
@@ -210,22 +161,24 @@ pub mod ffi {
     }
 }
 
-pub type ShapeType = ffi::ShapeType;
-pub type ShapeSubType = ffi::ShapeSubType;
-
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct SphereSettings {
+pub struct SphereShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub radius: f32,
 }
-const_assert_eq!(std::mem::size_of::<SphereSettings>(), 24);
+const_assert_eq!(std::mem::size_of::<SphereShapeSettings>(), 24);
 
-impl Default for SphereSettings {
-    fn default() -> SphereSettings {
-        SphereSettings {
+unsafe impl ExternType for SphereShapeSettings {
+    type Id = type_id!("XSphereShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for SphereShapeSettings {
+    fn default() -> SphereShapeSettings {
+        SphereShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -234,9 +187,9 @@ impl Default for SphereSettings {
     }
 }
 
-impl SphereSettings {
-    pub fn new(radius: f32) -> SphereSettings {
-        SphereSettings {
+impl SphereShapeSettings {
+    pub fn new(radius: f32) -> SphereShapeSettings {
+        SphereShapeSettings {
             radius,
             ..Default::default()
         }
@@ -245,20 +198,25 @@ impl SphereSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct BoxSettings {
+pub struct BoxShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub half_x: f32,
     pub half_y: f32,
     pub half_z: f32,
     pub convex_radius: f32,
 }
-const_assert_eq!(std::mem::size_of::<BoxSettings>(), 40);
+const_assert_eq!(std::mem::size_of::<BoxShapeSettings>(), 40);
 
-impl Default for BoxSettings {
-    fn default() -> BoxSettings {
-        BoxSettings {
+unsafe impl ExternType for BoxShapeSettings {
+    type Id = type_id!("XBoxShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for BoxShapeSettings {
+    fn default() -> BoxShapeSettings {
+        BoxShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -270,10 +228,10 @@ impl Default for BoxSettings {
     }
 }
 
-impl BoxSettings {
-    pub fn new(half_x: f32, half_y: f32, half_z: f32) -> BoxSettings {
+impl BoxShapeSettings {
+    pub fn new(half_x: f32, half_y: f32, half_z: f32) -> BoxShapeSettings {
         let min = half_x.min(half_y.min(half_z));
-        BoxSettings {
+        BoxShapeSettings {
             half_x,
             half_y,
             half_z,
@@ -285,18 +243,23 @@ impl BoxSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct CapsuleSettings {
+pub struct CapsuleShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub half_height: f32,
     pub radius: f32,
 }
-const_assert_eq!(std::mem::size_of::<CapsuleSettings>(), 32);
+const_assert_eq!(std::mem::size_of::<CapsuleShapeSettings>(), 32);
 
-impl Default for CapsuleSettings {
-    fn default() -> CapsuleSettings {
-        CapsuleSettings {
+unsafe impl ExternType for CapsuleShapeSettings {
+    type Id = type_id!("XCapsuleShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for CapsuleShapeSettings {
+    fn default() -> CapsuleShapeSettings {
+        CapsuleShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -306,9 +269,9 @@ impl Default for CapsuleSettings {
     }
 }
 
-impl CapsuleSettings {
-    pub fn new(half_height: f32, radius: f32) -> CapsuleSettings {
-        CapsuleSettings {
+impl CapsuleShapeSettings {
+    pub fn new(half_height: f32, radius: f32) -> CapsuleShapeSettings {
+        CapsuleShapeSettings {
             half_height,
             radius,
             ..Default::default()
@@ -318,19 +281,24 @@ impl CapsuleSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct TaperedCapsuleSettings {
+pub struct TaperedCapsuleShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub half_height: f32,
     pub top_radius: f32,
     pub bottom_radius: f32,
 }
-const_assert_eq!(std::mem::size_of::<TaperedCapsuleSettings>(), 32);
+const_assert_eq!(std::mem::size_of::<TaperedCapsuleShapeSettings>(), 32);
 
-impl Default for TaperedCapsuleSettings {
-    fn default() -> TaperedCapsuleSettings {
-        TaperedCapsuleSettings {
+unsafe impl ExternType for TaperedCapsuleShapeSettings {
+    type Id = type_id!("XTaperedCapsuleShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for TaperedCapsuleShapeSettings {
+    fn default() -> TaperedCapsuleShapeSettings {
+        TaperedCapsuleShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -341,9 +309,9 @@ impl Default for TaperedCapsuleSettings {
     }
 }
 
-impl TaperedCapsuleSettings {
-    pub fn new(half_height: f32, top_radius: f32, bottom_radius: f32) -> TaperedCapsuleSettings {
-        TaperedCapsuleSettings {
+impl TaperedCapsuleShapeSettings {
+    pub fn new(half_height: f32, top_radius: f32, bottom_radius: f32) -> TaperedCapsuleShapeSettings {
+        TaperedCapsuleShapeSettings {
             top_radius,
             bottom_radius,
             half_height,
@@ -354,19 +322,24 @@ impl TaperedCapsuleSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct CylinderSettings {
+pub struct CylinderShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub half_height: f32,
     pub radius: f32,
     pub convex_radius: f32,
 }
-const_assert_eq!(std::mem::size_of::<CylinderSettings>(), 32);
+const_assert_eq!(std::mem::size_of::<CylinderShapeSettings>(), 32);
 
-impl Default for CylinderSettings {
-    fn default() -> CylinderSettings {
-        CylinderSettings {
+unsafe impl ExternType for CylinderShapeSettings {
+    type Id = type_id!("XCylinderShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for CylinderShapeSettings {
+    fn default() -> CylinderShapeSettings {
+        CylinderShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -377,9 +350,9 @@ impl Default for CylinderSettings {
     }
 }
 
-impl CylinderSettings {
-    pub fn new(half_height: f32, radius: f32) -> CylinderSettings {
-        CylinderSettings {
+impl CylinderShapeSettings {
+    pub fn new(half_height: f32, radius: f32) -> CylinderShapeSettings {
+        CylinderShapeSettings {
             half_height,
             radius,
             convex_radius: (half_height / 10.0).clamp(MIN_CONVEX_RADIUS, MAX_CONVEX_RADIUS),
@@ -390,20 +363,25 @@ impl CylinderSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct TaperedCylinderSettings {
+pub struct TaperedCylinderShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub half_height: f32,
     pub top_radius: f32,
     pub bottom_radius: f32,
     pub convex_radius: f32,
 }
-const_assert_eq!(std::mem::size_of::<TaperedCylinderSettings>(), 40);
+const_assert_eq!(std::mem::size_of::<TaperedCylinderShapeSettings>(), 40);
 
-impl Default for TaperedCylinderSettings {
-    fn default() -> TaperedCylinderSettings {
-        TaperedCylinderSettings {
+unsafe impl ExternType for TaperedCylinderShapeSettings {
+    type Id = type_id!("XTaperedCylinderShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for TaperedCylinderShapeSettings {
+    fn default() -> TaperedCylinderShapeSettings {
+        TaperedCylinderShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -415,9 +393,9 @@ impl Default for TaperedCylinderSettings {
     }
 }
 
-impl TaperedCylinderSettings {
-    pub fn new(half_height: f32, top_radius: f32, bottom_radius: f32) -> TaperedCylinderSettings {
-        TaperedCylinderSettings {
+impl TaperedCylinderShapeSettings {
+    pub fn new(half_height: f32, top_radius: f32, bottom_radius: f32) -> TaperedCylinderShapeSettings {
+        TaperedCylinderShapeSettings {
             half_height,
             top_radius,
             bottom_radius,
@@ -429,34 +407,39 @@ impl TaperedCylinderSettings {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct ConvexHullSettings<'t> {
+pub struct ConvexHullShapeSettings<'t> {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub points: &'t [Vec3A],
     pub max_convex_radius: f32,
     pub max_error_convex_radius: f32,
     pub hull_tolerance: f32,
 }
-const_assert_eq!(std::mem::size_of::<ConvexHullSettings>(), 56);
+const_assert_eq!(std::mem::size_of::<ConvexHullShapeSettings>(), 56);
 
-impl<'t> Default for ConvexHullSettings<'t> {
-    fn default() -> ConvexHullSettings<'t> {
-        ConvexHullSettings {
+unsafe impl ExternType for ConvexHullShapeSettings<'_> {
+    type Id = type_id!("XConvexHullShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl<'t> Default for ConvexHullShapeSettings<'t> {
+    fn default() -> ConvexHullShapeSettings<'t> {
+        ConvexHullShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
             points: &[],
-            max_convex_radius: 0.05,
-            max_error_convex_radius: 0.05,
+            max_convex_radius: DEFAULT_CONVEX_RADIUS,
+            max_error_convex_radius: DEFAULT_ERROR_CONVEX_RADIUS,
             hull_tolerance: 1.0e-3,
         }
     }
 }
 
-impl<'t> ConvexHullSettings<'t> {
-    pub fn new(points: &'t [Vec3A]) -> ConvexHullSettings<'t> {
-        ConvexHullSettings {
+impl<'t> ConvexHullShapeSettings<'t> {
+    pub fn new(points: &'t [Vec3A]) -> ConvexHullShapeSettings<'t> {
+        ConvexHullShapeSettings {
             points,
             ..Default::default()
         }
@@ -465,20 +448,25 @@ impl<'t> ConvexHullSettings<'t> {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct TriangleSettings {
+pub struct TriangleShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub density: f32,
     pub convex_radius: f32,
     pub v1: Vec3A,
     pub v2: Vec3A,
     pub v3: Vec3A,
 }
-const_assert_eq!(std::mem::size_of::<TriangleSettings>(), 80);
+const_assert_eq!(std::mem::size_of::<TriangleShapeSettings>(), 80);
 
-impl Default for TriangleSettings {
-    fn default() -> TriangleSettings {
-        TriangleSettings {
+unsafe impl ExternType for TriangleShapeSettings {
+    type Id = type_id!("XTriangleShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for TriangleShapeSettings {
+    fn default() -> TriangleShapeSettings {
+        TriangleShapeSettings {
             user_data: 0,
             material: None,
             density: 1000.0,
@@ -490,9 +478,9 @@ impl Default for TriangleSettings {
     }
 }
 
-impl TriangleSettings {
-    pub fn new(v1: Vec3A, v2: Vec3A, v3: Vec3A) -> TriangleSettings {
-        TriangleSettings {
+impl TriangleShapeSettings {
+    pub fn new(v1: Vec3A, v2: Vec3A, v3: Vec3A) -> TriangleShapeSettings {
+        TriangleShapeSettings {
             v1,
             v2,
             v3,
@@ -503,17 +491,22 @@ impl TriangleSettings {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct PlaneSettings {
+pub struct PlaneShapeSettings {
     pub user_data: u64,
-    pub material: Option<RefPhysicsMaterial>,
+    pub material: Option<JRef<PhysicsMaterial>>,
     pub plane: Plane,
     pub half_extent: f32,
 }
-const_assert_eq!(std::mem::size_of::<PlaneSettings>(), 48);
+const_assert_eq!(std::mem::size_of::<PlaneShapeSettings>(), 48);
 
-impl Default for PlaneSettings {
-    fn default() -> PlaneSettings {
-        PlaneSettings {
+unsafe impl ExternType for PlaneShapeSettings {
+    type Id = type_id!("XPlaneShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for PlaneShapeSettings {
+    fn default() -> PlaneShapeSettings {
+        PlaneShapeSettings {
             user_data: 0,
             material: None,
             plane: Plane::new(Vec3::Y, 0.0),
@@ -522,9 +515,9 @@ impl Default for PlaneSettings {
     }
 }
 
-impl PlaneSettings {
-    pub fn new(plane: Plane, half_extent: f32) -> PlaneSettings {
-        PlaneSettings {
+impl PlaneShapeSettings {
+    pub fn new(plane: Plane, half_extent: f32) -> PlaneShapeSettings {
+        PlaneShapeSettings {
             plane,
             half_extent,
             ..Default::default()
@@ -534,19 +527,24 @@ impl PlaneSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct MeshSettings<'t> {
+pub struct MeshShapeSettings<'t> {
     pub user_data: u64,
     pub triangle_vertices: &'t [Vec3],
     pub indexed_triangles: &'t [IndexedTriangle],
-    pub materials: &'t [RefPhysicsMaterial],
+    pub materials: &'t [JRef<PhysicsMaterial>],
     pub max_triangles_per_leaf: u32,
     pub active_edge_cos_threshold_angle: f32,
 }
-const_assert_eq!(std::mem::size_of::<MeshSettings>(), 64);
+const_assert_eq!(std::mem::size_of::<MeshShapeSettings>(), 64);
 
-impl<'t> Default for MeshSettings<'t> {
-    fn default() -> MeshSettings<'t> {
-        MeshSettings {
+unsafe impl ExternType for MeshShapeSettings<'_> {
+    type Id = type_id!("XMeshShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl<'t> Default for MeshShapeSettings<'t> {
+    fn default() -> MeshShapeSettings<'t> {
+        MeshShapeSettings {
             user_data: 0,
             triangle_vertices: &[],
             indexed_triangles: &[],
@@ -557,9 +555,9 @@ impl<'t> Default for MeshSettings<'t> {
     }
 }
 
-impl<'t> MeshSettings<'t> {
-    pub fn new(triangle_vertices: &'t [Vec3], indexed_triangles: &'t [IndexedTriangle]) -> MeshSettings<'t> {
-        MeshSettings {
+impl<'t> MeshShapeSettings<'t> {
+    pub fn new(triangle_vertices: &'t [Vec3], indexed_triangles: &'t [IndexedTriangle]) -> MeshShapeSettings<'t> {
+        MeshShapeSettings {
             triangle_vertices,
             indexed_triangles,
             ..Default::default()
@@ -569,7 +567,7 @@ impl<'t> MeshSettings<'t> {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct HeightFieldSettings<'t> {
+pub struct HeightFieldShapeSettings<'t> {
     pub user_data: u64,
     pub offset: Vec3A,
     pub scale: Vec3A,
@@ -580,14 +578,19 @@ pub struct HeightFieldSettings<'t> {
     pub bits_per_sample: u32,
     pub height_samples: &'t [f32],
     pub material_indices: &'t [u8],
-    pub materials: &'t [RefPhysicsMaterial],
+    pub materials: &'t [JRef<PhysicsMaterial>],
     pub active_edge_cos_threshold_angle: f32,
 }
-const_assert_eq!(std::mem::size_of::<HeightFieldSettings>(), 128);
+const_assert_eq!(std::mem::size_of::<HeightFieldShapeSettings>(), 128);
 
-impl<'t> Default for HeightFieldSettings<'t> {
-    fn default() -> HeightFieldSettings<'t> {
-        HeightFieldSettings {
+unsafe impl ExternType for HeightFieldShapeSettings<'_> {
+    type Id = type_id!("XHeightFieldShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl<'t> Default for HeightFieldShapeSettings<'t> {
+    fn default() -> HeightFieldShapeSettings<'t> {
+        HeightFieldShapeSettings {
             user_data: 0,
             offset: Vec3A::ZERO,
             scale: Vec3A::ONE,
@@ -604,9 +607,9 @@ impl<'t> Default for HeightFieldSettings<'t> {
     }
 }
 
-impl<'t> HeightFieldSettings<'t> {
-    pub fn new(height_samples: &'t [f32], sample_count: u32) -> HeightFieldSettings<'t> {
-        HeightFieldSettings {
+impl<'t> HeightFieldShapeSettings<'t> {
+    pub fn new(height_samples: &'t [f32], sample_count: u32) -> HeightFieldShapeSettings<'t> {
+        HeightFieldShapeSettings {
             height_samples,
             sample_count,
             ..Default::default()
@@ -616,24 +619,29 @@ impl<'t> HeightFieldSettings<'t> {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct EmptySettings {
+pub struct EmptyShapeSettings {
     pub user_data: u64,
     pub center_of_mass: Vec3A,
 }
-const_assert_eq!(std::mem::size_of::<EmptySettings>(), 32);
+const_assert_eq!(std::mem::size_of::<EmptyShapeSettings>(), 32);
 
-impl Default for EmptySettings {
-    fn default() -> EmptySettings {
-        EmptySettings {
+unsafe impl ExternType for EmptyShapeSettings {
+    type Id = type_id!("XEmptyShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for EmptyShapeSettings {
+    fn default() -> EmptyShapeSettings {
+        EmptyShapeSettings {
             user_data: 0,
             center_of_mass: Vec3A::ZERO,
         }
     }
 }
 
-impl EmptySettings {
-    pub fn new(center_of_mass: Vec3A) -> EmptySettings {
-        EmptySettings {
+impl EmptyShapeSettings {
+    pub fn new(center_of_mass: Vec3A) -> EmptyShapeSettings {
+        EmptyShapeSettings {
             center_of_mass,
             ..Default::default()
         }
@@ -642,16 +650,21 @@ impl EmptySettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct ScaledSettings {
+pub struct ScaledShapeSettings {
     pub user_data: u64,
-    pub inner_shape: Option<RefShape>,
+    pub inner_shape: Option<JRef<Shape>>,
     pub scale: Vec3A,
 }
-const_assert_eq!(std::mem::size_of::<ScaledSettings>(), 32);
+const_assert_eq!(std::mem::size_of::<ScaledShapeSettings>(), 32);
 
-impl Default for ScaledSettings {
-    fn default() -> ScaledSettings {
-        ScaledSettings {
+unsafe impl ExternType for ScaledShapeSettings {
+    type Id = type_id!("XScaledShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for ScaledShapeSettings {
+    fn default() -> ScaledShapeSettings {
+        ScaledShapeSettings {
             user_data: 0,
             inner_shape: None,
             scale: Vec3A::ONE,
@@ -659,9 +672,9 @@ impl Default for ScaledSettings {
     }
 }
 
-impl ScaledSettings {
-    pub fn new(inner_shape: RefShape, scale: Vec3A) -> ScaledSettings {
-        ScaledSettings {
+impl ScaledShapeSettings {
+    pub fn new(inner_shape: JRef<Shape>, scale: Vec3A) -> ScaledShapeSettings {
+        ScaledShapeSettings {
             user_data: 0,
             inner_shape: Some(inner_shape),
             scale,
@@ -671,17 +684,22 @@ impl ScaledSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct RotatedTranslatedSettings {
+pub struct RotatedTranslatedShapeSettings {
     pub user_data: u64,
-    pub inner_shape: Option<RefShape>,
+    pub inner_shape: Option<JRef<Shape>>,
     pub position: Vec3A,
     pub rotation: Quat,
 }
-const_assert_eq!(std::mem::size_of::<RotatedTranslatedSettings>(), 48);
+const_assert_eq!(std::mem::size_of::<RotatedTranslatedShapeSettings>(), 48);
 
-impl Default for RotatedTranslatedSettings {
-    fn default() -> RotatedTranslatedSettings {
-        RotatedTranslatedSettings {
+unsafe impl ExternType for RotatedTranslatedShapeSettings {
+    type Id = type_id!("XRotatedTranslatedShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for RotatedTranslatedShapeSettings {
+    fn default() -> RotatedTranslatedShapeSettings {
+        RotatedTranslatedShapeSettings {
             user_data: 0,
             inner_shape: None,
             position: Vec3A::ZERO,
@@ -690,9 +708,9 @@ impl Default for RotatedTranslatedSettings {
     }
 }
 
-impl RotatedTranslatedSettings {
-    pub fn new(inner_shape: RefShape, position: Vec3A, rotation: Quat) -> RotatedTranslatedSettings {
-        RotatedTranslatedSettings {
+impl RotatedTranslatedShapeSettings {
+    pub fn new(inner_shape: JRef<Shape>, position: Vec3A, rotation: Quat) -> RotatedTranslatedShapeSettings {
+        RotatedTranslatedShapeSettings {
             user_data: 0,
             inner_shape: Some(inner_shape),
             position,
@@ -703,16 +721,21 @@ impl RotatedTranslatedSettings {
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct OffsetCenterOfMassSettings {
+pub struct OffsetCenterOfMassShapeSettings {
     pub user_data: u64,
-    pub inner_shape: Option<RefShape>,
+    pub inner_shape: Option<JRef<Shape>>,
     pub offset: Vec3A,
 }
-const_assert_eq!(std::mem::size_of::<OffsetCenterOfMassSettings>(), 32);
+const_assert_eq!(std::mem::size_of::<OffsetCenterOfMassShapeSettings>(), 32);
 
-impl Default for OffsetCenterOfMassSettings {
-    fn default() -> OffsetCenterOfMassSettings {
-        OffsetCenterOfMassSettings {
+unsafe impl ExternType for OffsetCenterOfMassShapeSettings {
+    type Id = type_id!("XOffsetCenterOfMassShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for OffsetCenterOfMassShapeSettings {
+    fn default() -> OffsetCenterOfMassShapeSettings {
+        OffsetCenterOfMassShapeSettings {
             user_data: 0,
             inner_shape: None,
             offset: Vec3A::ZERO,
@@ -720,9 +743,9 @@ impl Default for OffsetCenterOfMassSettings {
     }
 }
 
-impl OffsetCenterOfMassSettings {
-    pub fn new(inner_shape: RefShape, offset: Vec3A) -> OffsetCenterOfMassSettings {
-        OffsetCenterOfMassSettings {
+impl OffsetCenterOfMassShapeSettings {
+    pub fn new(inner_shape: JRef<Shape>, offset: Vec3A) -> OffsetCenterOfMassShapeSettings {
+        OffsetCenterOfMassShapeSettings {
             user_data: 0,
             inner_shape: Some(inner_shape),
             offset,
@@ -734,16 +757,16 @@ impl OffsetCenterOfMassSettings {
 #[derive(Debug, Clone)]
 pub struct SubShapeSettings {
     _shape: *const (),
-    pub shape: Option<RefShape>,
+    pub shape: Option<JRef<Shape>>,
     pub position: Vec3A,
     pub rotation: Quat,
     pub user_data: u32,
 }
 const_assert_eq!(std::mem::size_of::<SubShapeSettings>(), 64);
 
-unsafe impl cxx::ExternType for SubShapeSettings {
-    type Id = cxx::type_id!("SubShapeSettings");
-    type Kind = cxx::kind::Trivial;
+unsafe impl ExternType for SubShapeSettings {
+    type Id = type_id!("XSubShapeSettings");
+    type Kind = kind::Trivial;
 }
 
 impl Default for SubShapeSettings {
@@ -759,7 +782,7 @@ impl Default for SubShapeSettings {
 }
 
 impl SubShapeSettings {
-    pub fn new(shape: RefShape, position: Vec3A, rotation: Quat) -> SubShapeSettings {
+    pub fn new(shape: JRef<Shape>, position: Vec3A, rotation: Quat) -> SubShapeSettings {
         SubShapeSettings {
             _shape: std::ptr::null(),
             shape: Some(shape),
@@ -771,17 +794,66 @@ impl SubShapeSettings {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Default)]
+pub struct StaticCompoundShapeSettings<'t> {
+    pub user_data: u64,
+    pub sub_shapes: &'t [SubShapeSettings],
+}
+const_assert_eq!(std::mem::size_of::<StaticCompoundShapeSettings>(), 24);
+
+unsafe impl ExternType for StaticCompoundShapeSettings<'_> {
+    type Id = type_id!("XStaticCompoundShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl StaticCompoundShapeSettings<'_> {
+    pub fn new(sub_shapes: &[SubShapeSettings]) -> StaticCompoundShapeSettings<'_> {
+        StaticCompoundShapeSettings {
+            user_data: 0,
+            sub_shapes,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Default)]
+pub struct MutableCompoundShapeSettings<'t> {
+    pub user_data: u64,
+    pub sub_shapes: &'t [SubShapeSettings],
+}
+const_assert_eq!(std::mem::size_of::<MutableCompoundShapeSettings>(), 24);
+
+unsafe impl ExternType for MutableCompoundShapeSettings<'_> {
+    type Id = type_id!("XMutableCompoundShapeSettings");
+    type Kind = kind::Trivial;
+}
+
+impl MutableCompoundShapeSettings<'_> {
+    pub fn new(sub_shapes: &[SubShapeSettings]) -> MutableCompoundShapeSettings<'_> {
+        MutableCompoundShapeSettings {
+            user_data: 0,
+            sub_shapes,
+        }
+    }
+}
+
+#[repr(C)]
 #[derive(Debug, Clone)]
-pub struct SubShape {
-    pub shape: RefShape,
+pub struct CompoundSubShape {
+    pub shape: JRef<Shape>,
     pub position: Vec3,
     rotation: Vec3, // X, Y, Z of rotation quaternion
     pub user_data: u32,
     pub is_rotation_identity: bool,
 }
-const_assert_eq!(std::mem::size_of::<SubShape>(), 40);
+const_assert_eq!(std::mem::size_of::<CompoundSubShape>(), 40);
 
-impl SubShape {
+unsafe impl ExternType for CompoundSubShape {
+    type Id = type_id!("XCompoundSubShape");
+    type Kind = kind::Trivial;
+}
+
+impl CompoundSubShape {
     #[inline]
     pub fn rotation(&self) -> Quat {
         if self.is_rotation_identity {
@@ -793,241 +865,435 @@ impl SubShape {
     }
 }
 
-#[repr(C)]
-#[derive(Debug, Clone)]
-#[derive(Default)]
-pub struct StaticCompoundSettings<'t> {
-    pub user_data: u64,
-    pub sub_shapes: &'t [SubShapeSettings],
+#[inline]
+pub fn create_sphere_shape(settings: &SphereShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_sphere_shape_mut(settings).map(|s| s.into())
 }
 
-
-impl StaticCompoundSettings<'_> {
-    pub fn new(sub_shapes: &[SubShapeSettings]) -> StaticCompoundSettings<'_> {
-        StaticCompoundSettings {
-            user_data: 0,
-            sub_shapes,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-#[derive(Default)]
-pub struct MutableCompoundSettings<'t> {
-    pub user_data: u64,
-    pub sub_shapes: &'t [SubShapeSettings],
-}
-
-
-impl MutableCompoundSettings<'_> {
-    pub fn new(sub_shapes: &[SubShapeSettings]) -> MutableCompoundSettings<'_> {
-        MutableCompoundSettings {
-            user_data: 0,
-            sub_shapes,
-        }
-    }
-}
-
-pub fn create_sphere_shape(settings: &SphereSettings) -> JoltResult<RefShape> {
+#[inline]
+pub fn create_sphere_shape_mut(settings: &SphereShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeSphere(mem::transmute::<&SphereSettings, &ffi::SphereSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_box_shape(settings: &BoxSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeBox(mem::transmute::<&BoxSettings, &ffi::BoxSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_capsule_shape(settings: &CapsuleSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeCapsule(mem::transmute::<&CapsuleSettings, &ffi::CapsuleSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_tapered_capsule_shape(settings: &TaperedCapsuleSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeTaperedCapsule(
-            mem::transmute::<&TaperedCapsuleSettings, &ffi::TaperedCapsuleSettings>(settings),
-        );
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_cylinder_shape(settings: &CylinderSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeCylinder(mem::transmute::<&CylinderSettings, &ffi::CylinderSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_tapered_cylinder_shape(settings: &TaperedCylinderSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeTaperedCylinder(mem::transmute::<
-            &TaperedCylinderSettings,
-            &ffi::TaperedCylinderSettings,
-        >(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_convex_hull_shape(settings: &ConvexHullSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeConvexHull(mem::transmute::<&ConvexHullSettings, &ffi::ConvexHullSettings>(
+        let ptr = ffi::CreateSphereShape(mem::transmute::<&SphereShapeSettings, &ffi::XSphereShapeSettings>(
             settings,
         ));
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefShape::new(ptr))
+        Ok(JMut::new_unchecked(ptr))
     }
 }
 
-pub fn create_triangle_shape(settings: &TriangleSettings) -> JoltResult<RefShape> {
+#[inline]
+pub fn create_box_shape(settings: &BoxShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_box_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_box_shape_mut(settings: &BoxShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeTriangle(mem::transmute::<&TriangleSettings, &ffi::TriangleSettings>(settings));
+        let ptr = ffi::CreateBoxShape(mem::transmute::<&BoxShapeSettings, &ffi::XBoxShapeSettings>(settings));
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefShape::new(ptr))
+        Ok(JMut::new_unchecked(ptr))
     }
 }
 
-pub fn create_plane_shape(settings: &PlaneSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapePlane(mem::transmute::<&PlaneSettings, &ffi::PlaneSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
+#[inline]
+pub fn create_capsule_shape(settings: &CapsuleShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_capsule_shape_mut(settings).map(|s| s.into())
 }
 
-pub fn create_mesh_shape(settings: &MeshSettings) -> JoltResult<RefShape> {
+#[inline]
+pub fn create_capsule_shape_mut(settings: &CapsuleShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeMesh(mem::transmute::<&MeshSettings, &ffi::MeshSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_height_field_shape(settings: &HeightFieldSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeHeightField(mem::transmute::<&HeightFieldSettings, &ffi::HeightFieldSettings>(
+        let ptr = ffi::CreateCapsuleShape(mem::transmute::<&CapsuleShapeSettings, &ffi::XCapsuleShapeSettings>(
             settings,
         ));
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefShape::new(ptr))
+        Ok(JMut::new_unchecked(ptr))
     }
 }
 
-pub fn create_empty_shape(settings: &EmptySettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeEmpty(mem::transmute::<&EmptySettings, &ffi::EmptySettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
+#[inline]
+pub fn create_tapered_capsule_shape(settings: &TaperedCapsuleShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_tapered_capsule_shape_mut(settings).map(|s| s.into())
 }
 
-pub fn create_scaled_shape(settings: &ScaledSettings) -> JoltResult<RefShape> {
+#[inline]
+pub fn create_tapered_capsule_shape_mut(settings: &TaperedCapsuleShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeScaled(mem::transmute::<&ScaledSettings, &ffi::ScaledSettings>(settings));
-        if ptr.is_null() {
-            return Err(JoltError::CreateShape);
-        }
-        Ok(RefShape::new(ptr))
-    }
-}
-
-pub fn create_rotated_translated_shape(settings: &RotatedTranslatedSettings) -> JoltResult<RefShape> {
-    unsafe {
-        let ptr = ffi::CreateShapeRotatedTranslated(mem::transmute::<
-            &RotatedTranslatedSettings,
-            &ffi::RotatedTranslatedSettings,
+        let ptr = ffi::CreateTaperedCapsuleShape(mem::transmute::<
+            &TaperedCapsuleShapeSettings,
+            &ffi::XTaperedCapsuleShapeSettings,
         >(settings));
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefShape::new(ptr))
+        Ok(JMut::new_unchecked(ptr))
     }
 }
 
-pub fn create_offset_center_of_mass_shape(settings: &OffsetCenterOfMassSettings) -> JoltResult<RefShape> {
+#[inline]
+pub fn create_cylinder_shape(settings: &CylinderShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_cylinder_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_cylinder_shape_mut(settings: &CylinderShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeOffsetCenterOfMass(mem::transmute::<
-            &OffsetCenterOfMassSettings,
-            &ffi::OffsetCenterOfMassSettings,
+        let ptr = ffi::CreateCylinderShape(mem::transmute::<&CylinderShapeSettings, &ffi::XCylinderShapeSettings>(
+            settings,
+        ));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_tapered_cylinder_shape(settings: &TaperedCylinderShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_tapered_cylinder_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_tapered_cylinder_shape_mut(settings: &TaperedCylinderShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateTaperedCylinderShape(mem::transmute::<
+            &TaperedCylinderShapeSettings,
+            &ffi::XTaperedCylinderShapeSettings,
         >(settings));
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefShape::new(ptr))
+        Ok(JMut::new_unchecked(ptr))
     }
 }
 
-pub fn create_static_compound_shape(settings: &StaticCompoundSettings) -> JoltResult<RefStaticCompoundShape> {
-    if settings.sub_shapes.len() < 2 {
-        return Err(JoltError::TooLessSubShape);
-    }
+#[inline]
+pub fn create_convex_hull_shape(settings: &ConvexHullShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_convex_hull_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_convex_hull_shape_mut(settings: &ConvexHullShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeStaticCompound(
-            mem::transmute::<&StaticCompoundSettings, &ffi::StaticCompoundSettings>(settings),
+        let ptr = ffi::CreateConvexHullShape(
+            mem::transmute::<&ConvexHullShapeSettings, &ffi::XConvexHullShapeSettings>(settings),
         );
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefStaticCompoundShape(RefShape::new(ptr)))
+        Ok(JMut::new_unchecked(ptr))
     }
 }
 
-pub fn create_mutable_compound_shape(settings: &MutableCompoundSettings) -> JoltResult<RefMutableCompoundShape> {
-    if settings.sub_shapes.len() < 2 {
-        return Err(JoltError::TooLessSubShape);
-    }
+#[inline]
+pub fn create_triangle_shape(settings: &TriangleShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_triangle_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_triangle_shape_mut(settings: &TriangleShapeSettings) -> JoltResult<JMut<Shape>> {
     unsafe {
-        let ptr = ffi::CreateShapeMutableCompound(mem::transmute::<
-            &MutableCompoundSettings,
-            &ffi::MutableCompoundSettings,
+        let ptr = ffi::CreateTriangleShape(mem::transmute::<&TriangleShapeSettings, &ffi::XTriangleShapeSettings>(
+            settings,
+        ));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_plane_shape(settings: &PlaneShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_plane_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_plane_shape_mut(settings: &PlaneShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreatePlaneShape(mem::transmute::<&PlaneShapeSettings, &ffi::XPlaneShapeSettings>(
+            settings,
+        ));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_mesh_shape(settings: &MeshShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_mesh_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_mesh_shape_mut(settings: &MeshShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateMeshShape(mem::transmute::<&MeshShapeSettings, &ffi::XMeshShapeSettings>(settings));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_height_field_shape(settings: &HeightFieldShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_height_field_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_height_field_shape_mut(settings: &HeightFieldShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateHeightFieldShape(mem::transmute::<
+            &HeightFieldShapeSettings,
+            &ffi::XHeightFieldShapeSettings,
         >(settings));
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(RefMutableCompoundShape(RefShape::new(ptr)))
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_empty_shape(settings: &EmptyShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_empty_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_empty_shape_mut(settings: &EmptyShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateEmptyShape(mem::transmute::<&EmptyShapeSettings, &ffi::XEmptyShapeSettings>(
+            settings,
+        ));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_scaled_shape(settings: &ScaledShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_scaled_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_scaled_shape_mut(settings: &ScaledShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateScaledShape(mem::transmute::<&ScaledShapeSettings, &ffi::XScaledShapeSettings>(
+            settings,
+        ));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_rotated_translated_shape(settings: &RotatedTranslatedShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_rotated_translated_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_rotated_translated_shape_mut(settings: &RotatedTranslatedShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateRotatedTranslatedShape(mem::transmute::<
+            &RotatedTranslatedShapeSettings,
+            &ffi::XRotatedTranslatedShapeSettings,
+        >(settings));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_offset_center_of_mass_shape(settings: &OffsetCenterOfMassShapeSettings) -> JoltResult<JRef<Shape>> {
+    create_offset_center_of_mass_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_offset_center_of_mass_shape_mut(settings: &OffsetCenterOfMassShapeSettings) -> JoltResult<JMut<Shape>> {
+    unsafe {
+        let ptr = ffi::CreateOffsetCenterOfMassShape(mem::transmute::<
+            &OffsetCenterOfMassShapeSettings,
+            &ffi::XOffsetCenterOfMassShapeSettings,
+        >(settings));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_static_compound_shape(settings: &StaticCompoundShapeSettings) -> JoltResult<JRef<StaticCompoundShape>> {
+    create_static_compound_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_static_compound_shape_mut(
+    settings: &StaticCompoundShapeSettings,
+) -> JoltResult<JMut<StaticCompoundShape>> {
+    if settings.sub_shapes.len() < 2 {
+        return Err(JoltError::TooLessSubShape);
+    }
+    unsafe {
+        let ptr = ffi::CreateStaticCompoundShape(mem::transmute::<
+            &StaticCompoundShapeSettings,
+            &ffi::XStaticCompoundShapeSettings,
+        >(settings));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+#[inline]
+pub fn create_mutable_compound_shape(
+    settings: &MutableCompoundShapeSettings,
+) -> JoltResult<JRef<MutableCompoundShape>> {
+    create_mutable_compound_shape_mut(settings).map(|s| s.into())
+}
+
+#[inline]
+pub fn create_mutable_compound_shape_mut(
+    settings: &MutableCompoundShapeSettings,
+) -> JoltResult<JMut<MutableCompoundShape>> {
+    if settings.sub_shapes.len() < 2 {
+        return Err(JoltError::TooLessSubShape);
+    }
+    unsafe {
+        let ptr = ffi::CreateMutableCompoundShape(mem::transmute::<
+            &MutableCompoundShapeSettings,
+            &ffi::XMutableCompoundShapeSettings,
+        >(settings));
+        if ptr.is_null() {
+            return Err(JoltError::CreateShape);
+        }
+        Ok(JMut::new_unchecked(ptr))
+    }
+}
+
+pub struct PhysicsMaterial(ffi::PhysicsMaterial);
+
+const_assert_eq!(mem::size_of::<JRef<PhysicsMaterial>>(), mem::size_of::<usize>());
+const_assert_eq!(mem::size_of::<Option<JRef<PhysicsMaterial>>>(), 8);
+const_assert_eq!(
+    unsafe { mem::transmute::<Option<JRef<PhysicsMaterial>>, usize>(None) },
+    0
+);
+
+impl fmt::Debug for PhysicsMaterial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PhysicsMaterial").finish()
+    }
+}
+
+unsafe impl JRefTarget for PhysicsMaterial {
+    type JRefRaw = ffi::PhysicsMaterial;
+
+    #[inline]
+    fn name() -> &'static str {
+        "PhysicsMaterial"
+    }
+
+    #[inline]
+    fn from_ptr(raw: *const ffi::PhysicsMaterial) -> *const PhysicsMaterial {
+        raw as *const _
+    }
+
+    #[inline]
+    fn from_non_null(raw: NonNull<ffi::PhysicsMaterial>) -> NonNull<PhysicsMaterial> {
+        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    }
+
+    #[inline]
+    unsafe fn clone_ref(&mut self) -> NonNull<PhysicsMaterial> {
+        NonNull::new_unchecked(ffi::ClonePhysicsMaterial(&mut self.0) as *mut _)
+    }
+
+    #[inline]
+    unsafe fn drop_ref(&mut self) {
+        ffi::DropPhysicsMaterial(&mut self.0);
+    }
+
+    #[inline]
+    fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefPhysicsMaterial(&self.0) }
+    }
+}
+
+pub struct Shape(pub(crate) ffi::Shape);
+
+const_assert_eq!(mem::size_of::<JRef<Shape>>(), mem::size_of::<usize>());
+const_assert_eq!(mem::size_of::<Option<JRef<Shape>>>(), 8);
+const_assert_eq!(unsafe { mem::transmute::<Option<JRef<Shape>>, usize>(None) }, 0);
+
+impl fmt::Debug for Shape {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Shape").finish()
+    }
+}
+
+unsafe impl JRefTarget for Shape {
+    type JRefRaw = ffi::Shape;
+
+    #[inline]
+    fn name() -> &'static str {
+        "Shape"
+    }
+
+    #[inline]
+    fn from_ptr(raw: *const ffi::Shape) -> *const Shape {
+        raw as *const _
+    }
+
+    #[inline]
+    fn from_non_null(raw: NonNull<ffi::Shape>) -> NonNull<Shape> {
+        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    }
+
+    #[inline]
+    unsafe fn clone_ref(&mut self) -> NonNull<Shape> {
+        NonNull::new_unchecked(ffi::CloneShape(&mut self.0) as *mut _)
+    }
+
+    #[inline]
+    unsafe fn drop_ref(&mut self) {
+        ffi::DropShape(&mut self.0);
+    }
+
+    #[inline]
+    fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefShape(&self.0) }
     }
 }
 
 macro_rules! shape_methods {
     ($type:ty) => {
         impl $type {
+            #[inline]
+            fn as_ref(&self) -> &<Self as JRefTarget>::JRefRaw {
+                &self.0
+            }
+
+            #[inline]
+            fn as_mut(&mut self) -> Pin<&mut <Self as JRefTarget>::JRefRaw> {
+                unsafe { Pin::new_unchecked(&mut self.0) }
+            }
+
             #[inline]
             pub fn get_type(&self) -> ShapeType {
                 self.as_ref().GetType()
@@ -1044,13 +1310,13 @@ macro_rules! shape_methods {
             }
 
             #[inline]
-            pub unsafe fn set_user_data(&mut self, data: u64) {
+            pub fn set_user_data(&mut self, data: u64) {
                 self.as_mut().SetUserData(data);
             }
 
             #[inline]
             pub fn get_center_of_mass(&self) -> Vec3A {
-                self.as_ref().GetCenterOfMass().0
+                self.as_ref().GetCenterOfMass().into()
             }
 
             #[inline]
@@ -1080,48 +1346,85 @@ macro_rules! shape_methods {
 
             #[inline]
             pub fn make_scale_valid(&self, scale: Vec3A) -> Vec3A {
-                self.as_ref().MakeScaleValid(scale.into()).0
+                self.as_ref().MakeScaleValid(scale.into()).into()
             }
         }
     };
 }
 
-shape_methods!(RefShape);
+shape_methods!(Shape);
 
-/// In C++ code, Shape* is actually a smart pointer with a reference count.
-/// Currently, we don't have a perfect representation of this in Rust.
-/// So we're marking all `&mut self` functions as unsafe for now.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RefStaticCompoundShape(RefShape);
+pub struct StaticCompoundShape(pub(crate) ffi::StaticCompoundShape);
 
-impl From<RefStaticCompoundShape> for RefShape {
-    #[inline]
-    fn from(shape: RefStaticCompoundShape) -> RefShape {
-        shape.0
+impl fmt::Debug for StaticCompoundShape {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StaticCompoundShape").finish()
     }
 }
 
-shape_methods!(RefStaticCompoundShape);
+unsafe impl JRefTarget for StaticCompoundShape {
+    type JRefRaw = ffi::StaticCompoundShape;
 
-impl RefStaticCompoundShape {
     #[inline]
-    fn as_ref(&self) -> &ffi::StaticCompoundShape {
-        unsafe { self.0.as_ref_t::<ffi::StaticCompoundShape>() }
+    fn name() -> &'static str {
+        "StaticCompoundShape"
     }
 
     #[inline]
-    fn as_mut(&mut self) -> Pin<&mut ffi::StaticCompoundShape> {
-        unsafe { self.0.as_mut_t::<ffi::StaticCompoundShape>() }
+    fn from_ptr(raw: *const ffi::StaticCompoundShape) -> *const Self {
+        raw as *const _
     }
 
+    #[inline]
+    fn from_non_null(raw: NonNull<ffi::StaticCompoundShape>) -> NonNull<Self> {
+        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    }
+
+    #[inline]
+    unsafe fn clone_ref(&mut self) -> NonNull<Self> {
+        NonNull::new_unchecked(ffi::CloneStaticCompoundShape(&mut self.0) as *mut _)
+    }
+
+    #[inline]
+    unsafe fn drop_ref(&mut self) {
+        ffi::DropStaticCompoundShape(&mut self.0);
+    }
+
+    #[inline]
+    fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefStaticCompoundShape(&self.0) }
+    }
+}
+
+impl From<JMut<StaticCompoundShape>> for JMut<Shape> {
+    #[inline]
+    fn from(compund: JMut<StaticCompoundShape>) -> JMut<Shape> {
+        let shape = unsafe { JMut::new_unchecked(compund.0.as_ptr() as *mut _) };
+        mem::forget(compund);
+        shape
+    }
+}
+
+impl From<JRef<StaticCompoundShape>> for JRef<Shape> {
+    #[inline]
+    fn from(compund: JRef<StaticCompoundShape>) -> JRef<Shape> {
+        let shape = unsafe { JRef::new_unchecked(compund.0.as_ptr() as *mut _) };
+        mem::forget(compund);
+        shape
+    }
+}
+
+shape_methods!(StaticCompoundShape);
+
+impl StaticCompoundShape {
     #[inline]
     pub fn get_num_sub_shapes(&self) -> u32 {
         self.as_ref().GetNumSubShapes()
     }
 
     #[inline]
-    pub fn get_sub_shape(&self, idx: u32) -> &SubShape {
-        unsafe { mem::transmute(self.as_ref().GetSubShape(idx)) }
+    pub fn get_sub_shape(&self, idx: u32) -> &CompoundSubShape {
+        unsafe { self.as_ref().GetSubShape(idx) }
     }
 
     #[inline]
@@ -1130,45 +1433,82 @@ impl RefStaticCompoundShape {
     }
 
     #[inline]
-    pub unsafe fn set_compound_user_data(&mut self, idx: u32, data: u32) {
+    pub fn set_compound_user_data(&mut self, idx: u32, data: u32) {
         self.as_mut().SetCompoundUserData(idx, data);
     }
 }
 
-/// In C++ code, Shape* is actually a smart pointer with a reference count.
-/// Currently, we don't have a perfect representation of this in Rust.
-/// So we're marking all `&mut self` functions as unsafe for now.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RefMutableCompoundShape(RefShape);
+pub struct MutableCompoundShape(pub(crate) ffi::MutableCompoundShape);
 
-impl From<RefMutableCompoundShape> for RefShape {
-    #[inline]
-    fn from(shape: RefMutableCompoundShape) -> RefShape {
-        shape.0
+impl fmt::Debug for MutableCompoundShape {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MutableCompoundShape").finish()
     }
 }
 
-shape_methods!(RefMutableCompoundShape);
+unsafe impl JRefTarget for MutableCompoundShape {
+    type JRefRaw = ffi::MutableCompoundShape;
 
-impl RefMutableCompoundShape {
     #[inline]
-    fn as_ref(&self) -> &ffi::MutableCompoundShape {
-        unsafe { self.0.as_ref_t::<ffi::MutableCompoundShape>() }
+    fn name() -> &'static str {
+        "MutableCompoundShape"
     }
 
     #[inline]
-    fn as_mut(&mut self) -> Pin<&mut ffi::MutableCompoundShape> {
-        unsafe { self.0.as_mut_t::<ffi::MutableCompoundShape>() }
+    fn from_ptr(raw: *const ffi::MutableCompoundShape) -> *const MutableCompoundShape {
+        raw as *const _
     }
 
+    #[inline]
+    fn from_non_null(raw: NonNull<ffi::MutableCompoundShape>) -> NonNull<MutableCompoundShape> {
+        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    }
+
+    #[inline]
+    unsafe fn clone_ref(&mut self) -> NonNull<MutableCompoundShape> {
+        NonNull::new_unchecked(ffi::CloneMutableCompoundShape(&mut self.0) as *mut _)
+    }
+
+    #[inline]
+    unsafe fn drop_ref(&mut self) {
+        ffi::DropMutableCompoundShape(&mut self.0);
+    }
+
+    #[inline]
+    fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefMutableCompoundShape(&self.0) }
+    }
+}
+
+impl From<JMut<MutableCompoundShape>> for JMut<Shape> {
+    #[inline]
+    fn from(compund: JMut<MutableCompoundShape>) -> JMut<Shape> {
+        let shape = unsafe { JMut::new_unchecked(compund.0.as_ptr() as *mut _) };
+        mem::forget(compund);
+        shape
+    }
+}
+
+impl From<JRef<MutableCompoundShape>> for JRef<Shape> {
+    #[inline]
+    fn from(compund: JRef<MutableCompoundShape>) -> JRef<Shape> {
+        let shape = unsafe { JRef::new_unchecked(compund.0.as_ptr() as *mut _) };
+        mem::forget(compund);
+        shape
+    }
+}
+
+shape_methods!(MutableCompoundShape);
+
+impl MutableCompoundShape {
     #[inline]
     pub fn get_num_sub_shapes(&self) -> u32 {
         self.as_ref().GetNumSubShapes()
     }
 
     #[inline]
-    pub fn get_sub_shape(&self, idx: u32) -> &SubShape {
-        unsafe { mem::transmute(self.as_ref().GetSubShape(idx)) }
+    pub fn get_sub_shape(&self, idx: u32) -> &CompoundSubShape {
+        unsafe { self.as_ref().GetSubShape(idx) }
     }
 
     #[inline]
@@ -1177,58 +1517,88 @@ impl RefMutableCompoundShape {
     }
 
     #[inline]
-    pub unsafe fn set_compound_user_data(&mut self, idx: u32, data: u32) {
+    pub fn set_compound_user_data(&mut self, idx: u32, data: u32) {
         self.as_mut().SetCompoundUserData(idx, data);
     }
 
     #[inline]
-    pub unsafe fn add_shape(&mut self, position: Vec3A, rotation: Quat, shape: &RefShape, user_data: u32) -> u32 {
+    pub fn add_shape(&mut self, position: Vec3A, rotation: Quat, shape: &Shape, user_data: u32) -> u32 {
         unsafe {
             self.as_mut()
-                .AddShape(position.into(), rotation.into(), shape.as_ptr(), user_data)
+                .AddShape(position.into(), rotation.into(), &shape.0, user_data)
         }
     }
 
     #[inline]
-    pub unsafe fn remove_shape(&mut self, index: u32) {
+    pub fn remove_shape(&mut self, index: u32) {
         self.as_mut().RemoveShape(index);
     }
 
     #[inline]
-    pub unsafe fn modify_shape(&mut self, index: u32, position: Vec3A, rotation: Quat) {
+    pub fn modify_shape(&mut self, index: u32, position: Vec3A, rotation: Quat) {
         self.as_mut().ModifyShape(index, position.into(), rotation.into());
     }
 
     #[inline]
-    pub unsafe fn modify_shape_ex(&mut self, index: u32, position: Vec3A, rotation: Quat, shape: &RefShape) {
+    pub fn modify_shape_ex(&mut self, index: u32, position: Vec3A, rotation: Quat, shape: &Shape) {
         unsafe {
             self.as_mut()
-                .ModifyShapeEx(index, position.into(), rotation.into(), shape.as_ptr())
+                .ModifyShapeEx(index, position.into(), rotation.into(), &shape.0)
         }
     }
 
     #[inline]
-    pub unsafe fn adjust_center_of_mass(&mut self) {
+    pub fn adjust_center_of_mass(&mut self) {
         self.as_mut().AdjustCenterOfMass();
     }
 
     #[inline]
-    pub unsafe fn modify_shapes(&mut self, sub_shape_start_idx: u32, position: &[Vec3A], rotation: &[Quat]) {
+    pub fn modify_shapes(&mut self, sub_shape_start_idx: u32, position: &[Vec3A], rotation: &[Quat]) {
         let count = usize::min(position.len(), rotation.len()) as u32;
         unsafe {
             self.as_mut().ModifyShapes(
                 sub_shape_start_idx,
                 count,
-                position.as_ptr() as *const XVec3,
-                rotation.as_ptr() as *const XQuat,
+                position.as_ptr() as *const JVec3,
+                rotation.as_ptr() as *const JQuat,
                 mem::size_of::<Vec3A>() as u32,
                 mem::size_of::<Quat>() as u32,
             );
         }
     }
 
+    #[cfg(features = "glam-ext")]
     #[inline]
-    pub unsafe fn modify_shapes_ex(
+    pub fn modify_shapes_by_isometry(&mut self, sub_shape_start_idx: u32, transform: &[Isometry3A]) {
+        unsafe {
+            self.as_mut().ModifyShapes(
+                sub_shape_start_idx,
+                transform.len() as u32,
+                (&transform[0].translation as *const _) as *const JVec3,
+                (&transform[0].rotation as *const _) as *const JQuat,
+                mem::size_of::<Isometry3A>() as u32,
+                mem::size_of::<Isometry3A>() as u32,
+            );
+        }
+    }
+
+    #[cfg(features = "glam-ext")]
+    #[inline]
+    pub fn modify_shapes_by_transform(&mut self, sub_shape_start_idx: u32, transform: &[Transform3A]) {
+        unsafe {
+            self.as_mut().ModifyShapes(
+                sub_shape_start_idx,
+                transform.len() as u32,
+                (&transform[0].translation as *const _) as *const JVec3,
+                (&transform[0].rotation as *const _) as *const JQuat,
+                mem::size_of::<Transform3A>() as u32,
+                mem::size_of::<Transform3A>() as u32,
+            );
+        }
+    }
+
+    #[inline]
+    pub unsafe fn modify_shapes_unsafe(
         &mut self,
         sub_shape_start_idx: u32,
         position_ptr: *const Vec3A,
@@ -1240,8 +1610,8 @@ impl RefMutableCompoundShape {
         self.as_mut().ModifyShapes(
             sub_shape_start_idx,
             count,
-            position_ptr as *const XVec3,
-            rotation_ptr as *const XQuat,
+            position_ptr as *const JVec3,
+            rotation_ptr as *const JQuat,
             position_stride,
             rotation_stride,
         );
