@@ -1,118 +1,107 @@
+use cxx::{kind, type_id, ExternType};
 use glam::{Mat4, Quat, Vec3A};
+use jolt_macros::vtable;
 use static_assertions::const_assert_eq;
-use std::mem;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::ptr::NonNull;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::{fmt, mem, ptr};
 
-use crate::base::*;
+use crate::base::{
+    AABox, BodyID, BodyType, BroadPhaseLayer, JQuat, JVec3, MotionQuality, MotionType, ObjectLayer, StaticArray,
+    SubShapeID, ValidateResult,
+};
+use crate::body::{Body, BodyCreationSettings};
 use crate::error::{JoltError, JoltResult};
+use crate::shape::Shape;
+use crate::vtable::{VBox, VPair};
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum BodyType {
-        RigidBody,
-        SoftBody,
-    }
-
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum MotionType {
-        Static,
-        Kinematic,
-        Dynamic,
-    }
-
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum MotionQuality {
-        Discrete,
-        LinearCast,
-    }
-
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum AllowedDOFs {
-        None = 0b000000,
-        All = 0b111111,
-        TranslationX = 0b000001,
-        TranslationY = 0b000010,
-        TranslationZ = 0b000100,
-        RotationX = 0b001000,
-        RotationY = 0b010000,
-        RotationZ = 0b100000,
-        Plane2D = 0b100011,
-    }
-
-    #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum OverrideMassProperties {
-        CalculateMassAndInertia,
-        CalculateInertia,
-        MassAndInertiaProvided,
-    }
-
-    #[repr(u32)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum Activation {
-        Activate,
-        DontActivate,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum RsEventType {
-        Start,
-        Stop,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    struct RsHitEvent {
-        event: RsEventType,
-        body_id: BodyID,
-        hit_id: BodyID,
-    }
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    struct RsSensorEvent {
-        event: RsEventType,
-        sensor_id: BodyID,
-        object_id: BodyID,
-    }
-
-    extern "Rust" {
-        type XContactCollector;
-        fn start_hit_event(self: &mut XContactCollector, body_id: BodyID, hit_id: BodyID);
-        fn stop_hit_event(self: &mut XContactCollector, body_id: BodyID, hit_id: BodyID);
-        fn start_sensor_event(self: &mut XContactCollector, sensor_id: BodyID, object_id: BodyID);
-        fn stop_sensor_event(self: &mut XContactCollector, sensor_id: BodyID, object_id: BodyID);
-    }
-
     unsafe extern "C++" {
         include!("rust/cxx.h");
         include!("jolt-physics-rs/src/ffi.h");
 
+        type BodyType = crate::base::ffi::BodyType;
+        type MotionType = crate::base::ffi::MotionType;
+        type MotionQuality = crate::base::ffi::MotionQuality;
+        type Activation = crate::base::ffi::Activation;
+
         type Vec3 = crate::base::ffi::Vec3;
         type Quat = crate::base::ffi::Quat;
         type Mat44 = crate::base::ffi::Mat44;
+        type AABox = crate::base::ffi::AABox;
         type BodyID = crate::base::ffi::BodyID;
-        type Shape = crate::base::ffi::Shape;
+        type Shape = crate::shape::ffi::Shape;
 
-        type BodyType;
-        type MotionType;
-        type MotionQuality;
-        type AllowedDOFs;
-        type OverrideMassProperties;
-        type Activation;
+        type PhysicsSettings = crate::system::PhysicsSettings;
+        type XBodyStats = crate::system::BodyStats;
+        #[allow(dead_code)]
+        type CollideShapeResult = crate::system::CollideShapeResult;
+        #[allow(dead_code)]
+        type ContactManifold = crate::system::ContactManifold;
+        #[allow(dead_code)]
+        type ContactSettings = crate::system::ContactSettings;
+        #[allow(dead_code)]
+        type SubShapeIDPair = crate::system::SubShapeIDPair;
+
+        type BroadPhaseLayerInterface;
+        type ObjectVsBroadPhaseLayerFilter;
+        type ObjectLayerPairFilter;
+        type BodyActivationListener;
+        type ContactListener;
 
         fn GlobalInitialize();
         fn GlobalFinalize();
 
-        type XPhysicsSystem = crate::base::ffi::XPhysicsSystem;
-        unsafe fn CreatePhysicSystem(contacts: *mut XContactCollector) -> *mut XPhysicsSystem;
-        fn Prepare(self: Pin<&mut XPhysicsSystem>);
+        type XPhysicsSystem;
+        unsafe fn CreatePhysicSystem(
+            bpli: &BroadPhaseLayerInterface,
+            obplf: &ObjectVsBroadPhaseLayerFilter,
+            olpf: &ObjectLayerPairFilter,
+        ) -> *mut XPhysicsSystem;
+        unsafe fn DropXPhysicsSystem(system: *mut XPhysicsSystem);
+        unsafe fn CloneXPhysicsSystem(system: *mut XPhysicsSystem) -> *mut XPhysicsSystem;
+        unsafe fn CountRefXPhysicsSystem(system: *const XPhysicsSystem) -> u32;
+        fn GetPhysicsSystem(self: Pin<&mut XPhysicsSystem>) -> *mut PhysicsSystem;
         fn Update(self: Pin<&mut XPhysicsSystem>, delta: f32) -> u32;
-        fn GetGravity(self: &XPhysicsSystem) -> Vec3;
+        fn GetBodies(self: &XPhysicsSystem, bodies: &mut Vec<BodyID>);
+        fn GetActiveBodies(self: &XPhysicsSystem, body_type: BodyType, bodies: &mut Vec<BodyID>);
+
+        type PhysicsSystem;
+        unsafe fn SetBodyActivationListener(self: Pin<&mut PhysicsSystem>, listener: *mut BodyActivationListener);
+        unsafe fn GetBodyActivationListener(self: &PhysicsSystem) -> *mut BodyActivationListener;
+        unsafe fn SetContactListener(self: Pin<&mut PhysicsSystem>, inListener: *mut ContactListener);
+        unsafe fn GetContactListener(self: &PhysicsSystem) -> *mut ContactListener;
+        // void SetSoftBodyContactListener(SoftBodyContactListener *inListener);
+        // SoftBodyContactListener* GetSoftBodyContactListener() const;
+        // void SetCombineFriction(ContactConstraintManager::CombineFunction inCombineFriction);
+        // ContactConstraintManager::CombineFunction GetCombineFriction() const;
+        // void SetCombineRestitution(ContactConstraintManager::CombineFunction inCombineRestition);
+        // ContactConstraintManager::CombineFunction GetCombineRestitution() const;
+        fn SetPhysicsSettings(self: Pin<&mut PhysicsSystem>, settings: &PhysicsSettings);
+        fn GetPhysicsSettings(self: &PhysicsSystem) -> &PhysicsSettings;
+        // const BodyInterface& GetBodyInterface() const;
+        // BodyInterface& GetBodyInterface();
+        // const BodyInterface& GetBodyInterfaceNoLock() const;
+        // BodyInterface& GetBodyInterfaceNoLock();
+        // inline const BodyLockInterfaceNoLock& GetBodyLockInterfaceNoLock() const;
+        // inline const BodyLockInterfaceLocking& GetBodyLockInterface() const;
+        // const BroadPhaseQuery & GetBroadPhaseQuery() const;
+        // const NarrowPhaseQuery & GetNarrowPhaseQuery() const;
+        // const NarrowPhaseQuery & GetNarrowPhaseQueryNoLock() const;
+        fn OptimizeBroadPhase(self: Pin<&mut PhysicsSystem>);
+        fn GetGravity(self: &PhysicsSystem) -> Vec3;
+        fn SetGravity(self: Pin<&mut PhysicsSystem>, gravity: Vec3);
+        // void AddStepListener(PhysicsStepListener *inListener);
+        // void RemoveStepListener(PhysicsStepListener *inListener);
+        fn GetNumBodies(self: &PhysicsSystem) -> u32;
+        fn GetNumActiveBodies(self: &PhysicsSystem, body_type: BodyType) -> u32;
+        fn GetMaxBodies(self: &PhysicsSystem) -> u32;
+        fn GetBodyStats(self: &PhysicsSystem) -> XBodyStats;
+        fn WereBodiesInContact(self: &PhysicsSystem, body1: &BodyID, body2: &BodyID) -> bool;
+        fn GetBounds(self: &PhysicsSystem) -> AABox;
 
         type XBodyInterface;
         unsafe fn CreateBodyInterface(system: *mut XPhysicsSystem, lock: bool) -> *mut XBodyInterface;
@@ -153,8 +142,8 @@ pub(crate) mod ffi {
             activation: Activation,
         );
 
-        fn SetObjectLayer(self: Pin<&mut XBodyInterface>, body_id: &BodyID, layer: u16);
-        fn GetObjectLayer(self: &XBodyInterface, body_id: &BodyID) -> u16;
+        fn SetObjectLayer(self: Pin<&mut XBodyInterface>, body_id: &BodyID, layer: u32);
+        fn GetObjectLayer(self: &XBodyInterface, body_id: &BodyID) -> u32;
 
         fn SetPositionAndRotation(
             self: Pin<&mut XBodyInterface>,
@@ -274,170 +263,199 @@ pub(crate) mod ffi {
     }
 }
 
-pub type BodyType = ffi::BodyType;
-pub type MotionType = ffi::MotionType;
-pub type MotionQuality = ffi::MotionQuality;
-pub type AllowedDOFs = ffi::AllowedDOFs;
-pub type OverrideMassProperties = ffi::OverrideMassProperties;
-
-impl From<bool> for ffi::Activation {
-    #[inline]
-    fn from(value: bool) -> ffi::Activation {
-        if value {
-            ffi::Activation::Activate
-        } else {
-            ffi::Activation::DontActivate
-        }
-    }
-}
-
 #[repr(C)]
-#[derive(Debug, Clone)]
-pub struct CollisionGroup {
-    _group_filter: usize,
-    _group_id: u32,
-    _sub_group_id: u32,
-}
-const_assert_eq!(mem::size_of::<CollisionGroup>(), 16);
-
-impl Default for CollisionGroup {
-    fn default() -> CollisionGroup {
-        CollisionGroup {
-            _group_filter: 0,
-            _group_id: 0xFFFF_FFFF,
-            _sub_group_id: 0xFFFF_FFFF,
-        }
-    }
-}
-
-#[repr(C)]
-#[derive(Debug, Default, Clone)]
-pub struct MassProperties {
-    pub mass: f32,
-    pub inertia: Mat4,
-}
-const_assert_eq!(mem::size_of::<MassProperties>(), 80);
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct BodySettings {
-    pub position: Vec3A,
-    pub rotation: Quat,
-    pub linear_velocity: Vec3A,
-    pub angular_velocity: Vec3A,
-    pub user_data: u64,
-    pub object_layer: u16,
-    _collision_group: CollisionGroup,
-    pub motion_type: MotionType,
-    pub allowed_dofs: AllowedDOFs,
-    pub allow_dynamic_kinematic: bool,
-    pub is_sensor: bool,
-    pub collide_kinematic_vs_non_dynamic: bool,
+#[derive(Debug, Clone, Copy)]
+pub struct PhysicsSettings {
+    pub max_in_flight_body_pairs: i32,
+    pub step_listeners_batch_size: i32,
+    pub step_listener_batches_per_job: i32,
+    pub baumgarte: f32,
+    pub speculative_contact_distance: f32,
+    pub penetration_slop: f32,
+    pub linear_cast_threshold: f32,
+    pub linear_cast_max_penetration: f32,
+    pub manifold_tolerance_sq: f32,
+    pub max_penetration_distance: f32,
+    pub body_pair_cache_max_delta_position_sq: f32,
+    pub body_pair_cache_cos_max_delta_rotation_div2: f32,
+    pub contact_normal_cos_max_delta_rotation: f32,
+    pub contact_point_preserve_lambda_max_dist_sq: f32,
+    pub num_velocity_steps: u32,
+    pub num_position_steps: u32,
+    pub min_velocity_for_restitution: f32,
+    pub time_before_sleep: f32,
+    pub point_velocity_sleep_threshold: f32,
+    pub deterministic_simulation: bool,
+    pub constraint_warm_start: bool,
+    pub use_body_pair_contact_cache: bool,
     pub use_manifold_reduction: bool,
-    pub apply_gyroscopic_force: bool,
-    pub motion_quality: MotionQuality,
-    pub enhance_internal_edge_removal: bool,
+    pub use_large_island_splitter: bool,
     pub allow_sleeping: bool,
-    pub friction: f32,
-    pub restitution: f32,
-    pub linear_damping: f32,
-    pub angular_damping: f32,
-    pub max_linear_velocity: f32,
-    pub max_angular_velocity: f32,
-    pub gravity_factor: f32,
-    pub num_velocity_steps_override: u32,
-    pub num_position_steps_override: u32,
-    pub override_mass_properties: OverrideMassProperties,
-    pub inertia_multiplier: f32,
-    pub mass_properties: MassProperties,
-    _shape_settings: usize,
-    pub shape: Option<RefShape>,
+    pub check_active_edges: bool,
 }
-const_assert_eq!(mem::size_of::<BodySettings>(), 256);
+const_assert_eq!(mem::size_of::<PhysicsSettings>(), 84);
 
-impl Default for BodySettings {
-    fn default() -> BodySettings {
-        BodySettings {
-            position: Vec3A::ZERO,
-            rotation: Quat::IDENTITY,
-            linear_velocity: Vec3A::ZERO,
-            angular_velocity: Vec3A::ZERO,
-            user_data: 0,
-            object_layer: 0,
-            _collision_group: CollisionGroup::default(),
-            motion_type: MotionType::Dynamic,
-            allowed_dofs: AllowedDOFs::All,
-            allow_dynamic_kinematic: false,
-            is_sensor: false,
-            collide_kinematic_vs_non_dynamic: false,
+unsafe impl ExternType for PhysicsSettings {
+    type Id = type_id!("PhysicsSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for PhysicsSettings {
+    fn default() -> Self {
+        PhysicsSettings {
+            max_in_flight_body_pairs: 16384,
+            step_listeners_batch_size: 8,
+            step_listener_batches_per_job: 1,
+            baumgarte: 0.2,
+            speculative_contact_distance: 0.02,
+            penetration_slop: 0.02,
+            linear_cast_threshold: 0.75,
+            linear_cast_max_penetration: 0.25,
+            manifold_tolerance_sq: 1.0e-6,
+            max_penetration_distance: 0.2,
+            body_pair_cache_max_delta_position_sq: 0.001 * 0.001,
+            body_pair_cache_cos_max_delta_rotation_div2: 0.99984769515639123915701155881391, // cos(2 degrees / 2)
+            contact_normal_cos_max_delta_rotation: 0.99619469809174553229501040247389,       // cos(5 degree)
+            contact_point_preserve_lambda_max_dist_sq: 0.01 * 0.01,
+            num_velocity_steps: 10,
+            num_position_steps: 2,
+            min_velocity_for_restitution: 1.0,
+            time_before_sleep: 0.5,
+            point_velocity_sleep_threshold: 0.03,
+            deterministic_simulation: true,
+            constraint_warm_start: true,
+            use_body_pair_contact_cache: true,
             use_manifold_reduction: true,
-            apply_gyroscopic_force: false,
-            motion_quality: MotionQuality::Discrete,
-            enhance_internal_edge_removal: false,
+            use_large_island_splitter: true,
             allow_sleeping: true,
-            friction: 0.2,
-            restitution: 0.0,
-            linear_damping: 0.05,
-            angular_damping: 0.05,
-            max_linear_velocity: 500.0,
-            max_angular_velocity: 0.25 * std::f32::consts::PI * 60.0,
-            gravity_factor: 1.0,
-            num_velocity_steps_override: 0,
-            num_position_steps_override: 0,
-            override_mass_properties: OverrideMassProperties::CalculateMassAndInertia,
-            inertia_multiplier: 1.0,
-            mass_properties: MassProperties::default(),
-            _shape_settings: 0,
-            shape: None,
+            check_active_edges: true,
         }
     }
 }
 
-impl BodySettings {
-    pub fn new(shape: RefShape, layer: u16, motion_type: MotionType, position: Vec3A, rotation: Quat) -> BodySettings {
-        BodySettings {
-            position,
-            rotation,
-            object_layer: layer,
-            motion_type,
-            shape: Some(shape),
-            ..Default::default()
-        }
-    }
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BodyStats {
+    pub num_bodies: u32,
+    pub max_bodies: u32,
+    pub num_bodies_static: u32,
+    pub num_bodies_dynamic: u32,
+    pub num_bodies_active_dynamic: u32,
+    pub num_bodies_kinematic: u32,
+    pub num_bodies_active_kinematic: u32,
+    pub num_bodies_soft: u32,
+    pub num_bodies_active_soft: u32,
+}
+const_assert_eq!(mem::size_of::<BodyStats>(), 36);
 
-    pub fn new_static(shape: RefShape, layer: u16, position: Vec3A, rotation: Quat) -> BodySettings {
-        BodySettings {
-            position,
-            rotation,
-            object_layer: layer,
-            motion_type: MotionType::Static,
-            shape: Some(shape),
-            ..Default::default()
-        }
-    }
+unsafe impl ExternType for BodyStats {
+    type Id = type_id!("XBodyStats");
+    type Kind = kind::Trivial;
+}
 
-    pub fn new_sensor(
-        shape: RefShape,
-        layer: u16,
-        motion_type: MotionType,
-        position: Vec3A,
-        rotation: Quat,
-    ) -> BodySettings {
-        BodySettings {
-            position,
-            rotation,
-            object_layer: layer,
-            motion_type,
-            is_sensor: true,
-            shape: Some(shape),
-            ..Default::default()
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct CollideShapeResult {
+    pub contact_point1: Vec3A,
+    pub contact_point2: Vec3A,
+    pub penetration_axis: Vec3A,
+    pub penetration_depth: f32,
+    pub sub_shape_id1: SubShapeID,
+    pub sub_shape_id2: SubShapeID,
+    pub body_id2: BodyID,
+    pub shape1_face: StaticArray<Vec3A, 32>,
+    pub shape2_face: StaticArray<Vec3A, 32>,
+}
+const_assert_eq!(mem::size_of::<CollideShapeResult>(), 1120);
+
+unsafe impl ExternType for CollideShapeResult {
+    type Id = type_id!("CollideShapeResult");
+    type Kind = kind::Trivial;
+}
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct ContactManifold {
+    pub base_offset: Vec3A,
+    pub world_space_normal: Vec3A,
+    pub penetration_depth: f32,
+    pub sub_shape_id1: SubShapeID,
+    pub sub_shape_id2: SubShapeID,
+    pub relative_contact_points_on1: StaticArray<Vec3A, 64>,
+    pub relative_contact_points_on2: StaticArray<Vec3A, 64>,
+}
+const_assert_eq!(mem::size_of::<ContactManifold>(), 2128);
+
+unsafe impl ExternType for ContactManifold {
+    type Id = type_id!("ContactManifold");
+    type Kind = kind::Trivial;
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct ContactSettings {
+    pub combined_friction: f32,
+    pub combined_restitution: f32,
+    pub inv_mass_scale1: f32,
+    pub inv_inertia_scale1: f32,
+    pub inv_mass_scale2: f32,
+    pub inv_inertia_scale2: f32,
+    pub is_sensor: bool,
+    pub relative_linear_surface_velocity: Vec3A,
+    pub relative_angular_surface_velocity: Vec3A,
+}
+const_assert_eq!(mem::size_of::<ContactSettings>(), 64);
+
+unsafe impl ExternType for ContactSettings {
+    type Id = type_id!("ContactSettings");
+    type Kind = kind::Trivial;
+}
+
+impl Default for ContactSettings {
+    fn default() -> Self {
+        Self {
+            combined_friction: 0.0,
+            combined_restitution: 0.0,
+            inv_mass_scale1: 1.0,
+            inv_inertia_scale1: 1.0,
+            inv_mass_scale2: 1.0,
+            inv_inertia_scale2: 1.0,
+            is_sensor: false,
+            relative_linear_surface_velocity: Vec3A::ZERO,
+            relative_angular_surface_velocity: Vec3A::ZERO,
         }
     }
 }
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct SubShapeIDPair {
+    pub body1_id: BodyID,
+    pub body2_id: BodyID,
+    pub sub_shape_id1: SubShapeID,
+    pub sub_shape_id2: SubShapeID,
+}
+const_assert_eq!(mem::size_of::<SubShapeIDPair>(), 16);
+
+unsafe impl ExternType for SubShapeIDPair {
+    type Id = type_id!("SubShapeIDPair");
+    type Kind = kind::Trivial;
+}
+
+//
+// Global Init
+//
+
+static JOLT_INITED: AtomicBool = AtomicBool::new(false);
 
 #[inline]
 pub fn global_initialize() {
-    ffi::GlobalInitialize();
+    if JOLT_INITED
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        ffi::GlobalInitialize();
+    }
 }
 
 #[inline]
@@ -449,39 +467,204 @@ pub fn global_finalize() {
 // PhysicsSystem
 //
 
-pub struct PhysicsSystem {
-    contacts: XContactCollector,
-    system: RefPhysicsSystem,
+pub struct PhysicsSystem<CL: ContactListener = (), BAL: BodyActivationListener = ()> {
+    inner: Box<PhysicsSystemInner>,
+    cl_phantom: PhantomData<CL>,
+    bal_phantom: PhantomData<BAL>,
 }
 
-impl PhysicsSystem {
-    pub fn new() -> Box<PhysicsSystem> {
-        let mut system = Box::new(PhysicsSystem {
-            contacts: XContactCollector::new(256, 128),
-            system: unsafe { mem::transmute::<usize, RefPhysicsSystem>(usize::MAX) },
-        });
-        unsafe { system.system.0 = NonNull::new_unchecked(ffi::CreatePhysicSystem(&mut system.contacts)) };
-        system
+struct PhysicsSystemInner {
+    x_system: NonNull<ffi::XPhysicsSystem>,
+    raw_system: NonNull<ffi::PhysicsSystem>,
+
+    bpli_ptr: *mut u8,
+    bpli_cleanup: fn(ptr: *mut u8),
+    obplf_ptr: *mut u8,
+    obplfcleanupr: fn(ptr: *mut u8),
+    olpf_ptr: *mut u8,
+    olpf_cleanup: fn(ptr: *mut u8),
+}
+
+impl<CL: ContactListener, BAL: BodyActivationListener> fmt::Debug for PhysicsSystem<CL, BAL> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PhysicsSystem").finish()
+    }
+}
+
+impl<CL: ContactListener, BAL: BodyActivationListener> Drop for PhysicsSystem<CL, BAL> {
+    fn drop(&mut self) {
+        #[cfg(feature = "debug-print")]
+        println!(
+            "PhysicsSystem::drop {:?} {}",
+            self.inner.x_system,
+            unsafe { ffi::CountRefXPhysicsSystem(self.as_x_ptr()) } - 1
+        );
+
+        unsafe {
+            let cl = self.as_raw_ref().GetContactListener();
+            if !cl.is_null() {
+                let _ = VBox::<CL, ContactListenerVTable>::from_raw(cl as *mut _);
+            }
+            self.as_raw_mut().SetContactListener(ptr::null_mut());
+
+            let bal = self.as_raw_ref().GetBodyActivationListener();
+            if !bal.is_null() {
+                let _ = VBox::<BAL, BodyActivationListenerVTable>::from_raw(bal as *mut _);
+            }
+            self.as_raw_mut().SetBodyActivationListener(ptr::null_mut());
+
+            ffi::DropXPhysicsSystem(self.as_x_ptr());
+        }
+
+        if !self.inner.bpli_ptr.is_null() {
+            (self.inner.bpli_cleanup)(self.inner.bpli_ptr);
+            self.inner.bpli_ptr = ptr::null_mut();
+        }
+        if !self.inner.obplf_ptr.is_null() {
+            (self.inner.obplfcleanupr)(self.inner.obplf_ptr);
+            self.inner.obplf_ptr = ptr::null_mut();
+        }
+        if !self.inner.olpf_ptr.is_null() {
+            (self.inner.olpf_cleanup)(self.inner.olpf_ptr);
+            self.inner.olpf_ptr = ptr::null_mut();
+        }
+    }
+}
+
+impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
+    pub fn new<BPLI: BroadPhaseLayerInterface, OBPLF: ObjectVsBroadPhaseLayerFilter, OLPF: ObjectLayerPairFilter>(
+        bpli: VBox<BPLI, BroadPhaseLayerInterfaceVTable>,
+        obplf: VBox<OBPLF, ObjectVsBroadPhaseLayerFilterVTable>,
+        olpf: VBox<OLPF, ObjectLayerPairFilterVTable>,
+    ) -> PhysicsSystem<CL, BAL> {
+        unsafe {
+            let bpli_ptr = Box::into_raw(bpli) as *mut u8;
+            let obplf_ptr = Box::into_raw(obplf) as *mut u8;
+            let olpf_ptr = Box::into_raw(olpf) as *mut u8;
+
+            let mut x_system = NonNull::new_unchecked(ffi::CreatePhysicSystem(
+                &*(bpli_ptr as *mut _),
+                &*(obplf_ptr as *mut _),
+                &*(olpf_ptr as *mut _),
+            ));
+            let pin_system = Pin::new_unchecked(x_system.as_mut());
+            let raw_system = NonNull::new_unchecked(pin_system.GetPhysicsSystem());
+
+            fn bpli_cleanup<BPLI: BroadPhaseLayerInterface>(ptr: *mut u8) {
+                let _ = unsafe { VBox::<BPLI, BroadPhaseLayerInterfaceVTable>::from_raw(ptr as *mut _) };
+            }
+
+            fn obplf_cleanupr<OBPLF: ObjectVsBroadPhaseLayerFilter>(ptr: *mut u8) {
+                let _ = unsafe { VBox::<OBPLF, ObjectVsBroadPhaseLayerFilterVTable>::from_raw(ptr as *mut _) };
+            }
+
+            fn olpf_cleanup<OLPF: ObjectLayerPairFilter>(ptr: *mut u8) {
+                let _ = unsafe { VBox::<OLPF, ObjectLayerPairFilterVTable>::from_raw(ptr as *mut _) };
+            }
+
+            PhysicsSystem {
+                inner: Box::new(PhysicsSystemInner {
+                    x_system,
+                    raw_system,
+                    bpli_ptr,
+                    bpli_cleanup: bpli_cleanup::<BPLI>,
+                    obplf_ptr,
+                    obplfcleanupr: obplf_cleanupr::<OBPLF>,
+                    olpf_ptr,
+                    olpf_cleanup: olpf_cleanup::<OLPF>,
+                }),
+                cl_phantom: PhantomData,
+                bal_phantom: PhantomData,
+            }
+        }
     }
 
     #[inline]
-    pub fn inner_ref(&self) -> &RefPhysicsSystem {
-        &self.system
+    pub fn count_ref(&self) -> u32 {
+        unsafe { ffi::CountRefXPhysicsSystem(self.inner.x_system.as_ptr()) }
     }
 
     #[inline]
-    fn system(&self) -> &ffi::XPhysicsSystem {
-        self.system.as_ref()
+    fn as_x_ref(&self) -> &ffi::XPhysicsSystem {
+        unsafe { self.inner.x_system.as_ref() }
     }
 
     #[inline]
-    fn system_mut(&mut self) -> Pin<&mut ffi::XPhysicsSystem> {
-        unsafe { Pin::new_unchecked(self.system.as_mut()) }
+    fn as_x_mut(&mut self) -> Pin<&mut ffi::XPhysicsSystem> {
+        unsafe { Pin::new_unchecked(self.inner.x_system.as_mut()) }
     }
 
     #[inline]
-    pub(crate) fn system_ptr(&mut self) -> *mut ffi::XPhysicsSystem {
-        self.system.as_mut_ptr()
+    pub(crate) fn as_x_ptr(&self) -> *mut ffi::XPhysicsSystem {
+        self.inner.x_system.as_ptr()
+    }
+
+    #[inline]
+    fn as_raw_ref(&self) -> &ffi::PhysicsSystem {
+        unsafe { self.inner.raw_system.as_ref() }
+    }
+
+    #[inline]
+    fn as_raw_mut(&mut self) -> Pin<&mut ffi::PhysicsSystem> {
+        unsafe { Pin::new_unchecked(self.inner.raw_system.as_mut()) }
+    }
+
+    pub unsafe fn cpp_physics_system(&self) -> *mut u8 {
+        self.as_x_ptr() as *mut u8
+    }
+
+    #[inline]
+    pub fn set_body_activation_listener(&mut self, listener: Option<VBox<BAL, BodyActivationListenerVTable>>) {
+        unsafe {
+            let old = self.as_raw_ref().GetBodyActivationListener() as *mut u8;
+            if !old.is_null() {
+                let _ = VBox::<BAL, BodyActivationListenerVTable>::from_raw(old as *mut _);
+            }
+            if let Some(listener) = listener {
+                self.as_raw_mut()
+                    .SetBodyActivationListener(VBox::<BAL, BodyActivationListenerVTable>::into_raw(listener) as *mut _);
+            } else {
+                self.as_raw_mut().SetBodyActivationListener(ptr::null_mut());
+            }
+        };
+    }
+
+    #[inline]
+    pub fn get_body_activation_listener(&self) -> Option<&VPair<BAL, BodyActivationListenerVTable>> {
+        unsafe {
+            let current = self.as_raw_ref().GetBodyActivationListener() as *const u8;
+            match current.is_null() {
+                true => None,
+                false => Some(&*(current as *const _)),
+            }
+        }
+    }
+
+    #[inline]
+    pub fn set_contact_listener(&mut self, listener: Option<VBox<CL, ContactListenerVTable>>) {
+        unsafe {
+            let old = self.as_raw_ref().GetContactListener() as *mut u8;
+            if !old.is_null() {
+                let _ = VBox::<CL, ContactListenerVTable>::from_raw(old as *mut _);
+            }
+            if let Some(listener) = listener {
+                self.as_raw_mut()
+                    .SetContactListener(VBox::<CL, ContactListenerVTable>::into_raw(listener) as *mut _);
+            } else {
+                self.as_raw_mut().SetContactListener(ptr::null_mut());
+            }
+        };
+    }
+
+    #[inline]
+    pub fn get_contact_listener(&self) -> Option<&VPair<CL, ContactListenerVTable>> {
+        unsafe {
+            let current = self.as_raw_ref().GetContactListener() as *const u8;
+            match current.is_null() {
+                true => None,
+                false => Some(&*(current as *const _)),
+            }
+        }
     }
 
     #[inline]
@@ -490,90 +673,78 @@ impl PhysicsSystem {
     }
 
     #[inline]
-    pub fn prepare(&mut self) {
-        self.system_mut().Prepare()
+    pub fn set_physics_settings(&mut self, settings: &PhysicsSettings) {
+        self.as_raw_mut()
+            .SetPhysicsSettings(unsafe { mem::transmute::<&PhysicsSettings, &ffi::PhysicsSettings>(settings) });
     }
 
     #[inline]
-    pub fn update(&mut self, delta: f32) -> u32 {
-        self.contacts.clear();
-        self.system_mut().Update(delta)
+    pub fn get_physics_settings(&self) -> &PhysicsSettings {
+        unsafe { mem::transmute::<&ffi::PhysicsSettings, &PhysicsSettings>(self.as_raw_ref().GetPhysicsSettings()) }
+    }
+
+    #[inline]
+    pub fn optimize_broad_phase(&mut self) {
+        self.as_raw_mut().OptimizeBroadPhase();
     }
 
     #[inline]
     pub fn get_gravity(&self) -> Vec3A {
-        self.system().GetGravity().0
+        self.as_raw_ref().GetGravity().into()
     }
 
     #[inline]
-    pub fn hit_events(&self) -> &Vec<HitEvent> {
-        &self.contacts.hit_events
+    pub fn set_gravity(&mut self, gravity: Vec3A) {
+        self.as_raw_mut().SetGravity(gravity.into());
     }
 
     #[inline]
-    pub fn sensor_events(&self) -> &Vec<SensorEvent> {
-        &self.contacts.sensor_events
-    }
-}
-
-//
-// EventCollector
-//
-
-pub type EventType = ffi::RsEventType;
-pub type HitEvent = ffi::RsHitEvent;
-pub type SensorEvent = ffi::RsSensorEvent;
-
-pub struct XContactCollector {
-    hit_events: Vec<HitEvent>,
-    sensor_events: Vec<SensorEvent>,
-}
-
-impl XContactCollector {
-    fn new(hit_cap: usize, sensor_cap: usize) -> XContactCollector {
-        XContactCollector {
-            hit_events: Vec::with_capacity(hit_cap),
-            sensor_events: Vec::with_capacity(sensor_cap),
-        }
+    pub fn get_num_bodies(&self) -> u32 {
+        self.as_raw_ref().GetNumBodies()
     }
 
-    fn clear(&mut self) {
-        self.hit_events.clear();
-        self.sensor_events.clear();
+    #[inline]
+    pub fn get_num_active_bodies(&self, body_type: BodyType) -> u32 {
+        self.as_raw_ref().GetNumActiveBodies(body_type)
     }
 
-    fn start_hit_event(&mut self, body_id: BodyID, hit_id: BodyID) {
-        // println!("start_hit_event: {:?} {:?}", body_id, hit_id);
-        self.hit_events.push(HitEvent {
-            event: EventType::Start,
-            body_id,
-            hit_id,
-        });
+    #[inline]
+    pub fn get_max_bodies(&self) -> u32 {
+        self.as_raw_ref().GetMaxBodies()
     }
 
-    fn stop_hit_event(&mut self, body_id: BodyID, hit_id: BodyID) {
-        // println!("stop_hit_event: {:?} {:?}", body_id, hit_id);
-        self.hit_events.push(HitEvent {
-            event: EventType::Stop,
-            body_id,
-            hit_id,
-        });
+    #[inline]
+    pub fn get_body_stats(&self) -> BodyStats {
+        self.as_raw_ref().GetBodyStats()
     }
 
-    fn start_sensor_event(&mut self, sensor_id: BodyID, object_id: BodyID) {
-        self.sensor_events.push(SensorEvent {
-            event: EventType::Start,
-            sensor_id,
-            object_id,
-        });
+    #[inline]
+    pub fn were_bodies_in_contact(&self, body1: &BodyID, body2: &BodyID) -> bool {
+        self.as_raw_ref().WereBodiesInContact(body1, body2)
     }
 
-    fn stop_sensor_event(&mut self, sensor_id: BodyID, object_id: BodyID) {
-        self.sensor_events.push(SensorEvent {
-            event: EventType::Stop,
-            sensor_id,
-            object_id,
-        });
+    #[inline]
+    pub fn get_bounds(&self) -> AABox {
+        self.as_raw_ref().GetBounds()
+    }
+
+    #[inline]
+    pub fn update(&mut self, delta: f32) -> u32 {
+        self.as_x_mut().Update(delta)
+    }
+
+    #[inline]
+    pub fn get_bodies(&self) -> Vec<BodyID> {
+        let mut bodies = Vec::new();
+        self.as_x_ref().GetBodies(&mut bodies);
+        bodies
+    }
+
+    #[inline]
+    pub fn get_active_bodies(&self, body_type: BodyType) -> Vec<BodyID> {
+        let mut bodies = Vec::new();
+        self.as_x_ref().GetActiveBodies(body_type, &mut bodies);
+        bodies
     }
 }
 
@@ -584,14 +755,31 @@ impl XContactCollector {
 #[derive(Debug, Clone)]
 pub struct BodyInterface {
     body_itf: *mut ffi::XBodyInterface,
-    _system: RefPhysicsSystem,
+    _x_system: NonNull<ffi::XPhysicsSystem>,
+}
+
+impl Drop for BodyInterface {
+    fn drop(&mut self) {
+        #[cfg(feature = "debug-print")]
+        println!(
+            "BodyInterface::drop {:?} {}",
+            self._x_system,
+            unsafe { ffi::CountRefXPhysicsSystem(self._x_system.as_ptr()) } - 1
+        );
+        unsafe { ffi::DropXPhysicsSystem(self._x_system.as_ptr()) }
+    }
 }
 
 impl BodyInterface {
-    pub fn new(system: &mut PhysicsSystem, lock: bool) -> BodyInterface {
-        BodyInterface {
-            body_itf: unsafe { ffi::CreateBodyInterface(system.system_ptr(), lock) },
-            _system: system.system.clone(),
+    pub fn new<CL: ContactListener, BAL: BodyActivationListener>(
+        system: &mut PhysicsSystem<CL, BAL>,
+        lock: bool,
+    ) -> BodyInterface {
+        unsafe {
+            BodyInterface {
+                body_itf: ffi::CreateBodyInterface(system.inner.x_system.as_ptr(), lock),
+                _x_system: NonNull::new_unchecked(ffi::CloneXPhysicsSystem(system.inner.x_system.as_ptr())),
+            }
         }
     }
 
@@ -605,19 +793,19 @@ impl BodyInterface {
         unsafe { Pin::new_unchecked(&mut *self.body_itf) }
     }
 
-    pub fn create_body(&mut self, settings: &BodySettings) -> JoltResult<BodyID> {
+    pub fn create_body(&mut self, settings: &BodyCreationSettings) -> JoltResult<BodyID> {
         let body_id = self
             .as_mut()
-            .CreateBody(unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) });
+            .CreateBody(unsafe { mem::transmute::<&BodyCreationSettings, &ffi::BodyCreationSettings>(settings) });
         if body_id.is_invalid() {
             return Err(JoltError::CreateBody);
         }
         Ok(body_id)
     }
 
-    pub fn create_body_with_id(&mut self, body_id: BodyID, settings: &BodySettings) -> JoltResult<BodyID> {
+    pub fn create_body_with_id(&mut self, body_id: BodyID, settings: &BodyCreationSettings) -> JoltResult<BodyID> {
         let res_body_id = self.as_mut().CreateBodyWithID(&body_id, unsafe {
-            mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings)
+            mem::transmute::<&BodyCreationSettings, &ffi::BodyCreationSettings>(settings)
         });
         if res_body_id.is_invalid() {
             return Err(JoltError::CreateBody);
@@ -625,9 +813,9 @@ impl BodyInterface {
         Ok(res_body_id)
     }
 
-    pub fn create_add_body(&mut self, settings: &BodySettings, active: bool) -> JoltResult<BodyID> {
+    pub fn create_add_body(&mut self, settings: &BodyCreationSettings, active: bool) -> JoltResult<BodyID> {
         let body_id = self.as_mut().CreateAddBody(
-            unsafe { mem::transmute::<&BodySettings, &ffi::BodyCreationSettings>(settings) },
+            unsafe { mem::transmute::<&BodyCreationSettings, &ffi::BodyCreationSettings>(settings) },
             active.into(),
         );
         if body_id.is_invalid() {
@@ -687,10 +875,10 @@ impl BodyInterface {
     }
 
     #[inline]
-    pub fn set_shape(&mut self, body_id: BodyID, shape: &RefShape, update_mass_properties: bool, active: bool) {
+    pub fn set_shape(&mut self, body_id: BodyID, shape: &Shape, update_mass_properties: bool, active: bool) {
         unsafe {
             self.as_mut()
-                .SetShape(&body_id, shape.as_ptr(), update_mass_properties, active.into())
+                .SetShape(&body_id, &shape.0, update_mass_properties, active.into())
         }
     }
 
@@ -711,12 +899,12 @@ impl BodyInterface {
     }
 
     #[inline]
-    pub fn set_object_layer(&mut self, body_id: BodyID, layer: u16) {
+    pub fn set_object_layer(&mut self, body_id: BodyID, layer: ObjectLayer) {
         self.as_mut().SetObjectLayer(&body_id, layer)
     }
 
     #[inline]
-    pub fn get_object_layer(&self, body_id: BodyID) -> u16 {
+    pub fn get_object_layer(&self, body_id: BodyID) -> ObjectLayer {
         self.as_ref().GetObjectLayer(&body_id)
     }
 
@@ -740,11 +928,11 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_position_rotation(&self, body_id: BodyID) -> (Vec3A, Quat) {
-        let mut position = XVec3::default();
-        let mut rotation = XQuat::default();
+        let mut position = JVec3::default();
+        let mut rotation = JQuat::default();
         self.as_ref()
             .GetPositionAndRotation(&body_id, &mut position, &mut rotation);
-        (position.0, rotation.0)
+        (position.into(), rotation.into())
     }
 
     #[inline]
@@ -754,12 +942,12 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_position(&self, body_id: BodyID) -> Vec3A {
-        self.as_ref().GetPosition(&body_id).0
+        self.as_ref().GetPosition(&body_id).into()
     }
 
     #[inline]
     pub fn get_center_of_mass_position(&self, body_id: BodyID) -> Vec3A {
-        self.as_ref().GetCenterOfMassPosition(&body_id).0
+        self.as_ref().GetCenterOfMassPosition(&body_id).into()
     }
 
     #[inline]
@@ -769,17 +957,17 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_rotation(&self, body_id: BodyID) -> Quat {
-        self.as_ref().GetRotation(&body_id).0
+        self.as_ref().GetRotation(&body_id).into()
     }
 
     #[inline]
     pub fn get_world_transform(&self, body_id: BodyID) -> Mat4 {
-        self.as_ref().GetWorldTransform(&body_id).0
+        self.as_ref().GetWorldTransform(&body_id).into()
     }
 
     #[inline]
     pub fn get_center_of_mass_transform(&self, body_id: BodyID) -> Mat4 {
-        self.as_ref().GetCenterOfMassTransform(&body_id).0
+        self.as_ref().GetCenterOfMassTransform(&body_id).into()
     }
 
     #[inline]
@@ -801,11 +989,11 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_linear_and_angular_velocity(&self, body_id: BodyID) -> (Vec3A, Vec3A) {
-        let mut linear_velocity = XVec3::default();
-        let mut angular_velocity = XVec3::default();
+        let mut linear_velocity = JVec3::default();
+        let mut angular_velocity = JVec3::default();
         self.as_ref()
             .GetLinearAndAngularVelocity(&body_id, &mut linear_velocity, &mut angular_velocity);
-        (linear_velocity.0, angular_velocity.0)
+        (linear_velocity.into(), angular_velocity.into())
     }
 
     #[inline]
@@ -815,7 +1003,7 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_linear_velocity(&self, body_id: BodyID) -> Vec3A {
-        self.as_ref().GetLinearVelocity(&body_id).0
+        self.as_ref().GetLinearVelocity(&body_id).into()
     }
 
     #[inline]
@@ -841,12 +1029,12 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_angular_velocity(&self, body_id: BodyID) -> Vec3A {
-        self.as_ref().GetAngularVelocity(&body_id).0
+        self.as_ref().GetAngularVelocity(&body_id).into()
     }
 
     #[inline]
     pub fn get_point_velocity(&self, body_id: BodyID, point: Vec3A) -> Vec3A {
-        self.as_ref().GetPointVelocity(&body_id, point.into()).0
+        self.as_ref().GetPointVelocity(&body_id, point.into()).into()
     }
 
     #[inline]
@@ -957,7 +1145,7 @@ impl BodyInterface {
 
     #[inline]
     pub fn get_inverse_inertia(&self, body_id: BodyID) -> Mat4 {
-        self.as_ref().GetInverseInertia(&body_id).0
+        self.as_ref().GetInverseInertia(&body_id).into()
     }
 
     #[inline]
@@ -1014,4 +1202,63 @@ impl BodyInterface {
     pub fn invalidate_contact_cache(&mut self, body_id: BodyID) {
         self.as_mut().InvalidateContactCache(&body_id)
     }
+}
+
+#[cfg(not(feature = "profile"))]
+#[vtable]
+#[repr(C)]
+pub struct BroadPhaseLayerInterfaceVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub get_num_broad_phase_layers: extern "C" fn(*const u8) -> u32,
+    pub get_broad_phase_layer: extern "C" fn(*const u8, layer: ObjectLayer) -> BroadPhaseLayer,
+}
+
+#[cfg(feature = "profile")]
+#[vtable]
+#[repr(C)]
+pub struct BroadPhaseLayerInterfaceVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub get_num_broad_phase_layers: extern "C" fn(*const u8) -> u32,
+    pub get_broad_phase_layer: extern "C" fn(*const u8, layer: ObjectLayer) -> BroadPhaseLayer,
+    pub get_broad_phase_layer_name: extern "C" fn(*const u8, layer: ObjectLayer) -> *const char,
+}
+
+#[vtable]
+#[repr(C)]
+pub struct ObjectVsBroadPhaseLayerFilterVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub should_collide: extern "C" fn(*const u8, layer1: ObjectLayer, layer2: BroadPhaseLayer) -> bool,
+}
+
+#[vtable]
+#[repr(C)]
+pub struct ObjectLayerPairFilterVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub should_collide: extern "C" fn(*const u8, layer1: ObjectLayer, layer2: ObjectLayer) -> bool,
+}
+
+#[vtable(allow_empty)]
+#[repr(C)]
+pub struct BodyActivationListenerVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub on_body_activated: extern "C" fn(*mut u8, body: &BodyID, user_data: u64),
+    pub on_body_deactivated: extern "C" fn(*mut u8, body: &BodyID, user_data: u64),
+}
+
+#[vtable(allow_empty)]
+#[repr(C)]
+pub struct ContactListenerVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub on_contact_validate: extern "C" fn(
+        *mut u8,
+        body1: &Body,
+        body2: &Body,
+        base_offset: JVec3,
+        collision_result: &CollideShapeResult,
+    ) -> ValidateResult,
+    pub on_contact_added:
+        extern "C" fn(*mut u8, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &ContactSettings),
+    pub on_contact_persisted:
+        extern "C" fn(*mut u8, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &ContactSettings),
+    pub on_contact_removed: extern "C" fn(*mut u8, sub_shape_pair: &SubShapeIDPair),
 }
