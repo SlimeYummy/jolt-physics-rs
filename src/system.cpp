@@ -3,10 +3,11 @@
 #include "jolt-physics-rs/src/system.rs.h"
 
 static_assert(sizeof(PhysicsSettings) == 84, "PhysicsSettings size");
+static_assert(sizeof(CollideShapeResult) == 1120, "CollideShapeResult size");
+static_assert(sizeof(ContactManifold) == 2128, "ContactManifold size");
 
 // Callback for traces, connect this to your own trace function if you have one
-static void TraceImpl(const char* inFMT, ...)
-{
+static void TraceImpl(const char* inFMT, ...) {
 	// Format the message
 	va_list list;
 	va_start(list, inFMT);
@@ -19,17 +20,14 @@ static void TraceImpl(const char* inFMT, ...)
 }
 
 #ifdef JPH_ENABLE_ASSERTS
-
 // Callback for asserts, connect this to your own assert handler if you have one
-static bool AssertFailedImpl(const char* inExpression, const char* inMessage, const char* inFile, uint inLine)
-{
+static bool AssertFailedImpl(const char* inExpression, const char* inMessage, const char* inFile, uint inLine) {
 	// Print to the TTY
 	cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr ? inMessage : "") << endl;
 
 	// Breakpoint
 	return true;
 };
-
 #endif // JPH_ENABLE_ASSERTS
 
 void GlobalInitialize() {
@@ -52,7 +50,7 @@ void GlobalFinalize() {
 // PhysicsSystem
 //
 
-XPhysicsSystem::XPhysicsSystem():
+XPhysicsSystem::XPhysicsSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf):
 	_allocator(TempAllocatorImpl(10 * 1024 * 1024)),
 	_jobSys(JobSystemThreadPool(cMaxPhysicsJobs, cMaxPhysicsBarriers, 2)),
 	_phySys(PhysicsSystem())
@@ -61,16 +59,7 @@ XPhysicsSystem::XPhysicsSystem():
 	const uint cNumBodyMutexes = 0;
 	const uint cMaxBodyPairs = 20480;
 	const uint cMaxContactConstraints = 5120;
-
-	_phySys.Init(
-		cMaxBodies,
-		cNumBodyMutexes,
-		cMaxBodyPairs,
-		cMaxContactConstraints,
-		_bpLayerItf,
-		_objBpLayerFilter,
-		_objObjLayerFilter
-	);
+	_phySys.Init(cMaxBodies, cNumBodyMutexes, cMaxBodyPairs, cMaxContactConstraints, bpli, obplf, olpf);
 }
 
 uint32 XPhysicsSystem::Update(float delta) {
@@ -105,8 +94,8 @@ void XPhysicsSystem::DebugRender(DebugRenderer* debugRenderer) {
 }
 #endif
 
-XPhysicsSystem* CreatePhysicSystem() {
-	Ref<XPhysicsSystem> system = Ref(new XPhysicsSystem());
+XPhysicsSystem* CreatePhysicSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf) {
+	Ref<XPhysicsSystem> system = Ref(new XPhysicsSystem(bpli, obplf, olpf));
 	return LeakRefT<XPhysicsSystem>(system);
 }
 
