@@ -1,3 +1,4 @@
 pub const DEFAULT_CONVEX_RADIUS: f32 = 0.01;
 pub const MIN_CONVEX_RADIUS: f32 = 0.001;
 pub const MAX_CONVEX_RADIUS: f32 = 0.05;
+pub const DEFAULT_ERROR_CONVEX_RADIUS: f32 = 0.05;
