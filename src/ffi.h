@@ -17,6 +17,8 @@
 #include <Jolt/Core/FPException.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/CollideShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
@@ -69,8 +71,6 @@ JPH_SUPPRESS_WARNINGS
 using namespace JPH;
 using namespace std;
 
-constexpr float MARGIN_FACTOR = 0.08f;
-
 //
 // base
 //
@@ -100,6 +100,9 @@ static_assert(sizeof(BodyID) == 4, "BodyID size");
 static_assert(sizeof(SubShapeID) == 4, "SubShapeID size");
 
 static_assert(sizeof(Ref<int>) == sizeof(size_t), "RsRef size");
+
+static_assert(sizeof(ObjectLayer) == 4, "ObjectLayer size");
+static_assert(sizeof(BroadPhaseLayer) == 1, "BroadPhaseLayer size");
 
 template <class T>
 T* LeakRefT(RefConst<T> cxx_ref) {
@@ -200,22 +203,6 @@ public:
 	RENDERER_ONLY(virtual void Render(DebugRenderer* render) const {};)
 };
 
-class BPLayerInterfaceImpl final: public BroadPhaseLayerInterface {
-	virtual uint GetNumBroadPhaseLayers() const override { return 3; }
-	virtual BroadPhaseLayer GetBroadPhaseLayer(ObjectLayer bp) const override { return BroadPhaseLayer(RsObjToBpLayer(bp)); }
-	PROFILE_ONLY(virtual const char* GetBroadPhaseLayerName(BroadPhaseLayer bp) const override { return RsBpLayerName(uint8(bp)).data(); })
-};
-
-class ObjectVsBroadPhaseLayerFilterImpl: public ObjectVsBroadPhaseLayerFilter {
-public:
-	virtual bool ShouldCollide(ObjectLayer obj, BroadPhaseLayer bp) const override { return RsObjBpLayerFilter(obj, uint8(bp)); }
-};
-
-class ObjectLayerPairFilterImpl: public ObjectLayerPairFilter {
-public:
-	virtual bool ShouldCollide(ObjectLayer obj1, ObjectLayer obj2) const override { return RsObjObjLayerFilter(obj1, obj2); }
-};
-
 void GlobalInitialize();
 void GlobalFinalize();
 
@@ -227,15 +214,10 @@ private:
 	TempAllocatorImpl _allocator;
 	JobSystemThreadPool _jobSys;
 	PhysicsSystem _phySys;
-
-	BPLayerInterfaceImpl _bpLayerItf;
-	ObjectVsBroadPhaseLayerFilterImpl _objBpLayerFilter;
-	ObjectLayerPairFilterImpl _objObjLayerFilter;
-
 	RENDERER_ONLY(unordered_set<XDebugRenderable*> _renderables;)
 
 public:
-	XPhysicsSystem();
+	XPhysicsSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf);
 	~XPhysicsSystem() { PRINT_ONLY(printf("~XPhysicsSystem %d\n", GetRefCount())); }
 	PhysicsSystem& PhySys() { return this->_phySys; }
 	JobSystemThreadPool& JobSys() { return this->_jobSys; }
@@ -252,7 +234,7 @@ public:
 	RENDERER_ONLY(void DebugRender(DebugRenderer* debugRenderer);)
 };
 
-XPhysicsSystem* CreatePhysicSystem();
+XPhysicsSystem* CreatePhysicSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf);
 inline void DropXPhysicsSystem(XPhysicsSystem* ptr) { DropRef<XPhysicsSystem>(ptr); }
 inline XPhysicsSystem* CloneXPhysicsSystem(XPhysicsSystem* ptr) { return CloneRef<XPhysicsSystem>(ptr); }
 inline uint32 CountRefXPhysicsSystem(const XPhysicsSystem* ptr) { return RefCountRef<XPhysicsSystem>(ptr); }
@@ -305,14 +287,13 @@ inline void DropXCharacter(XCharacter* ptr) { DropRef<XCharacter>(ptr); }
 inline XCharacter* CloneXCharacter(XCharacter* ptr) { return CloneRef<XCharacter>(ptr); }
 inline uint32 CountRefXCharacter(const XCharacter* ptr) { return RefCountRef<XCharacter>(ptr); }
 
-class XCharacterVirtual: public CharacterVirtual, public CharacterContactListener, public XDebugRenderable {
+class XCharacterVirtual: public CharacterVirtual, public XDebugRenderable {
 private:
 	Ref<XPhysicsSystem> _system;
 
 public:
 	XCharacterVirtual(Ref<XPhysicsSystem> system, const CharacterVirtualSettings* settings, Vec3 position, Quat rotation);
 	~XCharacterVirtual() override;
-	// void SetListener(FatVTablePointer);
 	void Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity);
 	bool CanWalkStairs(Vec3 velocity) const { return CharacterVirtual::CanWalkStairs(velocity); }
 	bool WalkStairs(ObjectLayer chara_layer, float deltaTime, Vec3 stepUp, Vec3 stepForward, Vec3 stepForwardTest, Vec3 stepDownExtra);
@@ -323,28 +304,6 @@ public:
 	bool SetShape(ObjectLayer chara_layer, const Shape* shape, float maxPenetrationDepth);
 	// void CheckCollision(ObjectLayer chara_layer, RsVec3 position, RsQuat rotation, RsVec3 movementDirection, float maxPenetrationDepth, Shape* shape, RsVec3 baseOffset) const;
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
-public:
-	void OnAdjustBodyVelocity(const CharacterVirtual* chara, const Body& body2, Vec3& linearVelocity, Vec3& angularVelocity) override;
-	bool OnContactValidate(const CharacterVirtual* chara, const BodyID& body2, const SubShapeID& shape2) override;
-	void OnContactAdded(
-		const CharacterVirtual* chara,
-		const BodyID& body,
-		const SubShapeID& shape2,
-		Vec3 contactPosition,
-		Vec3 contactNormal,
-		CharacterContactSettings& settings
-	) override;
-	void OnContactSolve(
-		const CharacterVirtual* chara,
-		const BodyID& body2,
-		const SubShapeID& shape2,
-		Vec3 contactPosition,
-		Vec3 contactNormal,
-		Vec3 contactVelocity,
-		const PhysicsMaterial* contactMaterial,
-		Vec3 charaVelocity,
-		Vec3& newCharaVelocity
-	) override;
 };
 
 struct XCharacterVirtualSettings;
@@ -359,21 +318,26 @@ inline XCharacterVirtual* CloneXCharacterVirtual(XCharacterVirtual* ptr) { retur
 inline uint32 CountRefXCharacterVirtual(const XCharacterVirtual* ptr) { return RefCountRef<XCharacterVirtual>(ptr); }
 
 //
-// Debug
-//
-
-#if defined(JPH_DEBUG_RENDERER)
-struct XDebugApp;
-void RunDebugApplication(rust::Box<XDebugApp> rs_app);
-#endif
-
-//
 // Unit tests
 //
 
-void TestCharacterContactListener(
+const char* TestBroadPhaseLayerInterface(const BroadPhaseLayerInterface* itf);
+const char* TestObjectVsBroadPhaseLayerFilter(const ObjectVsBroadPhaseLayerFilter* filter);
+const char* TestObjectLayerPairFilter(const ObjectLayerPairFilter* filter);
+const char* TestBodyActivationListener(BodyActivationListener* listener);
+const char* TestContactListener(ContactListener* listener, XPhysicsSystem* system);
+const char* TestCharacterContactListener(
 	CharacterContactListener* listener,
 	XPhysicsSystem* system,
 	XCharacterVirtual* chara1,
 	XCharacterVirtual* chara2
 );
+
+//
+// Debug
+//
+
+#if defined(JPH_DEBUG_RENDERER)
+struct RustDebugApp;
+void RunDebugApplication(rust::Box<RustDebugApp> rs_app);
+#endif
