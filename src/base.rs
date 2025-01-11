@@ -1,11 +1,14 @@
+use core::fmt;
 use cxx::{kind, type_id, ExternType};
 use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
 use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
-use core::fmt;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
+
+pub type ObjectLayer = u32;
+pub type BroadPhaseLayer = u8;
 
 #[allow(dead_code)]
 #[cxx::bridge()]
@@ -139,6 +142,15 @@ pub(crate) mod ffi {
         CanSleep,
     }
 
+    #[repr(u32)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    enum ValidateResult {
+        AcceptAllContactsForThisBodyPair,
+        AcceptContact,
+        RejectContact,
+        RejectAllContactsForThisBodyPair,
+    }
+
     impl Vec<Vec3> {}
     impl Vec<Vec4> {}
     impl Vec<Quat> {}
@@ -186,6 +198,7 @@ pub type MotionType = ffi::MotionType;
 pub type MotionQuality = ffi::MotionQuality;
 pub type AllowedDOFs = ffi::AllowedDOFs;
 pub type OverrideMassProperties = ffi::OverrideMassProperties;
+pub type ValidateResult = ffi::ValidateResult;
 
 impl From<bool> for ffi::Activation {
     #[inline]
@@ -582,44 +595,6 @@ impl<'de> Deserialize<'de> for IndexedTriangle {
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SubShapeID(pub u32);
-const_assert_eq!(mem::size_of::<SubShapeID>(), 4);
-
-unsafe impl ExternType for SubShapeID {
-    type Id = type_id!("SubShapeID");
-    type Kind = kind::Trivial;
-}
-
-impl SubShapeID {
-    pub const EMPTY: SubShapeID = SubShapeID(0);
-
-    #[inline]
-    pub fn new(id: u32) -> SubShapeID {
-        SubShapeID(id)
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        *self == Self::EMPTY
-    }
-}
-
-impl From<u32> for SubShapeID {
-    #[inline]
-    fn from(id: u32) -> SubShapeID {
-        SubShapeID(id)
-    }
-}
-
-impl From<SubShapeID> for u32 {
-    #[inline]
-    fn from(id: SubShapeID) -> u32 {
-        id.0
-    }
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BodyID(pub u32);
 const_assert_eq!(mem::size_of::<BodyID>(), 4);
 
@@ -661,6 +636,44 @@ impl From<BodyID> for u32 {
     }
 }
 
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SubShapeID(pub u32);
+const_assert_eq!(mem::size_of::<SubShapeID>(), 4);
+
+unsafe impl ExternType for SubShapeID {
+    type Id = type_id!("SubShapeID");
+    type Kind = kind::Trivial;
+}
+
+impl SubShapeID {
+    pub const EMPTY: SubShapeID = SubShapeID(0);
+
+    #[inline]
+    pub fn new(id: u32) -> SubShapeID {
+        SubShapeID(id)
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        *self == Self::EMPTY
+    }
+}
+
+impl From<u32> for SubShapeID {
+    #[inline]
+    fn from(id: u32) -> SubShapeID {
+        SubShapeID(id)
+    }
+}
+
+impl From<SubShapeID> for u32 {
+    #[inline]
+    fn from(id: SubShapeID) -> u32 {
+        id.0
+    }
+}
+
 pub unsafe trait JRefTarget {
     type JRefRaw;
 
@@ -685,7 +698,7 @@ impl<T: JRefTarget> JMut<T> {
     pub(crate) unsafe fn new_unchecked(raw: *mut T::JRefRaw) -> JMut<T> {
         JMut::new(NonNull::new_unchecked(raw))
     }
-    
+
     #[inline]
     pub fn as_ref(&self) -> &T {
         unsafe { self.0.as_ref() }
@@ -746,7 +759,7 @@ impl<T: JRefTarget> JRef<T> {
     pub(crate) unsafe fn new_unchecked(raw: *mut T::JRefRaw) -> JRef<T> {
         JRef::new(NonNull::new_unchecked(raw))
     }
-    
+
     #[inline]
     pub fn as_ref(&self) -> &T {
         unsafe { &self.0.as_ref() }
@@ -783,5 +796,44 @@ impl<T: JRefTarget> Deref for JRef<T> {
     #[inline]
     fn deref(&self) -> &T {
         unsafe { &self.0.as_ref() }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone)]
+pub struct StaticArray<T, const N: usize> {
+    pub size: usize,
+    pub elements: [T; N],
+}
+
+impl<T: PartialEq, const N: usize> PartialEq for StaticArray<T, N> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.size == other.size && self.deref() == other.deref()
+    }
+}
+
+impl<T, const N: usize> Deref for StaticArray<T, N> {
+    type Target = [T];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.elements[0..self.size]
+    }
+}
+
+impl<T, const N: usize> DerefMut for StaticArray<T, N> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.elements[0..self.size]
+    }
+}
+
+impl<T: fmt::Debug, const N: usize> fmt::Debug for StaticArray<T, N> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("StaticArray")
+            .field("size", &self.size)
+            .field("elements", &&self.elements[0..self.size])
+            .finish()
     }
 }
