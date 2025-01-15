@@ -1,26 +1,30 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::missing_safety_doc)]
+#![allow(unexpected_cfgs)] // TODO: Upgrade rkyv to 0.8
 
-mod base;
-mod character;
-mod consts;
-mod error;
-mod layer;
-mod shape;
-mod system;
+pub mod base;
+pub mod body;
+pub mod character;
+pub mod consts;
+pub mod error;
+pub mod shape;
+pub mod system;
+pub mod vtable;
 
-pub use base::{AABox, BodyID, IndexedTriangle, Plane, RefPhysicsMaterial, RefPhysicsSystem, RefShape};
+pub use base::*;
+pub use body::*;
 pub use character::*;
 pub use consts::*;
 pub use error::*;
-pub use layer::*;
+pub use jolt_macros::vdata;
 pub use shape::*;
 pub use system::*;
+pub use vtable::*;
 
 #[cfg(all(windows, feature = "debug-renderer"))]
-mod debug;
+pub mod debug;
 #[cfg(all(windows, feature = "debug-renderer"))]
 pub mod keys;
 
-#[cfg(all(windows, feature = "debug-renderer"))]
-pub use debug::*;
+#[cfg(test)]
+mod test_callback;
