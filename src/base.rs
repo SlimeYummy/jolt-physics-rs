@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use static_assertions::const_assert_eq;
 use std::mem;
 use std::ops::{Deref, DerefMut};
-use std::ptr::NonNull;
 
 pub type ObjectLayer = u32;
 pub type BroadPhaseLayer = u8;
@@ -675,101 +674,34 @@ impl From<SubShapeID> for u32 {
 }
 
 pub unsafe trait JRefTarget {
-    type JRefRaw;
+    type JRaw: Sized + fmt::Debug;
 
     fn name() -> &'static str;
-    fn from_ptr(raw: *const Self::JRefRaw) -> *const Self;
-    fn from_non_null(raw: NonNull<Self::JRefRaw>) -> NonNull<Self>;
-    unsafe fn clone_ref(&mut self) -> NonNull<Self>;
-    unsafe fn drop_ref(&mut self);
-    fn count_ref(&self) -> u32;
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self;
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32;
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw;
+    unsafe fn drop_raw(raw: &mut Self::JRaw);
 }
 
 #[derive(Debug)]
-pub struct JMut<T: JRefTarget>(pub(crate) NonNull<T>);
-
-impl<T: JRefTarget> JMut<T> {
-    #[inline]
-    pub(crate) fn new(raw: NonNull<T::JRefRaw>) -> JMut<T> {
-        JMut(T::from_non_null(raw))
-    }
-
-    #[inline]
-    pub(crate) unsafe fn new_unchecked(raw: *mut T::JRefRaw) -> JMut<T> {
-        JMut::new(NonNull::new_unchecked(raw))
-    }
-
-    #[inline]
-    pub fn as_ref(&self) -> &T {
-        unsafe { self.0.as_ref() }
-    }
-
-    #[inline]
-    pub fn as_mut(&mut self) -> &mut T {
-        unsafe { self.0.as_mut() }
-    }
-
-    #[inline]
-    pub fn into_ref(self) -> JRef<T> {
-        let jref = JRef(self.0);
-        mem::forget(self);
-        jref
-    }
-
-    #[inline]
-    pub unsafe fn leak_ref(&mut self) -> JRef<T> {
-        JRef(self.clone_ref())
-    }
-}
-
-impl<T: JRefTarget> Drop for JMut<T> {
-    fn drop(&mut self) {
-        #[cfg(feature = "debug-print")]
-        println!("JMut<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
-        unsafe { (*self.0.as_ptr()).drop_ref() };
-    }
-}
-
-impl<T: JRefTarget> Deref for JMut<T> {
-    type Target = T;
-
-    #[inline]
-    fn deref(&self) -> &T {
-        unsafe { self.0.as_ref() }
-    }
-}
-
-impl<T: JRefTarget> DerefMut for JMut<T> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { self.0.as_mut() }
-    }
-}
-
-#[derive(Debug)]
-pub struct JRef<T: JRefTarget>(pub(crate) NonNull<T>);
+pub struct JRef<T: JRefTarget>(pub(crate) T::JRaw);
 
 impl<T: JRefTarget> JRef<T> {
     #[inline]
-    pub(crate) fn new(raw: NonNull<T::JRefRaw>) -> JRef<T> {
-        JRef(T::from_non_null(raw))
-    }
-
-    #[inline]
-    pub(crate) unsafe fn new_unchecked(raw: *mut T::JRefRaw) -> JRef<T> {
-        JRef::new(NonNull::new_unchecked(raw))
-    }
-
-    #[inline]
     pub fn as_ref(&self) -> &T {
-        unsafe { &self.0.as_ref() }
+        unsafe { T::make_ref(&self.0) }
+    }
+
+    #[inline]
+    pub fn count_ref(&self) -> u32 {
+        unsafe { T::count_ref(&self.0) }
     }
 }
 
 impl<T: JRefTarget> Clone for JRef<T> {
     #[inline]
     fn clone(&self) -> JRef<T> {
-        unsafe { JRef((*self.0.as_ptr()).clone_ref()) }
+        JRef(unsafe { T::clone_raw(&self.0) })
     }
 }
 
@@ -777,16 +709,7 @@ impl<T: JRefTarget> Drop for JRef<T> {
     fn drop(&mut self) {
         #[cfg(feature = "debug-print")]
         println!("JRef<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
-        unsafe { (*self.0.as_ptr()).drop_ref() };
-    }
-}
-
-impl<T: JRefTarget> From<JMut<T>> for JRef<T> {
-    #[inline]
-    fn from(jmut: JMut<T>) -> JRef<T> {
-        let jref = JRef(jmut.0);
-        mem::forget(jmut);
-        jref
+        unsafe { T::drop_raw(&mut self.0) };
     }
 }
 
@@ -795,7 +718,77 @@ impl<T: JRefTarget> Deref for JRef<T> {
 
     #[inline]
     fn deref(&self) -> &T {
-        unsafe { &self.0.as_ref() }
+        self.as_ref()
+    }
+}
+
+pub unsafe trait JMutTarget: JRefTarget {
+    unsafe fn make_mut(raw: &mut Self::JRaw) -> &mut Self;
+    unsafe fn steal_raw(raw: &Self::JRaw) -> Self::JRaw;
+}
+
+#[derive(Debug)]
+pub struct JMut<T: JMutTarget>(pub(crate) T::JRaw);
+
+impl<T: JMutTarget> JMut<T> {
+    #[inline]
+    pub fn as_ref(&self) -> &T {
+        unsafe { T::make_ref(&self.0) }
+    }
+
+    #[inline]
+    pub fn as_mut(&mut self) -> &mut T {
+        unsafe { T::make_mut(&mut self.0) }
+    }
+
+    #[inline]
+    pub fn count_ref(&self) -> u32 {
+        unsafe { T::count_ref(&self.0) }
+    }
+
+    #[inline]
+    pub fn into_ref(self) -> JRef<T> {
+        let jref = JRef(unsafe { T::steal_raw(&self.0) });
+        mem::forget(self);
+        jref
+    }
+
+    #[inline]
+    pub unsafe fn steal_ref(&mut self) -> JRef<T> {
+        JRef(unsafe { T::clone_raw(&self.0) })
+    }
+}
+
+impl<T: JMutTarget> Drop for JMut<T> {
+    fn drop(&mut self) {
+        #[cfg(feature = "debug-print")]
+        println!("JMut<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
+        unsafe { T::drop_raw(&mut self.0) };
+    }
+}
+
+impl<T: JMutTarget> Deref for JMut<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        self.as_ref()
+    }
+}
+
+impl<T: JMutTarget> DerefMut for JMut<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        self.as_mut()
+    }
+}
+
+impl<T: JMutTarget> From<JMut<T>> for JRef<T> {
+    #[inline]
+    fn from(jmut: JMut<T>) -> JRef<T> {
+        let jref = JRef(unsafe { T::steal_raw(&jmut.0) });
+        mem::forget(jmut);
+        jref
     }
 }
 

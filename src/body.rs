@@ -5,10 +5,10 @@ use std::mem;
 use std::pin::Pin;
 
 use crate::base::{
-    AABox, AllowedDOFs, BodyID, BodyType, JRef, JRefTarget, MotionQuality, MotionType, OverrideMassProperties,
-    SubShapeID, JVec3,
+    AABox, AllowedDOFs, BodyID, BodyType, JRef, JVec3, MotionQuality, MotionType, OverrideMassProperties, SubShapeID,
 };
 use crate::shape::Shape;
+use crate::ObjectLayer;
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
@@ -199,7 +199,7 @@ pub struct BodyCreationSettings {
     pub linear_velocity: Vec3A,
     pub angular_velocity: Vec3A,
     pub user_data: u64,
-    pub object_layer: u16,
+    pub object_layer: ObjectLayer,
     _collision_group: CollisionGroup,
     pub motion_type: MotionType,
     pub allowed_dofs: AllowedDOFs,
@@ -269,7 +269,7 @@ impl Default for BodyCreationSettings {
 impl BodyCreationSettings {
     pub fn new(
         shape: JRef<Shape>,
-        layer: u16,
+        layer: ObjectLayer,
         motion_type: MotionType,
         position: Vec3A,
         rotation: Quat,
@@ -284,7 +284,7 @@ impl BodyCreationSettings {
         }
     }
 
-    pub fn new_static(shape: JRef<Shape>, layer: u16, position: Vec3A, rotation: Quat) -> BodyCreationSettings {
+    pub fn new_static(shape: JRef<Shape>, layer: ObjectLayer, position: Vec3A, rotation: Quat) -> BodyCreationSettings {
         BodyCreationSettings {
             position,
             rotation,
@@ -297,7 +297,7 @@ impl BodyCreationSettings {
 
     pub fn new_sensor(
         shape: JRef<Shape>,
-        layer: u16,
+        layer: ObjectLayer,
         motion_type: MotionType,
         position: Vec3A,
         rotation: Quat,
@@ -660,7 +660,7 @@ impl Body {
 
     #[inline]
     pub fn get_shape(&self) -> &Shape {
-        unsafe { &*Shape::from_ptr(self.as_ref().GetShape()) }
+        unsafe { &*Shape::cast_ptr(self.as_ref().GetShape()) }
     }
 
     #[inline]
