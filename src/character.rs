@@ -12,7 +12,8 @@ use crate::base::{BodyID, JMut, JQuat, JRef, JRefTarget, JVec3, ObjectLayer, Pla
 use crate::body::Body;
 use crate::shape::{PhysicsMaterial, Shape};
 use crate::system::{BodyActivationListener, ContactListener, PhysicsSystem};
-use crate::vtable::{VBox, VData, VPair};
+use crate::vtable::{VBox, VPair};
+use crate::JMutTarget;
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
@@ -128,6 +129,7 @@ pub(crate) mod ffi {
 
         type XCharacterVirtual;
         unsafe fn CreateCharacterVirtual(
+            clean_up: fn (zelf: Pin<&mut XCharacterVirtual>),
             system: *mut XPhysicsSystem,
             settings: &XCharacterVirtualSettings,
             position: Vec3,
@@ -395,7 +397,7 @@ impl fmt::Debug for Character {
 }
 
 unsafe impl JRefTarget for Character {
-    type JRefRaw = ffi::XCharacter;
+    type JRaw = NonNull<Character>;
 
     #[inline]
     fn name() -> &'static str {
@@ -403,41 +405,55 @@ unsafe impl JRefTarget for Character {
     }
 
     #[inline]
-    fn from_ptr(raw: *const ffi::XCharacter) -> *const Character {
-        raw as *const _
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { raw.as_ref() }
     }
 
     #[inline]
-    fn from_non_null(raw: NonNull<ffi::XCharacter>) -> NonNull<Character> {
-        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        NonNull::new_unchecked(ffi::CloneXCharacter(raw.as_ptr() as *mut _) as *mut _)
     }
 
     #[inline]
-    unsafe fn clone_ref(&mut self) -> NonNull<Character> {
-        NonNull::new_unchecked(ffi::CloneXCharacter(&mut self.0) as *mut _)
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropXCharacter(raw.as_ptr() as *mut _);
     }
 
     #[inline]
-    unsafe fn drop_ref(&mut self) {
-        ffi::DropXCharacter(&mut self.0);
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefXCharacter(raw.as_ptr() as *const _) }
+    }
+}
+
+unsafe impl JMutTarget for Character {
+    #[inline]
+    unsafe fn make_mut(raw: &mut Self::JRaw) -> &mut Self {
+        unsafe { raw.as_mut() }
     }
 
     #[inline]
-    fn count_ref(&self) -> u32 {
-        unsafe { ffi::CountRefXCharacter(&self.0) }
+    unsafe fn steal_raw(raw: &Self::JRaw) -> Self::JRaw {
+        *raw
+    }
+}
+
+impl JMut<Character> {
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut ffi::XCharacter) -> JMut<Character> {
+        JMut(unsafe { NonNull::new_unchecked(raw as *mut _) })
     }
 }
 
 impl Character {
-    pub fn new<BAL: BodyActivationListener, CL: ContactListener>(
-        system: &mut PhysicsSystem<BAL, CL>,
+    pub fn new<CL: ContactListener, BAL: BodyActivationListener>(
+        system: &mut PhysicsSystem<CL, BAL>,
         settings: &CharacterSettings,
         position: Vec3A,
         rotation: Quat,
         user_data: u64,
     ) -> JMut<Character> {
         unsafe {
-            JMut::new_unchecked(ffi::CreateCharacter(
+            JMut::<Character>::new_unchecked(ffi::CreateCharacter(
                 system.as_x_ptr(),
                 mem::transmute::<&CharacterSettings, &ffi::XCharacterSettings>(settings),
                 position.into(),
@@ -447,8 +463,8 @@ impl Character {
         }
     }
 
-    pub fn new_add<BAL: BodyActivationListener, CL: ContactListener>(
-        system: &mut PhysicsSystem<BAL, CL>,
+    pub fn new_add<CL: ContactListener, BAL: BodyActivationListener>(
+        system: &mut PhysicsSystem<CL, BAL>,
         settings: &CharacterSettings,
         position: Vec3A,
         rotation: Quat,
@@ -457,7 +473,7 @@ impl Character {
         lock: bool,
     ) -> JMut<Character> {
         unsafe {
-            JMut::new_unchecked(ffi::CreateAddCharacter(
+            JMut::<Character>::new_unchecked(ffi::CreateAddCharacter(
                 system.as_x_ptr(),
                 mem::transmute::<&CharacterSettings, &ffi::XCharacterSettings>(settings),
                 position.into(),
@@ -506,7 +522,7 @@ impl Character {
 
     #[inline]
     pub fn get_shape(&self) -> &Shape {
-        unsafe { &*Shape::from_ptr(self.as_ref().GetShape()) }
+        unsafe { &*Shape::cast_ptr(self.as_ref().GetShape()) }
     }
 
     #[inline]
@@ -536,7 +552,7 @@ impl Character {
 
     #[inline]
     pub fn get_ground_material(&self) -> &PhysicsMaterial {
-        unsafe { &*PhysicsMaterial::from_ptr(self.as_ref().GetGroundMaterial()) }
+        unsafe { &*PhysicsMaterial::cast_ptr(self.as_ref().GetGroundMaterial()) }
     }
 
     #[inline]
@@ -679,61 +695,83 @@ impl<CCL: CharacterContactListener> fmt::Debug for CharacterVirtual<CCL> {
     }
 }
 
-impl<CCL: CharacterContactListener> Drop for CharacterVirtual<CCL> {
-    fn drop(&mut self) {
-        unsafe {
-            let ptr = self.as_ref().GetListener();
-            if !ptr.is_null() {
-                let _ = VBox::<CCL, CharacterContactListenerVTable>::from_raw(ptr as *mut _);
-            }
-            self.as_mut().SetListener(ptr::null_mut());
-        }
-    }
-}
-
 unsafe impl<CCL: CharacterContactListener> JRefTarget for CharacterVirtual<CCL> {
-    type JRefRaw = ffi::XCharacterVirtual;
+    type JRaw = NonNull<CharacterVirtual<CCL>>;
 
+    #[inline]
     fn name() -> &'static str {
         "CharacterVirtual"
     }
 
-    fn from_ptr(raw: *const ffi::XCharacterVirtual) -> *const CharacterVirtual<CCL> {
-        raw as *const _
+    #[inline]
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { raw.as_ref() }
     }
 
-    fn from_non_null(raw: NonNull<ffi::XCharacterVirtual>) -> NonNull<CharacterVirtual<CCL>> {
-        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    #[inline]
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        NonNull::new_unchecked(ffi::CloneXCharacterVirtual(raw.as_ptr() as *mut _) as *mut _)
     }
 
-    unsafe fn clone_ref(&mut self) -> NonNull<CharacterVirtual<CCL>> {
-        NonNull::new_unchecked(ffi::CloneXCharacterVirtual(&mut self.character) as *mut _)
+    #[inline]
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropXCharacterVirtual(raw.as_ptr() as *mut _);
     }
 
-    unsafe fn drop_ref(&mut self) {
-        ffi::DropXCharacterVirtual(&mut self.character);
+    #[inline]
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefXCharacterVirtual(raw.as_ptr() as *const _) }
+    }
+}
+
+unsafe impl<CCL: CharacterContactListener> JMutTarget for CharacterVirtual<CCL> {
+    #[inline]
+    unsafe fn make_mut(raw: &mut Self::JRaw) -> &mut Self {
+        unsafe { raw.as_mut() }
     }
 
-    fn count_ref(&self) -> u32 {
-        unsafe { ffi::CountRefXCharacterVirtual(&self.character) }
+    #[inline]
+    unsafe fn steal_raw(raw: &Self::JRaw) -> Self::JRaw {
+        *raw
+    }
+}
+
+impl<CCL: CharacterContactListener> JMut<CharacterVirtual<CCL>> {
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut ffi::XCharacterVirtual) -> JMut<CharacterVirtual<CCL>> {
+        JMut(unsafe { NonNull::new_unchecked(raw as *mut _) })
     }
 }
 
 impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
-    pub fn new<BAL: BodyActivationListener, CL: ContactListener>(
-        system: &mut PhysicsSystem<BAL, CL>,
+    pub fn new<CL: ContactListener, BAL: BodyActivationListener>(
+        system: &mut PhysicsSystem<CL, BAL>,
         settings: &CharacterVirtualSettings,
         position: Vec3A,
         rotation: Quat,
     ) -> JMut<CharacterVirtual<CCL>> {
         unsafe {
-            JMut::new_unchecked(ffi::CreateCharacterVirtual(
+            JMut::<CharacterVirtual<CCL>>::new_unchecked(ffi::CreateCharacterVirtual(
+                Self::clean_up,
                 system.as_x_ptr(),
                 mem::transmute::<&CharacterVirtualSettings, &ffi::XCharacterVirtualSettings>(settings),
                 position.into(),
                 rotation.into(),
             ))
         }
+    }
+
+    fn clean_up(zelf: Pin<&mut ffi::XCharacterVirtual>) {
+        unsafe {
+            let ptr = zelf.GetListener();
+            if !ptr.is_null() {
+                let _ = VBox::<CCL, CharacterContactListenerVTable>::from_raw(ptr as *mut _);
+            }
+            zelf.SetListener(ptr::null_mut());
+        }
+
+        #[cfg(feature = "debug-print")]
+        println!("CharacterVirtual::clean_up called");
     }
 
     #[inline]
@@ -773,7 +811,7 @@ impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
 
     #[inline]
     pub fn get_shape(&self) -> &Shape {
-        unsafe { &*Shape::from_ptr(self.as_ref().GetShape()) }
+        unsafe { &*Shape::cast_ptr(self.as_ref().GetShape()) }
     }
 
     #[inline]
@@ -803,7 +841,7 @@ impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
 
     #[inline]
     pub fn get_ground_material(&self) -> &PhysicsMaterial {
-        unsafe { &*PhysicsMaterial::from_ptr(self.as_ref().GetGroundMaterial()) }
+        unsafe { &*PhysicsMaterial::cast_ptr(self.as_ref().GetGroundMaterial()) }
     }
 
     #[inline]
@@ -1074,4 +1112,67 @@ impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
     pub fn set_inner_body_shape(&mut self, shape: &Shape) {
         unsafe { self.as_mut().SetInnerBodyShape(&shape.0) };
     }
+}
+
+#[vtable(allow_empty)]
+#[repr(C)]
+pub struct CharacterContactListenerVTable {
+    pub drop: extern "C" fn(*mut u8),
+    pub on_adjust_body_velocity: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        body2: &Body,
+        linear_velocity: &mut Vec3A,
+        angular_velocity: &mut Vec3A,
+    ),
+    pub on_contact_validate:
+        extern "C" fn(*mut u8, character: &CharacterVirtual<()>, body2: &BodyID, subshape2: &SubShapeID) -> bool,
+    pub on_character_contact_validate: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        other_character: &CharacterVirtual<()>,
+        subshape2: &SubShapeID,
+    ) -> bool,
+    pub on_contact_added: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        body2: &BodyID,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ),
+    pub on_character_contact_added: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        other_character: &CharacterVirtual<()>,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ),
+    pub on_contact_solve: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        body2: &BodyID,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        contact_velocity: JVec3,
+        material: &PhysicsMaterial,
+        character_velocity: JVec3,
+        new_character_velocity: &mut Vec3A,
+    ),
+    pub on_character_contact_solve: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        other_character: &CharacterVirtual<()>,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        contact_velocity: JVec3,
+        material: &PhysicsMaterial,
+        character_velocity: JVec3,
+        new_character_velocity: &mut Vec3A,
+    ),
 }
