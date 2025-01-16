@@ -180,7 +180,7 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
         if ident.to_string() == "drop" {
             vtable_ctor.push(quote!(drop: {
                 #sig_extern {
-                    std::ptr::drop_in_place(_0 as *mut crate::vtable::VPair<VD, #vtable_name>);
+                    unimplemented!("Drops in C++ side are not supported now.");
                 }
                 drop::<VD>
             },));

@@ -50,7 +50,7 @@ XCharacter* CreateCharacter(
 	Quat rotation,
 	uint64 userData
 ) {
-	JPH::CharacterSettings settings;
+	CharacterSettings settings;
 	settings.mUp = st.up;
 	settings.mSupportingVolume = st.supportingVolume;
 	settings.mMaxSlopeAngle = st.maxSlopeAngle;
@@ -82,17 +82,20 @@ XCharacter* CreateAddCharacter(
 //
 
 XCharacterVirtual::XCharacterVirtual(
+	rust::Fn<void (XCharacterVirtual&)> rustCleanUp,
 	Ref<XPhysicsSystem> system,
 	const CharacterVirtualSettings* settings,
 	Vec3 position,
 	Quat rotation
 ):
 	CharacterVirtual(settings, position, rotation, &system->PhySys()),
+	_rustCleanUp(rustCleanUp),
 	_system(system) {
 	RENDERER_ONLY(_system->AddRenderable(this));
 }
 
 XCharacterVirtual::~XCharacterVirtual() {
+	_rustCleanUp(*this);
 	RENDERER_ONLY(_system->RemoveRenderable(this));
 	PRINT_ONLY(printf("~XCharacterVirtual %d system %d\n", GetRefCount(), _system->GetRefCount() - 1));
 }
@@ -201,38 +204,6 @@ void XCharacterVirtual::Render(DebugRenderer* debugRenderer) const {
 // 	);
 // }
 
-
-void XCharacterVirtual::OnAdjustBodyVelocity(const CharacterVirtual* chara, const Body& body2, Vec3& linearVelocity, Vec3& angularVelocity)  {}
-
-bool XCharacterVirtual::OnContactValidate(const CharacterVirtual* chara, const BodyID& body2, const SubShapeID& shape2)  {
-	return true;
-}
-
-void XCharacterVirtual::OnContactAdded(
-	const CharacterVirtual* chara,
-	const BodyID& body,
-	const SubShapeID& shape2,
-	Vec3 contactPosition,
-	Vec3 contactNormal,
-	CharacterContactSettings& settings
-) {
-
-}
-
-void XCharacterVirtual::OnContactSolve(
-	const CharacterVirtual* chara,
-	const BodyID& body2,
-	const SubShapeID& shape2,
-	Vec3 contactPosition,
-	Vec3 contactNormal,
-	Vec3 contactVelocity,
-	const PhysicsMaterial* contactMaterial,
-	Vec3 charaVelocity,
-	Vec3& newCharaVelocity
-) {
-
-}
-
 struct XCharacterVirtualSettings {
 	Vec3 up;
 	Plane supportingVolume;
@@ -255,6 +226,7 @@ struct XCharacterVirtualSettings {
 static_assert(sizeof(XCharacterVirtualSettings) == 128, "XCharacterVirtualSettings size");
 
 XCharacterVirtual* CreateCharacterVirtual(
+	rust::Fn<void (XCharacterVirtual&)> rustCleanUp,
 	XPhysicsSystem* system,
 	const XCharacterVirtualSettings& st,
 	Vec3 position,
@@ -278,7 +250,6 @@ XCharacterVirtual* CreateCharacterVirtual(
 	settings.mMaxNumHits = st.maxNumHits;
 	settings.mHitReductionCosMaxAngle = st.hitReductionCosMaxAngle;
 	settings.mPenetrationRecoverySpeed = st.penetrationRecoverySpeed;
-	Ref<XCharacterVirtual> character = Ref(new XCharacterVirtual(Ref(system), &settings, position, rotation));
+	Ref<XCharacterVirtual> character = Ref(new XCharacterVirtual(rustCleanUp, Ref(system), &settings, position, rotation));
 	return LeakRefT<XCharacterVirtual>(character);
-	return character;
 }
