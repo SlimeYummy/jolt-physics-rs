@@ -24,12 +24,12 @@ protected:
     DebugUI* mDebugUI;
     String mStatusString; // A string that is shown on screen to indicate the status of the application
     
-    rust::Box<XDebugApp> mRsApp;
+    rust::Box<RustDebugApp> mRsApp;
     Ref<XPhysicsSystem> mPhySys;
     bool mCursorVisible = true;
 
 public:
-    DebugApp(rust::Box<XDebugApp> rsApp);
+    DebugApp(rust::Box<RustDebugApp> rsApp);
     virtual ~DebugApp();
     void Run();
 
