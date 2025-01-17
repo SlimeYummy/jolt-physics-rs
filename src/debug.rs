@@ -1,31 +1,31 @@
-use cxx::{type_id, ExternType};
+use cxx::{kind, type_id, ExternType};
 use glam::Vec3A;
 use static_assertions::{assert_cfg, const_assert_eq};
 use std::mem;
 
-use crate::base::*;
+use crate::base::JVec3;
 
 assert_cfg!(windows, "Debug rendering is only supported on Windows");
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
     extern "Rust" {
-        type XDebugApp;
+        type RustDebugApp;
 
         #[cxx_name = "GetPhysicsSystem"]
-        unsafe fn get_physics_system(self: &mut XDebugApp) -> *mut XPhysicsSystem;
+        unsafe fn get_physics_system(self: &mut RustDebugApp) -> *mut XPhysicsSystem;
         #[cxx_name = "UpdateFrame"]
         unsafe fn update_frame(
-            self: &mut XDebugApp,
+            self: &mut RustDebugApp,
             delta: f32,
             camera: &CameraState,
             mouse: *mut Mouse,
             keyboard: *mut Keyboard,
         ) -> bool;
         #[cxx_name = "GetInitialCamera"]
-        unsafe fn get_initial_camera(self: &mut XDebugApp, state: *mut CameraState);
+        unsafe fn get_initial_camera(self: &mut RustDebugApp, state: *mut CameraState);
         #[cxx_name = "GetCameraPivot"]
-        fn get_camera_pivot(self: &mut XDebugApp, heading: f32, pitch: f32) -> Vec3;
+        fn get_camera_pivot(self: &mut RustDebugApp, heading: f32, pitch: f32) -> Vec3;
     }
 
     unsafe extern "C++" {
@@ -33,9 +33,7 @@ pub(crate) mod ffi {
         include!("jolt-physics-rs/src/ffi.h");
 
         type Vec3 = crate::base::ffi::Vec3;
-
         type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
-
         type CameraState = crate::debug::CameraState;
 
         type Keyboard;
@@ -50,7 +48,7 @@ pub(crate) mod ffi {
         fn IsRightPressed(self: &Mouse) -> bool;
         fn IsMiddlePressed(self: &Mouse) -> bool;
 
-        fn RunDebugApplication(rs_app: Box<XDebugApp>);
+        fn RunDebugApplication(rs_app: Box<RustDebugApp>);
     }
 }
 
@@ -67,7 +65,7 @@ const_assert_eq!(mem::size_of::<CameraState>(), 64);
 
 unsafe impl ExternType for CameraState {
     type Id = type_id!("CameraState");
-    type Kind = cxx::kind::Trivial;
+    type Kind = kind::Trivial;
 }
 
 #[derive(PartialEq)]
@@ -112,11 +110,14 @@ impl DebugMouse {
     }
 }
 
-pub struct XDebugApp(Box<dyn DebugApp>);
+pub struct RustDebugApp {
+    dbg_app: Box<dyn DebugApp>,
+    x_physics_system: *mut ffi::XPhysicsSystem,
+}
 
-impl XDebugApp {
+impl RustDebugApp {
     pub fn get_physics_system(&mut self) -> *mut ffi::XPhysicsSystem {
-        self.0.as_mut().get_physics_system().as_mut_ptr()
+        self.x_physics_system
     }
 
     fn update_frame(
@@ -128,20 +129,20 @@ impl XDebugApp {
     ) -> bool {
         let mut mouse = DebugMouse(mouse);
         let mut keyboard = DebugKeyboard(keyboard);
-        self.0.update_frame(delta, camera, &mut mouse, &mut keyboard)
+        self.dbg_app.update_frame(delta, camera, &mut mouse, &mut keyboard)
     }
 
     fn get_initial_camera(&mut self, state: *mut ffi::CameraState) {
-        unsafe { self.0.get_initial_camera(&mut *state) };
+        unsafe { self.dbg_app.get_initial_camera(&mut *state) };
     }
 
-    fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> XVec3 {
-        self.0.get_camera_pivot(heading, pitch).into()
+    fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> JVec3 {
+        self.dbg_app.get_camera_pivot(heading, pitch).into()
     }
 }
 
 pub trait DebugApp {
-    fn get_physics_system(&mut self) -> RefPhysicsSystem;
+    fn cpp_physics_system(&mut self) -> *mut u8;
     fn update_frame(
         &mut self,
         delta: f32,
@@ -153,7 +154,11 @@ pub trait DebugApp {
     fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> Vec3A;
 }
 
-pub fn run_debug_application(dbg_app: Box<dyn DebugApp>) {
-    let rs_app = Box::new(XDebugApp(dbg_app));
-    ffi::RunDebugApplication(rs_app);
+pub fn run_debug_application(mut dbg_app: Box<dyn DebugApp>) {
+    let x_physics_system = dbg_app.cpp_physics_system() as *mut ffi::XPhysicsSystem;
+    let rs_dbg_app = Box::new(RustDebugApp {
+        dbg_app,
+        x_physics_system,
+    });
+    ffi::RunDebugApplication(rs_dbg_app);
 }

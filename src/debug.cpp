@@ -22,7 +22,7 @@ static_assert(sizeof(CameraState) == 64, "CameraState size");
 // JoltPhysics Application (modified version)
 //
 
-DebugApp::DebugApp(rust::Box<XDebugApp> rsApp) :
+DebugApp::DebugApp(rust::Box<RustDebugApp> rsApp) :
     mDebugRenderer(nullptr),
     mRenderer(nullptr),
     mKeyboard(nullptr),
@@ -91,16 +91,16 @@ DebugApp::DebugApp(rust::Box<XDebugApp> rsApp) :
     // Rust section
     {
         auto phySys = this->mRsApp->GetPhysicsSystem();
-        PRINT_ONLY(printf("DebugApplication %d\n", phySys->GetRefCount()));
+        PRINT_ONLY(printf("DebugApplication system %d\n", phySys->GetRefCount()));
         this->mPhySys = Ref(phySys);
-        PRINT_ONLY(printf("DebugApplication %d\n", this->mPhySys->GetRefCount()));
+        PRINT_ONLY(printf("DebugApplication system %d\n", this->mPhySys->GetRefCount()));
     }
 }
 
 DebugApp::~DebugApp() {
     // Rust section
     {
-        PRINT_ONLY(printf("~DebugApplication %d\n", this->mPhySys->GetRefCount()));
+        PRINT_ONLY(printf("~DebugApplication system %d\n", this->mPhySys->GetRefCount() - 1));
     }
 
     {
@@ -403,7 +403,7 @@ RMat44 DebugApp::GetCameraPivot(float cameraHeading, float cameraPitch) {
     return Mat44::sTranslation(position);
 }
 
-void RunDebugApplication(rust::Box<XDebugApp> rsApp) {
+void RunDebugApplication(rust::Box<RustDebugApp> rsApp) {
     RegisterDefaultAllocator();
     JPH_PROFILE_START("Main");
     FPExceptionsEnable enableExceptions;
