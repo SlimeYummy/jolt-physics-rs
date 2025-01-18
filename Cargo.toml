@@ -5,13 +5,13 @@ edition = "2021"
 
 [dependencies]
 cxx = { version = "1.0", features = ["default", "c++17"] }
-glam = { version = "0.27", features = ["approx", "serde"] }
-glam-ext = { path = "../glam-ext", features = ["approx", "serde"] }
+glam = { version = "0.29", features = ["approx", "serde"] }
+glam-ext = { version = "0.2", optional = true, features = ["approx", "serde"] }
+jolt-macros = { path = "./macros" }
 libc = "0.2"
 serde = { version = "1.0", features = ["derive", "rc"] }
 static_assertions = "1.1"
 thiserror = "1.0"
-vtable = "0.2"
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
@@ -19,8 +19,10 @@ cxx-build = "1.0"
 vcvars = "0.1.6"
 
 [features]
-default = ["deterministic"]
+default = ["deterministic", "glam-ext"]
+# default = ["deterministic", "glam-ext", "debug-renderer", "debug-print"]
 deterministic = []
+glam-ext = ["dep:glam-ext"]
 profile = []
 debug-renderer = []
 debug-print = []

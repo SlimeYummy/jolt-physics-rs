@@ -47,7 +47,8 @@
 #include <Application/Application.h>
 #endif
 
-// Disable common warnings triggered by Jolt, you can use JPH_SUPPRESS_WARNING_PUSH / JPH_SUPPRESS_WARNING_POP to store and restore the warning state
+// Disable common warnings triggered by Jolt
+// You can use JPH_SUPPRESS_WARNING_PUSH / JPH_SUPPRESS_WARNING_POP to store and restore the warning state
 JPH_SUPPRESS_WARNINGS
 
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
@@ -209,36 +210,6 @@ void GlobalFinalize();
 using XBodyStats = BodyManager::BodyStats;
 static_assert(sizeof(XBodyStats) == 36, "XBodyStats size");
 
-class XPhysicsSystem: public RefTarget<XPhysicsSystem> {
-private:
-	TempAllocatorImpl _allocator;
-	JobSystemThreadPool _jobSys;
-	PhysicsSystem _phySys;
-	RENDERER_ONLY(unordered_set<XDebugRenderable*> _renderables;)
-
-public:
-	XPhysicsSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf);
-	~XPhysicsSystem() { PRINT_ONLY(printf("~XPhysicsSystem %d\n", GetRefCount())); }
-	PhysicsSystem& PhySys() { return this->_phySys; }
-	JobSystemThreadPool& JobSys() { return this->_jobSys; }
-	TempAllocatorImpl& Allocator() { return this->_allocator; }
-	BodyInterface& BodyItf(bool lock) { return lock ? this->_phySys.GetBodyInterface() : this->_phySys.GetBodyInterfaceNoLock(); }
-
-public:
-	PhysicsSystem* GetPhysicsSystem() { return &this->_phySys; }
-	uint32 Update(float delta);
-	void GetBodies(rust::Vec<BodyID>& bodies) const;
-	void GetActiveBodies(EBodyType bodyType, rust::Vec<BodyID>& bodies) const;
-	RENDERER_ONLY(void AddRenderable(XDebugRenderable* renderable) { _renderables.insert(renderable); })
-	RENDERER_ONLY(void RemoveRenderable(XDebugRenderable* renderable) { _renderables.erase(renderable); })
-	RENDERER_ONLY(void DebugRender(DebugRenderer* debugRenderer);)
-};
-
-XPhysicsSystem* CreatePhysicSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf);
-inline void DropXPhysicsSystem(XPhysicsSystem* ptr) { DropRef<XPhysicsSystem>(ptr); }
-inline XPhysicsSystem* CloneXPhysicsSystem(XPhysicsSystem* ptr) { return CloneRef<XPhysicsSystem>(ptr); }
-inline uint32 CountRefXPhysicsSystem(const XPhysicsSystem* ptr) { return RefCountRef<XPhysicsSystem>(ptr); }
-
 class XBodyInterface: public BodyInterface {
 public:
 	~XBodyInterface() { PRINT_ONLY(printf("~XBodyInterface\n")); }
@@ -247,7 +218,53 @@ public:
 	BodyID CreateAddBody(const BodyCreationSettings& settings, EActivation activation);
 };
 
-XBodyInterface* CreateBodyInterface(XPhysicsSystem* system, bool lock);
+class XPhysicsSystem: public RefTarget<XPhysicsSystem> {
+private:
+	TempAllocatorImpl _allocator;
+	JobSystemThreadPool _jobSys;
+	PhysicsSystem _phySys;
+	rust::Fn<void (XPhysicsSystem&)> _rustCleanUp;
+	const BroadPhaseLayerInterface* _bpli;
+	const ObjectVsBroadPhaseLayerFilter* _obplf;
+	const ObjectLayerPairFilter* _olpf;
+	RENDERER_ONLY(unordered_set<XDebugRenderable*> _renderables;)
+
+public:
+	XPhysicsSystem(
+		rust::Fn<void (XPhysicsSystem&)> rustCleanUp,
+		const BroadPhaseLayerInterface* bpli,
+		const ObjectVsBroadPhaseLayerFilter* obplf,
+		const ObjectLayerPairFilter* olpf
+	);
+	~XPhysicsSystem();
+	PhysicsSystem& PhySys() { return this->_phySys; }
+	JobSystemThreadPool& JobSys() { return this->_jobSys; }
+	TempAllocatorImpl& Allocator() { return this->_allocator; }
+	BodyInterface& BodyItf(bool lock) { return lock ? this->_phySys.GetBodyInterface() : this->_phySys.GetBodyInterfaceNoLock(); }
+
+public:
+	PhysicsSystem* GetPhysicsSystem() { return &this->_phySys; }
+	XBodyInterface* GetBodyInterface(bool lock);
+	const BroadPhaseLayerInterface* GetBroadPhaseLayerInterface() const { return _bpli; }
+	const ObjectVsBroadPhaseLayerFilter* GetObjectVsBroadPhaseLayerFilter() const { return _obplf; }
+	const ObjectLayerPairFilter* GetObjectLayerPairFilter() const { return _olpf; }
+	uint32 Update(float delta);
+	void GetBodies(rust::Vec<BodyID>& bodies) const;
+	void GetActiveBodies(EBodyType bodyType, rust::Vec<BodyID>& bodies) const;
+	RENDERER_ONLY(void AddRenderable(XDebugRenderable* renderable) { _renderables.insert(renderable); })
+	RENDERER_ONLY(void RemoveRenderable(XDebugRenderable* renderable) { _renderables.erase(renderable); })
+	RENDERER_ONLY(void DebugRender(DebugRenderer* debugRenderer);)
+};
+
+XPhysicsSystem* CreatePhysicSystem(
+	rust::Fn<void (XPhysicsSystem&)> rustCleanUp,
+	const BroadPhaseLayerInterface* bpli,
+	const ObjectVsBroadPhaseLayerFilter* obplf,
+	const ObjectLayerPairFilter* olpf
+);
+inline void DropXPhysicsSystem(XPhysicsSystem* ptr) { DropRef<XPhysicsSystem>(ptr); }
+inline XPhysicsSystem* CloneXPhysicsSystem(XPhysicsSystem* ptr) { return CloneRef<XPhysicsSystem>(ptr); }
+inline uint32 CountRefXPhysicsSystem(const XPhysicsSystem* ptr) { return RefCountRef<XPhysicsSystem>(ptr); }
 
 //
 // character
@@ -289,10 +306,17 @@ inline uint32 CountRefXCharacter(const XCharacter* ptr) { return RefCountRef<XCh
 
 class XCharacterVirtual: public CharacterVirtual, public XDebugRenderable {
 private:
+	rust::Fn<void (XCharacterVirtual&)> _rustCleanUp;
 	Ref<XPhysicsSystem> _system;
 
 public:
-	XCharacterVirtual(Ref<XPhysicsSystem> system, const CharacterVirtualSettings* settings, Vec3 position, Quat rotation);
+	XCharacterVirtual(
+		rust::Fn<void (XCharacterVirtual&)> rustCleanUp,
+		Ref<XPhysicsSystem> system,
+		const CharacterVirtualSettings* settings,
+		Vec3 position,
+		Quat rotation
+	);
 	~XCharacterVirtual() override;
 	void Update(ObjectLayer chara_layer, float deltaTime, Vec3 gravity);
 	bool CanWalkStairs(Vec3 velocity) const { return CharacterVirtual::CanWalkStairs(velocity); }
@@ -302,12 +326,21 @@ public:
 	void RefreshContacts(ObjectLayer chara_layer);
 	void UpdateGroundVelocity() { CharacterVirtual::UpdateGroundVelocity(); }
 	bool SetShape(ObjectLayer chara_layer, const Shape* shape, float maxPenetrationDepth);
-	// void CheckCollision(ObjectLayer chara_layer, RsVec3 position, RsQuat rotation, RsVec3 movementDirection, float maxPenetrationDepth, Shape* shape, RsVec3 baseOffset) const;
+	// void CheckCollision(
+	// 	ObjectLayer chara_layer,
+	// 	RsVec3 position,
+	// 	RsQuat rotation,
+	// 	RsVec3 movementDirection,
+	// 	float maxPenetrationDepth,
+	// 	Shape* shape,
+	// 	RsVec3 baseOffset
+	// ) const;
 	RENDERER_ONLY(void Render(DebugRenderer* debugRender) const override;)
 };
 
 struct XCharacterVirtualSettings;
 XCharacterVirtual* CreateCharacterVirtual(
+	rust::Fn<void (XCharacterVirtual&)> rustCleanUp,
 	XPhysicsSystem* system,
 	const XCharacterVirtualSettings& settings,
 	Vec3 position,
