@@ -50,16 +50,35 @@ void GlobalFinalize() {
 // PhysicsSystem
 //
 
-XPhysicsSystem::XPhysicsSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf):
+XPhysicsSystem::XPhysicsSystem(
+	rust::Fn<void (XPhysicsSystem&)> rustCleanUp,
+	const BroadPhaseLayerInterface* bpli,
+	const ObjectVsBroadPhaseLayerFilter* obplf,
+	const ObjectLayerPairFilter* olpf
+):
 	_allocator(TempAllocatorImpl(10 * 1024 * 1024)),
 	_jobSys(JobSystemThreadPool(cMaxPhysicsJobs, cMaxPhysicsBarriers, 2)),
-	_phySys(PhysicsSystem())
+	_phySys(PhysicsSystem()),
+	_rustCleanUp(rustCleanUp),
+	_bpli(bpli),
+	_obplf(obplf),
+	_olpf(olpf)
 {
 	const uint cMaxBodies = 20480;
 	const uint cNumBodyMutexes = 0;
 	const uint cMaxBodyPairs = 20480;
 	const uint cMaxContactConstraints = 5120;
-	_phySys.Init(cMaxBodies, cNumBodyMutexes, cMaxBodyPairs, cMaxContactConstraints, bpli, obplf, olpf);
+	_phySys.Init(cMaxBodies, cNumBodyMutexes, cMaxBodyPairs, cMaxContactConstraints, *bpli, *obplf, *olpf);
+}
+
+XPhysicsSystem::~XPhysicsSystem() {
+	PRINT_ONLY(printf("~XPhysicsSystem %d\n", GetRefCount()));
+	this->_rustCleanUp(*this);
+}
+
+XBodyInterface* XPhysicsSystem::GetBodyInterface(bool lock) {
+	BodyInterface* bodyItf = &this->BodyItf(lock);
+	return reinterpret_cast<XBodyInterface*>(bodyItf);
 }
 
 uint32 XPhysicsSystem::Update(float delta) {
@@ -94,8 +113,13 @@ void XPhysicsSystem::DebugRender(DebugRenderer* debugRenderer) {
 }
 #endif
 
-XPhysicsSystem* CreatePhysicSystem(const BroadPhaseLayerInterface& bpli, const ObjectVsBroadPhaseLayerFilter& obplf, const ObjectLayerPairFilter& olpf) {
-	Ref<XPhysicsSystem> system = Ref(new XPhysicsSystem(bpli, obplf, olpf));
+XPhysicsSystem* CreatePhysicSystem(
+	rust::Fn<void (XPhysicsSystem&)> rustCleanUp,
+	const BroadPhaseLayerInterface* bpli,
+	const ObjectVsBroadPhaseLayerFilter* obplf,
+	const ObjectLayerPairFilter* olpf
+) {
+	Ref<XPhysicsSystem> system = Ref(new XPhysicsSystem(rustCleanUp, bpli, obplf, olpf));
 	return LeakRefT<XPhysicsSystem>(system);
 }
 
@@ -121,9 +145,4 @@ BodyID XBodyInterface::CreateBodyWithID(const BodyID &bodyId, const BodyCreation
 
 BodyID XBodyInterface::CreateAddBody(const BodyCreationSettings& settings, EActivation activation) {
 	return BodyInterface::CreateAndAddBody(settings, activation);
-}
-
-XBodyInterface* CreateBodyInterface(XPhysicsSystem* system, bool lock) {
-	BodyInterface* bodyItf = &system->BodyItf(lock);
-	return reinterpret_cast<XBodyInterface*>(bodyItf);
 }

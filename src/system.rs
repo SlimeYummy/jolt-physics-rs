@@ -9,8 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::{fmt, mem, ptr};
 
 use crate::base::{
-    AABox, BodyID, BodyType, BroadPhaseLayer, JQuat, JVec3, MotionQuality, MotionType, ObjectLayer, StaticArray,
-    SubShapeID, ValidateResult,
+    AABox, BodyID, BodyType, BroadPhaseLayer, JQuat, JRef, JRefTarget, JVec3, MotionQuality, MotionType, ObjectLayer,
+    StaticArray, SubShapeID, ValidateResult,
 };
 use crate::body::{Body, BodyCreationSettings};
 use crate::error::{JoltError, JoltResult};
@@ -57,14 +57,19 @@ pub(crate) mod ffi {
 
         type XPhysicsSystem;
         unsafe fn CreatePhysicSystem(
-            bpli: &BroadPhaseLayerInterface,
-            obplf: &ObjectVsBroadPhaseLayerFilter,
-            olpf: &ObjectLayerPairFilter,
+            clean_up: fn (zelf: Pin<&mut XPhysicsSystem>),
+            bpli: *const BroadPhaseLayerInterface,
+            obplf: *const ObjectVsBroadPhaseLayerFilter,
+            olpf: *const ObjectLayerPairFilter,
         ) -> *mut XPhysicsSystem;
         unsafe fn DropXPhysicsSystem(system: *mut XPhysicsSystem);
         unsafe fn CloneXPhysicsSystem(system: *mut XPhysicsSystem) -> *mut XPhysicsSystem;
         unsafe fn CountRefXPhysicsSystem(system: *const XPhysicsSystem) -> u32;
         fn GetPhysicsSystem(self: Pin<&mut XPhysicsSystem>) -> *mut PhysicsSystem;
+        unsafe fn GetBodyInterface(self: Pin<&mut XPhysicsSystem>, lock: bool) -> *mut XBodyInterface;
+        unsafe fn GetBroadPhaseLayerInterface(self: &XPhysicsSystem) -> *const BroadPhaseLayerInterface;
+        unsafe fn GetObjectVsBroadPhaseLayerFilter(self: &XPhysicsSystem) -> *const ObjectVsBroadPhaseLayerFilter;
+        unsafe fn GetObjectLayerPairFilter(self: &XPhysicsSystem) -> *const ObjectLayerPairFilter;
         fn Update(self: Pin<&mut XPhysicsSystem>, delta: f32) -> u32;
         fn GetBodies(self: &XPhysicsSystem, bodies: &mut Vec<BodyID>);
         fn GetActiveBodies(self: &XPhysicsSystem, body_type: BodyType, bodies: &mut Vec<BodyID>);
@@ -104,7 +109,6 @@ pub(crate) mod ffi {
         fn GetBounds(self: &PhysicsSystem) -> AABox;
 
         type XBodyInterface;
-        unsafe fn CreateBodyInterface(system: *mut XPhysicsSystem, lock: bool) -> *mut XBodyInterface;
         type BodyCreationSettings;
 
         fn CreateBody(self: Pin<&mut XBodyInterface>, settings: &BodyCreationSettings) -> BodyID;
@@ -476,13 +480,6 @@ pub struct PhysicsSystem<CL: ContactListener = (), BAL: BodyActivationListener =
 struct PhysicsSystemInner {
     x_system: NonNull<ffi::XPhysicsSystem>,
     raw_system: NonNull<ffi::PhysicsSystem>,
-
-    bpli_ptr: *mut u8,
-    bpli_cleanup: fn(ptr: *mut u8),
-    obplf_ptr: *mut u8,
-    obplfcleanupr: fn(ptr: *mut u8),
-    olpf_ptr: *mut u8,
-    olpf_cleanup: fn(ptr: *mut u8),
 }
 
 impl<CL: ContactListener, BAL: BodyActivationListener> fmt::Debug for PhysicsSystem<CL, BAL> {
@@ -515,19 +512,6 @@ impl<CL: ContactListener, BAL: BodyActivationListener> Drop for PhysicsSystem<CL
 
             ffi::DropXPhysicsSystem(self.as_x_ptr());
         }
-
-        if !self.inner.bpli_ptr.is_null() {
-            (self.inner.bpli_cleanup)(self.inner.bpli_ptr);
-            self.inner.bpli_ptr = ptr::null_mut();
-        }
-        if !self.inner.obplf_ptr.is_null() {
-            (self.inner.obplfcleanupr)(self.inner.obplf_ptr);
-            self.inner.obplf_ptr = ptr::null_mut();
-        }
-        if !self.inner.olpf_ptr.is_null() {
-            (self.inner.olpf_cleanup)(self.inner.olpf_ptr);
-            self.inner.olpf_ptr = ptr::null_mut();
-        }
     }
 }
 
@@ -543,40 +527,46 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
             let olpf_ptr = Box::into_raw(olpf) as *mut u8;
 
             let mut x_system = NonNull::new_unchecked(ffi::CreatePhysicSystem(
-                &*(bpli_ptr as *mut _),
-                &*(obplf_ptr as *mut _),
-                &*(olpf_ptr as *mut _),
+                Self::clean_up::<BPLI, OBPLF, OLPF>,
+                bpli_ptr as *const _,
+                obplf_ptr as *const _,
+                olpf_ptr as *const _,
             ));
-            let pin_system = Pin::new_unchecked(x_system.as_mut());
-            let raw_system = NonNull::new_unchecked(pin_system.GetPhysicsSystem());
-
-            fn bpli_cleanup<BPLI: BroadPhaseLayerInterface>(ptr: *mut u8) {
-                let _ = unsafe { VBox::<BPLI, BroadPhaseLayerInterfaceVTable>::from_raw(ptr as *mut _) };
-            }
-
-            fn obplf_cleanupr<OBPLF: ObjectVsBroadPhaseLayerFilter>(ptr: *mut u8) {
-                let _ = unsafe { VBox::<OBPLF, ObjectVsBroadPhaseLayerFilterVTable>::from_raw(ptr as *mut _) };
-            }
-
-            fn olpf_cleanup<OLPF: ObjectLayerPairFilter>(ptr: *mut u8) {
-                let _ = unsafe { VBox::<OLPF, ObjectLayerPairFilterVTable>::from_raw(ptr as *mut _) };
-            }
+            let raw_system = NonNull::new_unchecked(Pin::new_unchecked(x_system.as_mut()).GetPhysicsSystem());
 
             PhysicsSystem {
                 inner: Box::new(PhysicsSystemInner {
                     x_system,
                     raw_system,
-                    bpli_ptr,
-                    bpli_cleanup: bpli_cleanup::<BPLI>,
-                    obplf_ptr,
-                    obplfcleanupr: obplf_cleanupr::<OBPLF>,
-                    olpf_ptr,
-                    olpf_cleanup: olpf_cleanup::<OLPF>,
                 }),
                 cl_phantom: PhantomData,
                 bal_phantom: PhantomData,
             }
         }
+    }
+
+    fn clean_up<BPLI: BroadPhaseLayerInterface, OBPLF: ObjectVsBroadPhaseLayerFilter, OLPF: ObjectLayerPairFilter>(
+        zelf: Pin<&mut ffi::XPhysicsSystem>,
+    ) {
+        unsafe {
+            let bpli = zelf.GetBroadPhaseLayerInterface();
+            if !bpli.is_null() {
+                let _ = VBox::<BPLI, BroadPhaseLayerInterfaceVTable>::from_raw(bpli as *mut _);
+            }
+
+            let obplf = zelf.GetObjectVsBroadPhaseLayerFilter();
+            if !obplf.is_null() {
+                let _ = VBox::<OBPLF, ObjectVsBroadPhaseLayerFilterVTable>::from_raw(obplf as *mut _);
+            }
+
+            let olpf = zelf.GetObjectLayerPairFilter();
+            if !olpf.is_null() {
+                let _ = VBox::<OLPF, ObjectLayerPairFilterVTable>::from_raw(olpf as *mut _);
+            }
+        }
+
+        #[cfg(feature = "debug-print")]
+        println!("PhysicsSystem::clean_up called");
     }
 
     #[inline]
@@ -609,8 +599,34 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
         unsafe { Pin::new_unchecked(self.inner.raw_system.as_mut()) }
     }
 
+    #[inline]
     pub unsafe fn cpp_physics_system(&self) -> *mut u8 {
         self.as_x_ptr() as *mut u8
+    }
+
+    #[inline]
+    pub fn get_body_interface(&mut self) -> &mut BodyInterface {
+        unsafe { &mut *(self.as_x_mut().GetBodyInterface(false) as *mut _) }
+    }
+
+    #[inline]
+    pub fn body_itf(&mut self) -> &mut BodyInterface {
+        self.get_body_interface()
+    }
+
+    #[inline]
+    pub unsafe fn steal_body_interface(&mut self) -> JRef<BodyInterface> {
+        unsafe {
+            JRef(BorrowedBodyInterface {
+                body_itf: NonNull::new_unchecked(self.as_x_mut().GetBodyInterface(false) as *mut _),
+                phy_system: ffi::CloneXPhysicsSystem(self.as_x_ptr()),
+            })
+        }
+    }
+
+    #[inline]
+    pub unsafe fn steal_body_itf(&mut self) -> JRef<BodyInterface> {
+        self.steal_body_interface()
     }
 
     #[inline]
@@ -665,11 +681,6 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
                 false => Some(&*(current as *const _)),
             }
         }
-    }
-
-    #[inline]
-    pub fn body_interface(&mut self, lock: bool) -> BodyInterface {
-        BodyInterface::new(self, lock)
     }
 
     #[inline]
@@ -752,45 +763,23 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
 // BodyInterface
 //
 
-#[derive(Debug, Clone)]
-pub struct BodyInterface {
-    body_itf: *mut ffi::XBodyInterface,
-    _x_system: NonNull<ffi::XPhysicsSystem>,
-}
+pub struct BodyInterface(pub(crate) ffi::XBodyInterface);
 
-impl Drop for BodyInterface {
-    fn drop(&mut self) {
-        #[cfg(feature = "debug-print")]
-        println!(
-            "BodyInterface::drop {:?} {}",
-            self._x_system,
-            unsafe { ffi::CountRefXPhysicsSystem(self._x_system.as_ptr()) } - 1
-        );
-        unsafe { ffi::DropXPhysicsSystem(self._x_system.as_ptr()) }
+impl fmt::Debug for BodyInterface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BodyInterface").finish()
     }
 }
 
 impl BodyInterface {
-    pub fn new<CL: ContactListener, BAL: BodyActivationListener>(
-        system: &mut PhysicsSystem<CL, BAL>,
-        lock: bool,
-    ) -> BodyInterface {
-        unsafe {
-            BodyInterface {
-                body_itf: ffi::CreateBodyInterface(system.inner.x_system.as_ptr(), lock),
-                _x_system: NonNull::new_unchecked(ffi::CloneXPhysicsSystem(system.inner.x_system.as_ptr())),
-            }
-        }
-    }
-
     #[inline]
     fn as_ref(&self) -> &ffi::XBodyInterface {
-        unsafe { &*self.body_itf }
+        &self.0
     }
 
     #[inline]
     fn as_mut(&mut self) -> Pin<&mut ffi::XBodyInterface> {
-        unsafe { Pin::new_unchecked(&mut *self.body_itf) }
+        unsafe { Pin::new_unchecked(&mut self.0) }
     }
 
     pub fn create_body(&mut self, settings: &BodyCreationSettings) -> JoltResult<BodyID> {
@@ -1201,6 +1190,44 @@ impl BodyInterface {
     #[inline]
     pub fn invalidate_contact_cache(&mut self, body_id: BodyID) {
         self.as_mut().InvalidateContactCache(&body_id)
+    }
+}
+
+#[derive(Debug)]
+pub struct BorrowedBodyInterface {
+    body_itf: NonNull<BodyInterface>,
+    phy_system: *mut ffi::XPhysicsSystem,
+}
+
+unsafe impl JRefTarget for BodyInterface {
+    type JRaw = BorrowedBodyInterface;
+
+    #[inline]
+    fn name() -> &'static str {
+        "Character"
+    }
+
+    #[inline]
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { raw.body_itf.as_ref() }
+    }
+
+    #[inline]
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        BorrowedBodyInterface {
+            body_itf: raw.body_itf,
+            phy_system: unsafe { ffi::CloneXPhysicsSystem(raw.phy_system as *mut _) },
+        }
+    }
+
+    #[inline]
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropXPhysicsSystem(raw.phy_system);
+    }
+
+    #[inline]
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefXPhysicsSystem(raw.phy_system) }
     }
 }
 
