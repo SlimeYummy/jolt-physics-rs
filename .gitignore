@@ -15,4 +15,7 @@ Cargo.lock
 
 Assets/
 
+.cargo/
 .vscode/
+
+flag_check*
