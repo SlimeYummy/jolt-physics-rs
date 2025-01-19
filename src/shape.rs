@@ -1,7 +1,7 @@
 use core::fmt;
 use cxx::{kind, type_id, ExternType};
 use glam::{Quat, Vec3, Vec3A};
-#[cfg(features = "glam-ext")]
+#[cfg(feature = "glam-ext")]
 use glam_ext::{Isometry3A, Transform3A};
 use static_assertions::const_assert_eq;
 use std::mem;
@@ -11,6 +11,7 @@ use std::ptr::NonNull;
 use crate::base::{AABox, IndexedTriangle, JMut, JQuat, JRef, JRefTarget, JVec3, Plane, ShapeSubType, ShapeType};
 use crate::consts::{DEFAULT_CONVEX_RADIUS, DEFAULT_ERROR_CONVEX_RADIUS, MAX_CONVEX_RADIUS, MIN_CONVEX_RADIUS};
 use crate::error::{JoltError, JoltResult};
+use crate::JMutTarget;
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
@@ -879,7 +880,7 @@ pub fn create_sphere_shape_mut(settings: &SphereShapeSettings) -> JoltResult<JMu
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -895,7 +896,7 @@ pub fn create_box_shape_mut(settings: &BoxShapeSettings) -> JoltResult<JMut<Shap
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -913,7 +914,7 @@ pub fn create_capsule_shape_mut(settings: &CapsuleShapeSettings) -> JoltResult<J
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -932,7 +933,7 @@ pub fn create_tapered_capsule_shape_mut(settings: &TaperedCapsuleShapeSettings) 
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -950,7 +951,7 @@ pub fn create_cylinder_shape_mut(settings: &CylinderShapeSettings) -> JoltResult
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -969,7 +970,7 @@ pub fn create_tapered_cylinder_shape_mut(settings: &TaperedCylinderShapeSettings
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -987,7 +988,7 @@ pub fn create_convex_hull_shape_mut(settings: &ConvexHullShapeSettings) -> JoltR
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1005,7 +1006,7 @@ pub fn create_triangle_shape_mut(settings: &TriangleShapeSettings) -> JoltResult
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1023,7 +1024,7 @@ pub fn create_plane_shape_mut(settings: &PlaneShapeSettings) -> JoltResult<JMut<
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1039,7 +1040,7 @@ pub fn create_mesh_shape_mut(settings: &MeshShapeSettings) -> JoltResult<JMut<Sh
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1058,7 +1059,7 @@ pub fn create_height_field_shape_mut(settings: &HeightFieldShapeSettings) -> Jol
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1076,7 +1077,7 @@ pub fn create_empty_shape_mut(settings: &EmptyShapeSettings) -> JoltResult<JMut<
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1094,7 +1095,7 @@ pub fn create_scaled_shape_mut(settings: &ScaledShapeSettings) -> JoltResult<JMu
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1113,7 +1114,7 @@ pub fn create_rotated_translated_shape_mut(settings: &RotatedTranslatedShapeSett
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1132,7 +1133,7 @@ pub fn create_offset_center_of_mass_shape_mut(settings: &OffsetCenterOfMassShape
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<Shape>::new_unchecked(ptr))
     }
 }
 
@@ -1156,7 +1157,7 @@ pub fn create_static_compound_shape_mut(
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<StaticCompoundShape>::new_unchecked(ptr))
     }
 }
 
@@ -1182,7 +1183,7 @@ pub fn create_mutable_compound_shape_mut(
         if ptr.is_null() {
             return Err(JoltError::CreateShape);
         }
-        Ok(JMut::new_unchecked(ptr))
+        Ok(JMut::<MutableCompoundShape>::new_unchecked(ptr))
     }
 }
 
@@ -1202,7 +1203,7 @@ impl fmt::Debug for PhysicsMaterial {
 }
 
 unsafe impl JRefTarget for PhysicsMaterial {
-    type JRefRaw = ffi::PhysicsMaterial;
+    type JRaw = NonNull<PhysicsMaterial>;
 
     #[inline]
     fn name() -> &'static str {
@@ -1210,28 +1211,30 @@ unsafe impl JRefTarget for PhysicsMaterial {
     }
 
     #[inline]
-    fn from_ptr(raw: *const ffi::PhysicsMaterial) -> *const PhysicsMaterial {
-        raw as *const _
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { raw.as_ref() }
     }
 
     #[inline]
-    fn from_non_null(raw: NonNull<ffi::PhysicsMaterial>) -> NonNull<PhysicsMaterial> {
-        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        NonNull::new_unchecked(ffi::ClonePhysicsMaterial(raw.as_ptr() as *mut _) as *mut _)
     }
 
     #[inline]
-    unsafe fn clone_ref(&mut self) -> NonNull<PhysicsMaterial> {
-        NonNull::new_unchecked(ffi::ClonePhysicsMaterial(&mut self.0) as *mut _)
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropPhysicsMaterial(raw.as_ptr() as *mut _);
     }
 
     #[inline]
-    unsafe fn drop_ref(&mut self) {
-        ffi::DropPhysicsMaterial(&mut self.0);
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefPhysicsMaterial(raw.as_ptr() as *const _) }
     }
+}
 
+impl PhysicsMaterial {
     #[inline]
-    fn count_ref(&self) -> u32 {
-        unsafe { ffi::CountRefPhysicsMaterial(&self.0) }
+    pub(crate) unsafe fn cast_ptr(p: *const ffi::PhysicsMaterial) -> *const PhysicsMaterial {
+        p as *const PhysicsMaterial
     }
 }
 
@@ -1243,12 +1246,16 @@ const_assert_eq!(unsafe { mem::transmute::<Option<JRef<Shape>>, usize>(None) }, 
 
 impl fmt::Debug for Shape {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Shape").finish()
+        f.debug_struct("Shape")
+            .field("type", &self.get_type())
+            .field("sub_type", &self.get_sub_type())
+            .field("user_data", &self.get_user_data())
+            .finish()
     }
 }
 
 unsafe impl JRefTarget for Shape {
-    type JRefRaw = ffi::Shape;
+    type JRaw = NonNull<Shape>;
 
     #[inline]
     fn name() -> &'static str {
@@ -1256,41 +1263,62 @@ unsafe impl JRefTarget for Shape {
     }
 
     #[inline]
-    fn from_ptr(raw: *const ffi::Shape) -> *const Shape {
-        raw as *const _
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { raw.as_ref() }
     }
 
     #[inline]
-    fn from_non_null(raw: NonNull<ffi::Shape>) -> NonNull<Shape> {
-        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        NonNull::new_unchecked(ffi::CloneShape(raw.as_ptr() as *mut _) as *mut _)
     }
 
     #[inline]
-    unsafe fn clone_ref(&mut self) -> NonNull<Shape> {
-        NonNull::new_unchecked(ffi::CloneShape(&mut self.0) as *mut _)
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropShape(raw.as_ptr() as *mut _);
     }
 
     #[inline]
-    unsafe fn drop_ref(&mut self) {
-        ffi::DropShape(&mut self.0);
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefShape(raw.as_ptr() as *mut _) }
+    }
+}
+
+unsafe impl JMutTarget for Shape {
+    #[inline]
+    unsafe fn make_mut(raw: &mut Self::JRaw) -> &mut Self {
+        unsafe { raw.as_mut() }
     }
 
     #[inline]
-    fn count_ref(&self) -> u32 {
-        unsafe { ffi::CountRefShape(&self.0) }
+    unsafe fn steal_raw(raw: &Self::JRaw) -> Self::JRaw {
+        *raw
+    }
+}
+
+impl JRef<Shape> {
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut ffi::Shape) -> JRef<Shape> {
+        JRef(unsafe { NonNull::new_unchecked(raw as *mut _) })
+    }
+}
+
+impl JMut<Shape> {
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut ffi::Shape) -> JMut<Shape> {
+        JMut(unsafe { NonNull::new_unchecked(raw as *mut _) })
     }
 }
 
 macro_rules! shape_methods {
-    ($type:ty) => {
+    ($type:ty, $ref:ty) => {
         impl $type {
             #[inline]
-            fn as_ref(&self) -> &<Self as JRefTarget>::JRefRaw {
+            fn as_ref(&self) -> &$ref {
                 &self.0
             }
 
             #[inline]
-            fn as_mut(&mut self) -> Pin<&mut <Self as JRefTarget>::JRefRaw> {
+            fn as_mut(&mut self) -> Pin<&mut $ref> {
                 unsafe { Pin::new_unchecked(&mut self.0) }
             }
 
@@ -1352,18 +1380,30 @@ macro_rules! shape_methods {
     };
 }
 
-shape_methods!(Shape);
+shape_methods!(Shape, ffi::Shape);
+
+impl Shape {
+    #[inline]
+    pub(crate) unsafe fn cast_ptr(p: *const ffi::Shape) -> *const Shape {
+        p as *const Shape
+    }
+}
 
 pub struct StaticCompoundShape(pub(crate) ffi::StaticCompoundShape);
 
 impl fmt::Debug for StaticCompoundShape {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("StaticCompoundShape").finish()
+        f.debug_struct("StaticCompoundShape")
+            .field("type", &self.get_type())
+            .field("sub_type", &self.get_sub_type())
+            .field("num_sub_shapes", &self.get_num_sub_shapes())
+            .field("user_data", &self.get_user_data())
+            .finish()
     }
 }
 
 unsafe impl JRefTarget for StaticCompoundShape {
-    type JRefRaw = ffi::StaticCompoundShape;
+    type JRaw = NonNull<StaticCompoundShape>;
 
     #[inline]
     fn name() -> &'static str {
@@ -1371,35 +1411,49 @@ unsafe impl JRefTarget for StaticCompoundShape {
     }
 
     #[inline]
-    fn from_ptr(raw: *const ffi::StaticCompoundShape) -> *const Self {
-        raw as *const _
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { mem::transmute::<&Self::JRaw, &Self>(raw) }
     }
 
     #[inline]
-    fn from_non_null(raw: NonNull<ffi::StaticCompoundShape>) -> NonNull<Self> {
-        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        NonNull::new_unchecked(ffi::CloneStaticCompoundShape(raw.as_ptr() as *mut _) as *mut _)
     }
 
     #[inline]
-    unsafe fn clone_ref(&mut self) -> NonNull<Self> {
-        NonNull::new_unchecked(ffi::CloneStaticCompoundShape(&mut self.0) as *mut _)
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropStaticCompoundShape(raw.as_ptr() as *mut _);
     }
 
     #[inline]
-    unsafe fn drop_ref(&mut self) {
-        ffi::DropStaticCompoundShape(&mut self.0);
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefStaticCompoundShape(raw.as_ptr() as *const _) }
+    }
+}
+
+unsafe impl JMutTarget for StaticCompoundShape {
+    #[inline]
+    unsafe fn make_mut(raw: &mut Self::JRaw) -> &mut Self {
+        unsafe { raw.as_mut() }
     }
 
     #[inline]
-    fn count_ref(&self) -> u32 {
-        unsafe { ffi::CountRefStaticCompoundShape(&self.0) }
+    unsafe fn steal_raw(raw: &Self::JRaw) -> Self::JRaw {
+        *raw
+    }
+}
+
+impl JMut<StaticCompoundShape> {
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut ffi::StaticCompoundShape) -> JMut<StaticCompoundShape> {
+        JMut(unsafe { NonNull::new_unchecked(raw as *mut _) })
     }
 }
 
 impl From<JMut<StaticCompoundShape>> for JMut<Shape> {
     #[inline]
     fn from(compund: JMut<StaticCompoundShape>) -> JMut<Shape> {
-        let shape = unsafe { JMut::new_unchecked(compund.0.as_ptr() as *mut _) };
+        let shape = unsafe { JMut::<Shape>::new_unchecked(compund.0.as_ptr() as *mut _) };
         mem::forget(compund);
         shape
     }
@@ -1408,13 +1462,13 @@ impl From<JMut<StaticCompoundShape>> for JMut<Shape> {
 impl From<JRef<StaticCompoundShape>> for JRef<Shape> {
     #[inline]
     fn from(compund: JRef<StaticCompoundShape>) -> JRef<Shape> {
-        let shape = unsafe { JRef::new_unchecked(compund.0.as_ptr() as *mut _) };
+        let shape = unsafe { JRef::<Shape>::new_unchecked(compund.0.as_ptr() as *mut _) };
         mem::forget(compund);
         shape
     }
 }
 
-shape_methods!(StaticCompoundShape);
+shape_methods!(StaticCompoundShape, ffi::StaticCompoundShape);
 
 impl StaticCompoundShape {
     #[inline]
@@ -1442,12 +1496,17 @@ pub struct MutableCompoundShape(pub(crate) ffi::MutableCompoundShape);
 
 impl fmt::Debug for MutableCompoundShape {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MutableCompoundShape").finish()
+        f.debug_struct("MutableCompoundShape")
+            .field("type", &self.get_type())
+            .field("sub_type", &self.get_sub_type())
+            .field("num_sub_shapes", &self.get_num_sub_shapes())
+            .field("user_data", &self.get_user_data())
+            .finish()
     }
 }
 
 unsafe impl JRefTarget for MutableCompoundShape {
-    type JRefRaw = ffi::MutableCompoundShape;
+    type JRaw = NonNull<MutableCompoundShape>;
 
     #[inline]
     fn name() -> &'static str {
@@ -1455,35 +1514,49 @@ unsafe impl JRefTarget for MutableCompoundShape {
     }
 
     #[inline]
-    fn from_ptr(raw: *const ffi::MutableCompoundShape) -> *const MutableCompoundShape {
-        raw as *const _
+    unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
+        unsafe { raw.as_ref() }
     }
 
     #[inline]
-    fn from_non_null(raw: NonNull<ffi::MutableCompoundShape>) -> NonNull<MutableCompoundShape> {
-        unsafe { NonNull::new_unchecked(raw.as_ptr() as *mut _) }
+    unsafe fn clone_raw(raw: &Self::JRaw) -> Self::JRaw {
+        NonNull::new_unchecked(ffi::CloneMutableCompoundShape(raw.as_ptr() as *mut _) as *mut _)
     }
 
     #[inline]
-    unsafe fn clone_ref(&mut self) -> NonNull<MutableCompoundShape> {
-        NonNull::new_unchecked(ffi::CloneMutableCompoundShape(&mut self.0) as *mut _)
+    unsafe fn drop_raw(raw: &mut Self::JRaw) {
+        ffi::DropMutableCompoundShape(raw.as_ptr() as *mut _);
     }
 
     #[inline]
-    unsafe fn drop_ref(&mut self) {
-        ffi::DropMutableCompoundShape(&mut self.0);
+    unsafe fn count_ref(raw: &Self::JRaw) -> u32 {
+        unsafe { ffi::CountRefMutableCompoundShape(raw.as_ptr() as *const _) }
+    }
+}
+
+unsafe impl JMutTarget for MutableCompoundShape {
+    #[inline]
+    unsafe fn make_mut(raw: &mut Self::JRaw) -> &mut Self {
+        unsafe { raw.as_mut() }
     }
 
     #[inline]
-    fn count_ref(&self) -> u32 {
-        unsafe { ffi::CountRefMutableCompoundShape(&self.0) }
+    unsafe fn steal_raw(raw: &Self::JRaw) -> Self::JRaw {
+        *raw
+    }
+}
+
+impl JMut<MutableCompoundShape> {
+    #[inline]
+    pub(crate) unsafe fn new_unchecked(raw: *mut ffi::MutableCompoundShape) -> JMut<MutableCompoundShape> {
+        JMut(unsafe { NonNull::new_unchecked(raw as *mut _) })
     }
 }
 
 impl From<JMut<MutableCompoundShape>> for JMut<Shape> {
     #[inline]
     fn from(compund: JMut<MutableCompoundShape>) -> JMut<Shape> {
-        let shape = unsafe { JMut::new_unchecked(compund.0.as_ptr() as *mut _) };
+        let shape = unsafe { JMut::<Shape>::new_unchecked(compund.0.as_ptr() as *mut _) };
         mem::forget(compund);
         shape
     }
@@ -1492,13 +1565,13 @@ impl From<JMut<MutableCompoundShape>> for JMut<Shape> {
 impl From<JRef<MutableCompoundShape>> for JRef<Shape> {
     #[inline]
     fn from(compund: JRef<MutableCompoundShape>) -> JRef<Shape> {
-        let shape = unsafe { JRef::new_unchecked(compund.0.as_ptr() as *mut _) };
+        let shape = unsafe { JRef::<Shape>::new_unchecked(compund.0.as_ptr() as *mut _) };
         mem::forget(compund);
         shape
     }
 }
 
-shape_methods!(MutableCompoundShape);
+shape_methods!(MutableCompoundShape, ffi::MutableCompoundShape);
 
 impl MutableCompoundShape {
     #[inline]
@@ -1567,7 +1640,7 @@ impl MutableCompoundShape {
         }
     }
 
-    #[cfg(features = "glam-ext")]
+    #[cfg(feature = "glam-ext")]
     #[inline]
     pub fn modify_shapes_by_isometry(&mut self, sub_shape_start_idx: u32, transform: &[Isometry3A]) {
         unsafe {
@@ -1582,7 +1655,7 @@ impl MutableCompoundShape {
         }
     }
 
-    #[cfg(features = "glam-ext")]
+    #[cfg(feature = "glam-ext")]
     #[inline]
     pub fn modify_shapes_by_transform(&mut self, sub_shape_start_idx: u32, transform: &[Transform3A]) {
         unsafe {
