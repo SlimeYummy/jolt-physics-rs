@@ -1,5 +1,6 @@
-use crate::keys::*;
 use glam::{Quat, Vec3, Vec3A};
+use jolt_physics_rs::debug::*;
+use jolt_physics_rs::keys::*;
 use jolt_physics_rs::*;
 use std::f32::consts::PI;
 
@@ -7,19 +8,17 @@ use std::f32::consts::PI;
 const FPS: f32 = 120.0;
 
 struct JoltDemo {
-    system: Box<PhysicsSystem>,
-    body_itf: BodyInterface,
+    system: PhysicsSystem,
     duration: f32,
-    chara_common: Option<CharacterCommon>,
-    chara_virtual: Option<CharacterVirtual>,
-    mutable_object: Option<(RefMutableCompoundShape, BodyID)>,
+    character: Option<JMut<CharacterVirtual<CharacterContactListenerImpl>>>,
+    mutable_object: Option<(JMut<MutableCompoundShape>, BodyID)>,
     cv_desired_velocity: Vec3A,
     cv_player_body_id: BodyID,
 }
 
 impl DebugApp for JoltDemo {
-    fn get_physics_system(&mut self) -> RefPhysicsSystem {
-        self.system.inner_ref().clone()
+    fn cpp_physics_system(&mut self) -> *mut u8 {
+        unsafe { self.system.cpp_physics_system() }
     }
 
     fn update_frame(
@@ -40,7 +39,7 @@ impl DebugApp for JoltDemo {
 
     fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> Vec3A {
         let fwd = Vec3A::new(pitch.cos() * heading.cos(), pitch.sin(), pitch.cos() * heading.sin());
-        if let Some(chara) = &self.chara_virtual {
+        if let Some(chara) = &self.character {
             let pos = chara.get_position();
             let ret = Vec3A::new(pos.x, pos.y + 1.0, pos.z) - 5.0 * fwd;
             return ret;
@@ -51,17 +50,18 @@ impl DebugApp for JoltDemo {
 
 impl JoltDemo {
     pub fn new() -> Box<dyn DebugApp> {
-        let mut system = PhysicsSystem::new();
-        let body_itf = BodyInterface::new(system.as_mut(), false);
+        let system = PhysicsSystem::<(), ()>::new(
+            BroadPhaseLayerInterfaceImpl::new_vbox(BroadPhaseLayerInterfaceImpl),
+            ObjectVsBroadPhaseLayerFilterImpl::new_vbox(ObjectVsBroadPhaseLayerFilterImpl),
+            ObjectLayerPairFilterImpl::new_vbox(ObjectLayerPairFilterImpl),
+        );
         let mut app = Box::new(Self {
             system,
-            body_itf,
             duration: 0.0,
-            chara_common: None,
-            chara_virtual: None,
+            character: None,
             mutable_object: None,
             cv_desired_velocity: Vec3A::ZERO,
-            cv_player_body_id: BodyID::invalid(),
+            cv_player_body_id: BodyID::INVALID,
         });
 
         app.create_dyn_cube().unwrap();
@@ -78,46 +78,42 @@ impl JoltDemo {
 
         app.create_sensor_sphere().unwrap();
 
-        let chara_shape = create_capsule_shape(&CapsuleSettings::new(0.5 * 1.35, 0.3)).unwrap();
-        let chara_shape = create_rotated_translated_shape(&RotatedTranslatedSettings::new(
-            chara_shape,
+        let chara_shape = create_capsule_shape(&CapsuleShapeSettings::new(0.5 * 1.35, 0.3)).unwrap();
+        let chara_shape = create_rotated_translated_shape(&RotatedTranslatedShapeSettings::new(
+            chara_shape.into(),
             Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
             Quat::IDENTITY,
         ))
         .unwrap();
 
-        // common character
-        let mut chara_common = CharacterCommon::new_ex(
-            app.system.as_mut(),
-            &CharacterCommonSettings::new(chara_shape.clone(), PHY_LAYER_BODY_PLAYER),
-            Vec3A::new(0.0, 5.0, 1.0),
-            Quat::IDENTITY,
-            0,
-            true,
-            true,
-        );
-
         // virtual character
-        let chara_virtual = CharacterVirtual::new(
-            app.system.as_mut(),
+        let mut character = CharacterVirtual::new(
+            &mut app.system,
             &CharacterVirtualSettings::new(chara_shape),
             Vec3A::new(4.0, 5.0, 4.0),
             Quat::IDENTITY,
         );
+        character.set_listener(Some(CharacterContactListenerImpl::new_vbox(
+            CharacterContactListenerImpl {
+                allow_sliding: false,
+                body_itf: unsafe { app.system.steal_body_itf() },
+            },
+        )));
 
-        let target_shape = create_capsule_shape(&CapsuleSettings::new(0.5 * 1.2, 0.25)).unwrap();
-        let target_shape = create_rotated_translated_shape(&RotatedTranslatedSettings::new(
+        let target_shape = create_capsule_shape(&CapsuleShapeSettings::new(0.5 * 1.2, 0.25)).unwrap();
+        let target_shape = create_rotated_translated_shape(&RotatedTranslatedShapeSettings::new(
             target_shape,
             Vec3A::new(0.0, 0.5 * 1.35 + 0.3, 0.0),
             Quat::IDENTITY,
         ))
         .unwrap();
         app.cv_player_body_id = app
-            .body_itf
+            .system
+            .body_itf()
             .create_add_body(
-                &BodySettings::new(
+                &BodyCreationSettings::new(
                     target_shape,
-                    PHY_LAYER_BODY_PLAYER,
+                    LAYER_PLAYER,
                     MotionType::Kinematic,
                     Vec3A::new(4.0, 5.0, 4.0),
                     Quat::IDENTITY,
@@ -126,14 +122,12 @@ impl JoltDemo {
             )
             .unwrap();
 
-        app.system.prepare();
-
-        app.chara_common = Some(chara_common);
-        app.chara_virtual = Some(chara_virtual);
+        app.system.optimize_broad_phase();
+        app.character = Some(character);
         app
     }
 
-    fn update(&mut self, delta: f32, camera: &CameraState, mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) {
+    fn update(&mut self, delta: f32, camera: &CameraState, _mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) {
         self.duration += delta;
 
         let jump = keyboard.is_key_pressed(DIK_SPACE);
@@ -161,23 +155,14 @@ impl JoltDemo {
         let rotation = Quat::from_rotation_arc(Vec3::X, cam_fwd.into());
         move_dir = rotation * move_dir;
 
-        // if let Some(chara) = &mut self.chara_common {
-        //     if chara.is_supported() {
-        //         let current_velocity = chara.get_linear_velocity(false);
-        //         let mut desired_velocity = 5.0 * move_dir;
-        //         desired_velocity.y = current_velocity.y;
-        //         let new_velocity = desired_velocity * 0.75 + current_velocity * 0.25;
-        //         chara.set_linear_velocity(&new_velocity, false);
-        //     }
-        // }
+        if let Some(chara) = &mut self.character {
+            chara.get_listener_mut().unwrap().allow_sliding = !move_dir.abs_diff_eq(Vec3A::ZERO, 1e-6);
 
-        if let Some(chara) = &mut self.chara_virtual {
             let mut new_velocity;
             chara.update_ground_velocity();
             let ground_velocity = chara.get_ground_velocity();
             let linear_velocity = chara.get_linear_velocity();
             let moving_towards_ground = (linear_velocity.y - ground_velocity.y) < 0.1;
-            // println!("ground_velocity => {:?} {:?}", ground_velocity, linear_velocity);
             if chara.get_ground_state() == GroundState::OnGround && moving_towards_ground {
                 new_velocity = ground_velocity;
                 if jump {
@@ -198,86 +183,86 @@ impl JoltDemo {
             chara.set_linear_velocity(new_velocity);
 
             chara.extended_update(
-                PHY_LAYER_BODY_PLAYER,
+                LAYER_PLAYER,
                 1.0 / FPS,
                 self.system.get_gravity(),
                 &ExtendedUpdateSettings::default(),
             );
 
-            self.body_itf
-                .set_position(self.cv_player_body_id, chara.get_position(), true);
+            if self.cv_player_body_id.is_valid() {
+                self.system
+                    .body_itf()
+                    .set_position(self.cv_player_body_id, chara.get_position(), true);
+            }
         }
 
         self.update_dyn_mutable_compound();
 
         self.system.update(1.0 / FPS);
-
-        if let Some(chara) = &mut self.chara_common {
-            chara.post_simulation(0.1, false);
-        }
     }
 
     fn create_ground(&mut self) -> JoltResult<BodyID> {
         println!("create_ground");
-        let ground = create_plane_shape(&PlaneSettings::new(Plane::new(Vec3::Y, 0.0), 50.0))?;
-        self.body_itf.create_add_body(
-            &BodySettings::new_static(ground, PHY_LAYER_STATIC, Vec3A::new(0.0, 0.0, 50.0), Quat::IDENTITY),
+        let ground = create_plane_shape(&PlaneShapeSettings::new(Plane::new(Vec3::Y, 0.0), 50.0))?;
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new_static(ground, LAYER_STATIC, Vec3A::new(0.0, 0.0, 50.0), Quat::IDENTITY),
             false,
         )
     }
 
     fn create_dyn_cube(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_cube");
-        let boxx = create_box_shape(&BoxSettings::new(0.5, 0.5, 0.5))?;
-        let mut bs = BodySettings::new(
+        let boxx = create_box_shape(&BoxShapeSettings::new(0.5, 0.5, 0.5))?;
+        println!("{}", boxx.count_ref());
+        let mut bs = BodyCreationSettings::new(
             boxx,
-            PHY_LAYER_DYNAMIC,
+            LAYER_DYNAMIC,
             MotionType::Dynamic,
             Vec3A::new(8.0, 15.0, 8.0),
             Quat::IDENTITY,
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 10.0;
-        self.body_itf.create_add_body(&bs, true)
+        self.system.body_itf().create_add_body(&bs, true)
     }
 
     fn create_dyn_sphere(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_sphere");
-        let sphere = create_sphere_shape(&SphereSettings::new(0.8))?;
-        let mut bs = BodySettings::new(
+        let sphere = create_sphere_shape(&SphereShapeSettings::new(0.8))?;
+        let mut bs = BodyCreationSettings::new(
             sphere,
-            PHY_LAYER_DYNAMIC,
+            LAYER_DYNAMIC,
             MotionType::Dynamic,
             Vec3A::new(10.0, 20.0, 10.0),
             Quat::IDENTITY,
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 25.0;
-        self.body_itf.create_add_body(&bs, true)
+        self.system.body_itf().create_add_body(&bs, true)
     }
 
     fn create_dyn_box(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_box");
-        let long_box = create_box_shape(&BoxSettings::new(0.5, 1.0, 0.5))?;
-        let mut bs = BodySettings::new(
+        let long_box = create_box_shape(&BoxShapeSettings::new(0.5, 1.0, 0.5))?;
+        let mut bs = BodyCreationSettings::new(
             long_box,
-            PHY_LAYER_DYNAMIC,
+            LAYER_DYNAMIC,
             MotionType::Dynamic,
             Vec3A::new(2.0, 20.0, 10.0),
             Quat::IDENTITY,
         );
         bs.override_mass_properties = OverrideMassProperties::CalculateInertia;
         bs.mass_properties.mass = 70.0;
-        self.body_itf.create_add_body(&bs, true)
+        self.system.body_itf().create_add_body(&bs, true)
     }
 
     fn create_dyn_tapered_capsule(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_tapered_capsule");
-        let obj = create_tapered_capsule_shape(&TaperedCapsuleSettings::new(1.0, 1.0, 0.3))?;
-        self.body_itf.create_add_body(
-            &BodySettings::new(
+        let obj = create_tapered_capsule_shape(&TaperedCapsuleShapeSettings::new(1.0, 1.0, 0.3))?;
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new(
                 obj,
-                PHY_LAYER_DYNAMIC,
+                LAYER_DYNAMIC,
                 MotionType::Dynamic,
                 Vec3A::new(8.0, 30.0, 16.0),
                 Quat::IDENTITY,
@@ -288,16 +273,16 @@ impl JoltDemo {
 
     fn create_dyn_convex_hull(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_convex_hull");
-        let convex = create_convex_hull_shape(&ConvexHullSettings::new(&[
+        let convex = create_convex_hull_shape(&ConvexHullShapeSettings::new(&[
             Vec3A::new(1.0, 1.0, 1.0),
             Vec3A::new(1.0, -1.0, -1.0),
             Vec3A::new(-1.0, -1.0, 1.0),
             Vec3A::new(-1.0, 1.0, -1.0),
         ]))?;
-        self.body_itf.create_add_body(
-            &BodySettings::new(
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new(
                 convex,
-                PHY_LAYER_DYNAMIC,
+                LAYER_DYNAMIC,
                 MotionType::Dynamic,
                 Vec3A::new(-4.0, 30.0, 10.0),
                 Quat::IDENTITY,
@@ -308,18 +293,18 @@ impl JoltDemo {
 
     fn create_dyn_static_compound(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_static_compound");
-        let capsule = create_capsule_shape(&CapsuleSettings::new(0.25, 0.5))?;
-        let boxx = create_box_shape(&BoxSettings::new(0.1, 0.1, 1.0))?;
+        let capsule = create_capsule_shape(&CapsuleShapeSettings::new(0.25, 0.5))?;
+        let boxx = create_box_shape(&BoxShapeSettings::new(0.1, 0.1, 1.0))?;
         let sub_shapes = vec![
             SubShapeSettings::new(capsule, Vec3A::new(0.0, 0.25, 0.0), Quat::IDENTITY),
             SubShapeSettings::new(boxx.clone(), Vec3A::new(0.0, 0.0, 0.0), Quat::IDENTITY),
             SubShapeSettings::new(boxx.clone(), Vec3A::new(0.0, 0.0, 0.0), Quat::from_rotation_y(PI / 2.0)),
         ];
-        let static_compound = create_static_compound_shape(&StaticCompoundSettings::new(&sub_shapes))?;
-        self.body_itf.create_add_body(
-            &BodySettings::new(
+        let static_compound = create_static_compound_shape(&StaticCompoundShapeSettings::new(&sub_shapes))?;
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new(
                 static_compound.into(),
-                PHY_LAYER_DYNAMIC,
+                LAYER_DYNAMIC,
                 MotionType::Dynamic,
                 Vec3A::new(7.0, 0.0, 15.0),
                 Quat::IDENTITY,
@@ -330,17 +315,17 @@ impl JoltDemo {
 
     fn create_dyn_mutable_compound(&mut self) -> JoltResult<BodyID> {
         println!("create_dyn_mutable_compound");
-        let sphere = create_sphere_shape(&SphereSettings::new(0.75))?;
-        let boxx = create_box_shape(&BoxSettings::new(0.1, 0.1, 1.0))?;
+        let sphere = create_sphere_shape(&SphereShapeSettings::new(0.75))?;
+        let boxx = create_box_shape(&BoxShapeSettings::new(0.1, 0.1, 1.0))?;
         let sub_shapes = vec![
             SubShapeSettings::new(sphere, Vec3A::new(0.0, 0.0, 0.0), Quat::IDENTITY),
-            SubShapeSettings::new(boxx.clone(), Vec3A::new(0.0, 0.0, 0.0), Quat::IDENTITY),
+            SubShapeSettings::new(boxx, Vec3A::new(0.0, 0.0, 0.0), Quat::IDENTITY),
         ];
-        let mutable_compound = create_mutable_compound_shape(&MutableCompoundSettings::new(&sub_shapes))?;
-        let body_id = self.body_itf.create_add_body(
-            &BodySettings::new(
-                mutable_compound.clone().into(),
-                PHY_LAYER_DYNAMIC,
+        let mut mutable_compound = create_mutable_compound_shape_mut(&MutableCompoundShapeSettings::new(&sub_shapes))?;
+        let body_id = self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new(
+                unsafe { mutable_compound.steal_ref().into() },
+                LAYER_DYNAMIC,
                 MotionType::Dynamic,
                 Vec3A::new(7.0, 3.0, -7.0),
                 Quat::IDENTITY,
@@ -357,14 +342,13 @@ impl JoltDemo {
             None => return,
         };
         let previous_center_of_mass = mutable_compound.get_center_of_mass();
-        unsafe {
-            mutable_compound.modify_shapes(
-                0,
-                &[Vec3A::new(0.0, 0.0, 0.0), Vec3A::new(0.0, 0.0, 0.0)],
-                &[Quat::IDENTITY, Quat::from_rotation_x(self.duration * PI / 4.0)],
-            )
-        };
-        self.body_itf
+        mutable_compound.modify_shapes(
+            0,
+            &[Vec3A::new(0.0, 0.0, 0.0), Vec3A::new(0.0, 0.0, 0.0)],
+            &[Quat::IDENTITY, Quat::from_rotation_x(self.duration * PI / 4.0)],
+        );
+        self.system
+            .body_itf()
             .notify_shape_changed(body_id, previous_center_of_mass, false, true);
     }
 
@@ -406,10 +390,10 @@ impl JoltDemo {
             vertices.extend_from_slice(&[rs2, b2, rb2]);
             indexes.push(IndexedTriangle::new(idx * 18 + 15, idx * 18 + 16, idx * 18 + 17, 0));
         }
-        let settings = MeshSettings::new(&vertices, &indexes);
+        let settings = MeshShapeSettings::new(&vertices, &indexes);
         let mesh = create_mesh_shape(&settings)?;
-        self.body_itf.create_add_body(
-            &BodySettings::new_static(mesh, PHY_LAYER_STATIC, Vec3A::new(2.0, 0.0, 15.0), Quat::IDENTITY),
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new_static(mesh, LAYER_STATIC, Vec3A::new(2.0, 0.0, 15.0), Quat::IDENTITY),
             false,
         )
     }
@@ -429,14 +413,14 @@ impl JoltDemo {
                 samples.push(z);
             }
         }
-        let mut settings = HeightFieldSettings::new(&samples, 32);
+        let mut settings = HeightFieldShapeSettings::new(&samples, 32);
         settings.offset = Vec3A::new(0.0, 0.0, 0.0);
         settings.scale = Vec3A::new(1.0, 1.0, 1.0);
         let height_field = create_height_field_shape(&settings)?;
-        self.body_itf.create_add_body(
-            &BodySettings::new_static(
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new_static(
                 height_field,
-                PHY_LAYER_STATIC,
+                LAYER_STATIC,
                 Vec3A::new(-16.0, 0.0, -31.0),
                 Quat::IDENTITY,
             ),
@@ -446,17 +430,164 @@ impl JoltDemo {
 
     fn create_sensor_sphere(&mut self) -> JoltResult<BodyID> {
         println!("create_sensor_sphere");
-        let sphere = create_sphere_shape(&SphereSettings::new(4.0))?;
-        self.body_itf.create_add_body(
-            &BodySettings::new_sensor(
+        let sphere = create_sphere_shape(&SphereShapeSettings::new(4.0))?;
+        self.system.body_itf().create_add_body(
+            &BodyCreationSettings::new_sensor(
                 sphere,
-                PHY_LAYER_STATIC,
+                LAYER_STATIC,
                 MotionType::Static,
                 Vec3A::new(-10.0, 1.0, 10.0),
                 Quat::IDENTITY,
             ),
             true,
         )
+    }
+}
+
+pub const LAYER_STATIC: u32 = 0x1;
+pub const LAYER_DYNAMIC: u32 = 0x2;
+pub const LAYER_PLAYER: u32 = 0x3;
+
+const BP_LAYER_STATIC: u8 = 0x0;
+const BP_LAYER_MOVE: u8 = 0x1;
+
+#[vdata(BroadPhaseLayerInterfaceVTable)]
+struct BroadPhaseLayerInterfaceImpl;
+
+impl BroadPhaseLayerInterface for BroadPhaseLayerInterfaceImpl {
+    fn get_num_broad_phase_layers(&self) -> u32 {
+        2
+    }
+
+    fn get_broad_phase_layer(&self, layer: ObjectLayer) -> BroadPhaseLayer {
+        match layer {
+            LAYER_STATIC => BP_LAYER_STATIC,
+            LAYER_DYNAMIC => BP_LAYER_MOVE,
+            LAYER_PLAYER => BP_LAYER_MOVE,
+            _ => BP_LAYER_STATIC,
+        }
+    }
+}
+
+#[vdata(ObjectVsBroadPhaseLayerFilterVTable)]
+struct ObjectVsBroadPhaseLayerFilterImpl;
+
+impl ObjectVsBroadPhaseLayerFilter for ObjectVsBroadPhaseLayerFilterImpl {
+    fn should_collide(&self, layer: ObjectLayer, bp_layer: BroadPhaseLayer) -> bool {
+        match layer {
+            LAYER_STATIC => bp_layer != BP_LAYER_STATIC,
+            LAYER_DYNAMIC => true,
+            LAYER_PLAYER => true,
+            _ => false,
+        }
+    }
+}
+
+#[vdata(ObjectLayerPairFilterVTable)]
+struct ObjectLayerPairFilterImpl;
+
+impl ObjectLayerPairFilter for ObjectLayerPairFilterImpl {
+    fn should_collide(&self, layer1: ObjectLayer, layer2: ObjectLayer) -> bool {
+        match layer1 {
+            LAYER_STATIC => layer2 != LAYER_STATIC,
+            LAYER_DYNAMIC => true,
+            LAYER_PLAYER => layer2 != LAYER_PLAYER,
+            _ => false,
+        }
+    }
+}
+
+#[vdata(CharacterContactListenerVTable)]
+struct CharacterContactListenerImpl {
+    allow_sliding: bool,
+    body_itf: JRef<BodyInterface>,
+}
+
+impl CharacterContactListener for CharacterContactListenerImpl {
+    fn on_adjust_body_velocity(
+        &mut self,
+        _character: &CharacterVirtual,
+        _body2: &Body,
+        _linear_velocity: &mut Vec3A,
+        _angular_velocity: &mut Vec3A,
+    ) {
+    }
+
+    fn on_contact_validate(&mut self, _character: &CharacterVirtual, _body2: &BodyID, _subshape2: &SubShapeID) -> bool {
+        true
+    }
+
+    fn on_character_contact_validate(
+        &mut self,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
+    ) -> bool {
+        true
+    }
+
+    fn on_contact_added(
+        &mut self,
+        _character: &CharacterVirtual,
+        body2: &BodyID,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ) {
+        if settings.can_push_character && self.body_itf.get_motion_type(*body2) != MotionType::Static {
+            self.allow_sliding = true;
+        }
+    }
+
+    fn on_character_contact_added(
+        &mut self,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ) {
+        if settings.can_push_character {
+            self.allow_sliding = true;
+        }
+    }
+
+    fn on_contact_solve(
+        &mut self,
+        character: &CharacterVirtual,
+        _body2: &BodyID,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        contact_normal: JVec3,
+        contact_velocity: JVec3,
+        _material: &PhysicsMaterial,
+        _character_velocity: JVec3,
+        new_character_velocity: &mut Vec3A,
+    ) {
+        let contact_normal: Vec3A = contact_normal.into();
+        let contact_velocity: Vec3A = contact_velocity.into();
+        if !self.allow_sliding
+            && contact_velocity.abs_diff_eq(Vec3A::ZERO, 1e-6)
+            && !character.is_slope_too_steep(contact_normal)
+        {
+            *new_character_velocity = Vec3A::ZERO;
+        }
+    }
+
+    fn on_character_contact_solve(
+        &mut self,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        _contact_velocity: JVec3,
+        _material: &PhysicsMaterial,
+        _character_velocity: JVec3,
+        _new_character_velocity: &mut Vec3A,
+    ) {
     }
 }
 
