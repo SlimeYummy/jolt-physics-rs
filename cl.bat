@@ -1,3 +1,5 @@
+@REM Use this script with .cargo/config.toml
+
 set CC=clang-cl
 set CXX=clang-cl
 set CFLAGS=/clang:-fms-compatibility /clang:-fms-extensions
