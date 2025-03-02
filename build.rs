@@ -2,7 +2,7 @@ use std::path::Path;
 use std::{env, fs};
 
 fn main() {
-    let is_debug = env::var("PROFILE").map(|p| p == "debug").unwrap_or(true);
+    // let is_debug = env::var("PROFILE").map(|p| p == "debug").unwrap_or(true);
     let is_windows = env::var_os("CARGO_CFG_WINDOWS").is_some();
     let is_unix = env::var_os("CARGO_CFG_UNIX").is_some();
     let is_clang = env::var("CC")

@@ -1,7 +1,6 @@
 use core::fmt;
 use cxx::{kind, type_id, ExternType};
-use glam::{IVec3, IVec4, Mat4, Quat, Vec3, Vec3A, Vec4};
-use serde::{Deserialize, Serialize};
+use glam::{IVec3, Mat4, Quat, Vec3, Vec3A, Vec4};
 use static_assertions::const_assert_eq;
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -496,7 +495,9 @@ unsafe impl ExternType for Int3 {
 }
 
 #[repr(C, align(16))]
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Plane {
     pub normal: Vec3,
     pub distance: f32,
@@ -523,7 +524,9 @@ impl Plane {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AABox {
     pub min: Vec3A,
     pub max: Vec3A,
@@ -544,6 +547,8 @@ impl AABox {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IndexedTriangle {
     pub idx: [u32; 3],
     pub material_index: u32,
@@ -564,31 +569,6 @@ impl IndexedTriangle {
             material_index,
             user_data: 0,
         }
-    }
-}
-
-impl Serialize for IndexedTriangle {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        IVec4::new(
-            self.idx[0] as i32,
-            self.idx[1] as i32,
-            self.idx[2] as i32,
-            self.material_index as i32,
-        )
-        .serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for IndexedTriangle {
-    fn deserialize<D>(deserializer: D) -> Result<IndexedTriangle, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let v = IVec4::deserialize(deserializer)?;
-        Ok(IndexedTriangle::new(v.x as u32, v.y as u32, v.z as u32, v.w as u32))
     }
 }
 
