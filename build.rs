@@ -52,7 +52,6 @@ fn main() {
 
     cxx.cpp(true)
         .std("c++17")
-        .static_crt(false)
         .files(&cpp_file)
         .include("./JoltPhysics")
         .files(list_source_files("./JoltPhysics/Jolt"))
@@ -74,9 +73,26 @@ fn main() {
         cxx.define("JPH_DEBUG_PRINT", "1");
     }
 
-    if is_windows && is_debug_renderer {
+    if is_debug_renderer {
+        let mut files = list_source_files("./JoltPhysics/TestFramework");
+        if is_windows {
+            files = files
+                .into_iter()
+                .filter(|f| {
+                    !f.contains("ApplicationWindowLinux.")
+                        && !f.contains("ApplicationWindowMacOS.")
+                        && !f.contains("\\Input\\Linux\\")
+                        && !f.contains("\\Input\\MacOS\\")
+                        && !f.contains("\\Renderer\\VK\\")
+                        && !f.contains("\\Renderer\\MTL\\")
+                })
+                .collect();
+        } else {
+            panic!("Debug renderer not supported on this platform");
+        }
+
         cxx.include("./JoltPhysics/TestFramework")
-            .files(list_source_files("./JoltPhysics/TestFramework"))
+            .files(files)
             .define("JPH_DEBUG_RENDERER", "1");
     }
 
@@ -121,6 +137,7 @@ fn main() {
         println!("cargo:rustc-link-lib=d3dcompiler");
         println!("cargo:rustc-link-lib=Dinput8");
         println!("cargo:rustc-link-lib=dxguid");
+        println!("cargo:rustc-link-lib=Advapi32");
     }
 
     if is_unix || is_clang {

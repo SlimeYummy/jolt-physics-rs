@@ -1,7 +1,10 @@
 use cxx::{kind, type_id, ExternType};
 use glam::Vec3A;
 use static_assertions::{assert_cfg, const_assert_eq};
-use std::mem;
+use std::{
+    mem,
+    sync::{Arc, Mutex},
+};
 
 use crate::base::JVec3;
 
@@ -9,6 +12,65 @@ assert_cfg!(windows, "Debug rendering is only supported on Windows");
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
+    #[repr(u32)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum DebugKey {
+        Invalid,
+        Unknown,
+        A,
+        B,
+        C,
+        D,
+        E,
+        F,
+        G,
+        H,
+        I,
+        J,
+        K,
+        L,
+        M,
+        N,
+        O,
+        P,
+        Q,
+        R,
+        S,
+        T,
+        U,
+        V,
+        W,
+        X,
+        Y,
+        Z,
+        Num0,
+        Num1,
+        Num2,
+        Num3,
+        Num4,
+        Num5,
+        Num6,
+        Num7,
+        Num8,
+        Num9,
+        Space,
+        Comma,
+        Period,
+        Escape,
+        LShift,
+        RShift,
+        LControl,
+        RControl,
+        LAlt,
+        RAlt,
+        Left,
+        Right,
+        Up,
+        Down,
+        Return,
+        NumKeys,
+    }
+
     extern "Rust" {
         type RustDebugApp;
 
@@ -32,12 +94,14 @@ pub(crate) mod ffi {
         include!("rust/cxx.h");
         include!("jolt-physics-rs/src/ffi.h");
 
+        type DebugKey;
+
         type Vec3 = crate::base::ffi::Vec3;
         type XPhysicsSystem = crate::system::ffi::XPhysicsSystem;
         type CameraState = crate::debug::CameraState;
 
         type Keyboard;
-        fn IsKeyPressed(self: &Keyboard, key: i32) -> bool;
+        fn IsKeyPressed(self: &Keyboard, key: DebugKey) -> bool;
 
         type Mouse;
         fn GetX(self: &Mouse) -> i32;
@@ -51,6 +115,8 @@ pub(crate) mod ffi {
         fn RunDebugApplication(rs_app: Box<RustDebugApp>);
     }
 }
+
+pub type DebugKey = ffi::DebugKey;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -72,7 +138,7 @@ unsafe impl ExternType for CameraState {
 pub struct DebugKeyboard(pub(crate) *mut ffi::Keyboard);
 
 impl DebugKeyboard {
-    pub fn is_key_pressed(&self, key: i32) -> bool {
+    pub fn is_key_pressed(&self, key: DebugKey) -> bool {
         unsafe { (&*self.0).IsKeyPressed(key) }
     }
 }
@@ -111,7 +177,7 @@ impl DebugMouse {
 }
 
 pub struct RustDebugApp {
-    dbg_app: Box<dyn DebugApp>,
+    dbg_app: Arc<Mutex<dyn DebugApp>>,
     x_physics_system: *mut ffi::XPhysicsSystem,
 }
 
@@ -129,15 +195,18 @@ impl RustDebugApp {
     ) -> bool {
         let mut mouse = DebugMouse(mouse);
         let mut keyboard = DebugKeyboard(keyboard);
-        self.dbg_app.update_frame(delta, camera, &mut mouse, &mut keyboard)
+        self.dbg_app
+            .lock()
+            .unwrap()
+            .update_frame(delta, camera, &mut mouse, &mut keyboard)
     }
 
     fn get_initial_camera(&mut self, state: *mut ffi::CameraState) {
-        unsafe { self.dbg_app.get_initial_camera(&mut *state) };
+        unsafe { self.dbg_app.lock().unwrap().get_initial_camera(&mut *state) };
     }
 
     fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> JVec3 {
-        self.dbg_app.get_camera_pivot(heading, pitch).into()
+        self.dbg_app.lock().unwrap().get_camera_pivot(heading, pitch).into()
     }
 }
 
@@ -154,8 +223,8 @@ pub trait DebugApp {
     fn get_camera_pivot(&mut self, heading: f32, pitch: f32) -> Vec3A;
 }
 
-pub fn run_debug_application(mut dbg_app: Box<dyn DebugApp>) {
-    let x_physics_system = dbg_app.cpp_physics_system() as *mut ffi::XPhysicsSystem;
+pub fn run_debug_application(mut dbg_app: Arc<Mutex<dyn DebugApp>>) {
+    let x_physics_system = dbg_app.lock().unwrap().cpp_physics_system() as *mut ffi::XPhysicsSystem;
     let rs_dbg_app = Box::new(RustDebugApp {
         dbg_app,
         x_physics_system,
