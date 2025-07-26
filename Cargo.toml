@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 cxx = { version = "1.0", features = ["default", "c++17"] }
 glam = { version = "0.30", features = ["approx"] }
-glam-ext = { version = "0.3", optional = true, features = ["approx"] }
+glam-ext = { path = "../glam-ext", optional = true, features = ["approx"] }
 jolt-macros = { path = "./macros" }
 libc = "0.2"
 rkyv = { version = "0.8", optional = true }

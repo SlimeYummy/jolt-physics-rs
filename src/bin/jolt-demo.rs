@@ -1,8 +1,8 @@
 use glam::{Quat, Vec3, Vec3A};
 use jolt_physics_rs::debug::*;
-use jolt_physics_rs::keys::*;
 use jolt_physics_rs::*;
 use std::f32::consts::PI;
+use std::sync::{Arc, Mutex};
 
 // const FPS: f32 = 60.0;
 const FPS: f32 = 120.0;
@@ -49,20 +49,20 @@ impl DebugApp for JoltDemo {
 }
 
 impl JoltDemo {
-    pub fn new() -> Box<dyn DebugApp> {
+    pub fn new() -> Arc<Mutex<dyn DebugApp>> {
         let system = PhysicsSystem::<(), ()>::new(
             BroadPhaseLayerInterfaceImpl::new_vbox(BroadPhaseLayerInterfaceImpl),
             ObjectVsBroadPhaseLayerFilterImpl::new_vbox(ObjectVsBroadPhaseLayerFilterImpl),
             ObjectLayerPairFilterImpl::new_vbox(ObjectLayerPairFilterImpl),
         );
-        let mut app = Box::new(Self {
+        let mut app = Self {
             system,
             duration: 0.0,
             character: None,
             mutable_object: None,
             cv_desired_velocity: Vec3A::ZERO,
             cv_player_body_id: BodyID::INVALID,
-        });
+        };
 
         app.create_dyn_cube().unwrap();
         app.create_dyn_sphere().unwrap();
@@ -124,24 +124,24 @@ impl JoltDemo {
 
         app.system.optimize_broad_phase();
         app.character = Some(character);
-        app
+        Arc::new(Mutex::new(app))
     }
 
     fn update(&mut self, delta: f32, camera: &CameraState, _mouse: &mut DebugMouse, keyboard: &mut DebugKeyboard) {
         self.duration += delta;
 
-        let jump = keyboard.is_key_pressed(DIK_SPACE);
+        let jump = keyboard.is_key_pressed(DebugKey::Space);
         let mut move_dir = Vec3A::ZERO;
-        if keyboard.is_key_pressed(DIK_W) {
+        if keyboard.is_key_pressed(DebugKey::W) {
             move_dir.x += 1.0;
         }
-        if keyboard.is_key_pressed(DIK_S) {
+        if keyboard.is_key_pressed(DebugKey::S) {
             move_dir.x += -1.0;
         }
-        if keyboard.is_key_pressed(DIK_A) {
+        if keyboard.is_key_pressed(DebugKey::A) {
             move_dir.z += -1.0;
         }
-        if keyboard.is_key_pressed(DIK_D) {
+        if keyboard.is_key_pressed(DebugKey::D) {
             move_dir.z += 1.0;
         }
         move_dir = move_dir.normalize_or_zero();
@@ -540,6 +540,27 @@ impl CharacterContactListener for CharacterContactListenerImpl {
         }
     }
 
+    fn on_contact_persisted(
+        &mut self,
+        _character: &CharacterVirtual,
+        body2: &BodyID,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ) {
+        if settings.can_push_character && self.body_itf.get_motion_type(*body2) != MotionType::Static {
+            self.allow_sliding = true;
+        }
+    }
+
+    fn on_contact_removed(
+        &mut self,
+        _character: &CharacterVirtual,
+        _body2: &BodyID,
+        _subshape2: &SubShapeID,
+    ) {}
+
     fn on_character_contact_added(
         &mut self,
         _character: &CharacterVirtual,
@@ -553,6 +574,27 @@ impl CharacterContactListener for CharacterContactListenerImpl {
             self.allow_sliding = true;
         }
     }
+
+    fn on_character_contact_persisted(
+        &mut self,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ) {
+        if settings.can_push_character {
+            self.allow_sliding = true;
+        }
+    }
+
+    fn on_character_contact_removed(
+        &mut self,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
+    ) {}
 
     fn on_contact_solve(
         &mut self,
@@ -594,5 +636,5 @@ impl CharacterContactListener for CharacterContactListenerImpl {
 fn main() {
     global_initialize();
     let demo_app = JoltDemo::new();
-    run_debug_application(demo_app);
+    run_debug_application(demo_app.clone());
 }
