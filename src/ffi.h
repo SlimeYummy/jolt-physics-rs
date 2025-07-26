@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <thread>
 #include <iostream>
+#include <unordered_set>
 
 #include "rust/cxx.h"
 
@@ -371,6 +372,7 @@ const char* TestCharacterContactListener(
 //
 
 #if defined(JPH_DEBUG_RENDERER)
+typedef EKey DebugKey;
 struct RustDebugApp;
 void RunDebugApplication(rust::Box<RustDebugApp> rs_app);
 #endif

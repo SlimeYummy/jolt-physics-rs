@@ -7,7 +7,17 @@
 #include <Input/Keyboard.h>
 #include <Input/Mouse.h>
 #include <Jolt/Core/Reference.h>
+
+// STL includes
+JPH_SUPPRESS_WARNINGS_STD_BEGIN
 #include <chrono>
+JPH_SUPPRESS_WARNINGS_STD_END
+
+class UIManager;
+class DebugUI;
+namespace JPH {
+	class DebugRenderer;
+}
 
 class DebugApp {
 private:
@@ -15,14 +25,15 @@ private:
     CameraState mWorldCamera;
 
 protected:
-    DebugRenderer* mDebugRenderer;
-    Renderer* mRenderer;
-    RefConst<Font> mFont;
-    Keyboard* mKeyboard;
-    Mouse* mMouse;
-    UIManager* mUI;
-    DebugUI* mDebugUI;
-    String mStatusString; // A string that is shown on screen to indicate the status of the application
+	DebugRenderer* mDebugRenderer;
+	ApplicationWindow* mWindow;
+	Renderer* mRenderer;
+	RefConst<Font> mFont;
+	Keyboard* mKeyboard;
+	Mouse* mMouse;
+	UIManager* mUI;
+	DebugUI* mDebugUI;
+	String mStatusString;
     
     rust::Box<RustDebugApp> mRsApp;
     Ref<XPhysicsSystem> mPhySys;
@@ -62,6 +73,9 @@ protected:
     void ClearDebugRenderer();
 
 private:
+	/// Render a frame
+	bool RenderFrame();
+
     // Extract heading and pitch from the local space (relative to the camera pivot) camera forward
     void GetCameraLocalHeadingAndPitch(float& outHeading, float& outPitch);
 
