@@ -255,8 +255,8 @@ impl ContactListener for TestContactListener {
         collision_result: &CollideShapeResult,
     ) -> ValidateResult {
         assert_eq!(self.str, "TestContactListener - test");
-        assert_eq!(body1.get_id().0, 0x1000000);
-        assert_eq!(body2.get_id().0, 0x1000001);
+        assert_eq!(body1.get_id().0, 0x800000);
+        assert_eq!(body2.get_id().0, 0x800001);
         self.buf.push((body1.get_id(), body2.get_id()));
         assert_eq!(base_offset, Vec3A::new(4.3, 5.4, 0.82));
         assert_eq!(collision_result.penetration_depth, 0.073);
@@ -266,8 +266,8 @@ impl ContactListener for TestContactListener {
 
     fn on_contact_added(&mut self, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &ContactSettings) {
         assert_eq!(self.str, "TestContactListener - test");
-        assert_eq!(body1.get_id().0, 0x1000000);
-        assert_eq!(body2.get_id().0, 0x1000001);
+        assert_eq!(body1.get_id().0, 0x800000);
+        assert_eq!(body2.get_id().0, 0x800001);
         assert_eq!(manifold.penetration_depth, 0.028);
         assert_eq!(settings.relative_angular_surface_velocity, Vec3A::new(0.1, 0.2, 0.3));
         self.buf.push((body1.get_id(), body2.get_id()));
@@ -282,8 +282,8 @@ impl ContactListener for TestContactListener {
         settings: &ContactSettings,
     ) {
         assert_eq!(self.str, "TestContactListener - test");
-        assert_eq!(body1.get_id().0, 0x1000000);
-        assert_eq!(body2.get_id().0, 0x1000001);
+        assert_eq!(body1.get_id().0, 0x800000);
+        assert_eq!(body2.get_id().0, 0x800001);
         assert_eq!(manifold.penetration_depth, 0.103);
         assert_eq!(settings.relative_linear_surface_velocity, Vec3A::new(1.1, 2.2, 3.3));
         self.buf.push((body1.get_id(), body2.get_id()));
@@ -328,7 +328,7 @@ fn test_contact_listener() {
     assert!(listener.called_on_contact_added);
     assert!(listener.called_on_contact_persisted);
     assert!(listener.called_on_contact_removed);
-    assert_eq!(listener.buf, vec![(BodyID(0x1000000), BodyID(0x1000001)); 3]);
+    assert_eq!(listener.buf, vec![(BodyID(0x800000), BodyID(0x800001)); 3]);
 }
 
 #[vdata(CharacterContactListenerVTable)]
@@ -409,6 +409,19 @@ impl CharacterContactListener for TestCclListener {
         self.called_on_contact_added = true;
     }
 
+    fn on_contact_persisted(
+        &mut self,
+        character: &CharacterVirtual,
+        body2: &BodyID,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ) {
+    }
+
+    fn on_contact_removed(&mut self, character: &CharacterVirtual, body2: &BodyID, subshape2: &SubShapeID) {}
+
     fn on_character_contact_added(
         &mut self,
         character: &CharacterVirtual,
@@ -429,6 +442,25 @@ impl CharacterContactListener for TestCclListener {
         assert_eq!(settings.can_receive_impulses, false);
         settings.can_receive_impulses = true;
         self.called_on_character_contact_added = true;
+    }
+
+    fn on_character_contact_persisted(
+        &mut self,
+        character: &CharacterVirtual,
+        other_character: &CharacterVirtual,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ) {
+    }
+
+    fn on_character_contact_removed(
+        &mut self,
+        character: &CharacterVirtual,
+        other_character: &CharacterVirtual,
+        subshape2: &SubShapeID,
+    ) {
     }
 
     fn on_contact_solve(
