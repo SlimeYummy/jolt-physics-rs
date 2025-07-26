@@ -688,8 +688,10 @@ impl<T: JRefTarget> Clone for JRef<T> {
 impl<T: JRefTarget> Drop for JRef<T> {
     fn drop(&mut self) {
         #[cfg(feature = "debug-print")]
-        println!("JRef<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
+        let cnt = self.count_ref() - 1;
         unsafe { T::drop_raw(&mut self.0) };
+        #[cfg(feature = "debug-print")]
+        println!("JRef<{}>::drop {:?} {}", T::name(), self.0, cnt);
     }
 }
 
@@ -742,8 +744,10 @@ impl<T: JMutTarget> JMut<T> {
 impl<T: JMutTarget> Drop for JMut<T> {
     fn drop(&mut self) {
         #[cfg(feature = "debug-print")]
-        println!("JMut<{}>::drop {:?} {}", T::name(), self.0, self.count_ref() - 1);
+        let cnt = self.count_ref() - 1;
         unsafe { T::drop_raw(&mut self.0) };
+        #[cfg(feature = "debug-print")]
+        println!("JMut<{}>::drop {:?} {}", T::name(), self.0, cnt);
     }
 }
 

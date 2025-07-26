@@ -129,7 +129,7 @@ pub(crate) mod ffi {
 
         type XCharacterVirtual;
         unsafe fn CreateCharacterVirtual(
-            clean_up: fn (zelf: Pin<&mut XCharacterVirtual>),
+            clean_up: fn(zelf: Pin<&mut XCharacterVirtual>),
             system: *mut XPhysicsSystem,
             settings: &XCharacterVirtualSettings,
             position: Vec3,
@@ -1142,6 +1142,17 @@ pub struct CharacterContactListenerVTable {
         contact_normal: JVec3,
         settings: &mut CharacterContactSettings,
     ),
+    pub on_contact_persisted: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        body2: &BodyID,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ),
+    pub on_contact_removed:
+        extern "C" fn(*mut u8, character: &CharacterVirtual<()>, body2: &BodyID, subshape2: &SubShapeID),
     pub on_character_contact_added: extern "C" fn(
         *mut u8,
         character: &CharacterVirtual<()>,
@@ -1150,6 +1161,21 @@ pub struct CharacterContactListenerVTable {
         contact_position: JVec3,
         contact_normal: JVec3,
         settings: &mut CharacterContactSettings,
+    ),
+    pub on_character_contact_persisted: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        other_character: &CharacterVirtual<()>,
+        subshape2: &SubShapeID,
+        contact_position: JVec3,
+        contact_normal: JVec3,
+        settings: &mut CharacterContactSettings,
+    ),
+    pub on_character_contact_removed: extern "C" fn(
+        *mut u8,
+        character: &CharacterVirtual<()>,
+        other_character: &CharacterVirtual<()>,
+        subshape2: &SubShapeID,
     ),
     pub on_contact_solve: extern "C" fn(
         *mut u8,

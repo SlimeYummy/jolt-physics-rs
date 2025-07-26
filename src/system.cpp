@@ -74,6 +74,9 @@ XPhysicsSystem::XPhysicsSystem(
 XPhysicsSystem::~XPhysicsSystem() {
 	PRINT_ONLY(printf("~XPhysicsSystem %d\n", GetRefCount()));
 	this->_rustCleanUp(*this);
+	this->_bpli = nullptr;
+	this->_obplf = nullptr;
+	this->_olpf = nullptr;
 }
 
 XBodyInterface* XPhysicsSystem::GetBodyInterface(bool lock) {

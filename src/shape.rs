@@ -138,6 +138,7 @@ pub(crate) mod ffi {
             rotation: Quat,
             shape: *const Shape,
             user_data: u32,
+            index: u32,
         ) -> u32;
         fn RemoveShape(self: Pin<&mut MutableCompoundShape>, index: u32);
         fn ModifyShape(self: Pin<&mut MutableCompoundShape>, index: u32, position: Vec3, rotation: Quat);
@@ -1595,10 +1596,10 @@ impl MutableCompoundShape {
     }
 
     #[inline]
-    pub fn add_shape(&mut self, position: Vec3A, rotation: Quat, shape: &Shape, user_data: u32) -> u32 {
+    pub fn add_shape(&mut self, position: Vec3A, rotation: Quat, shape: &Shape, user_data: u32, index: u32) -> u32 {
         unsafe {
             self.as_mut()
-                .AddShape(position.into(), rotation.into(), &shape.0, user_data)
+                .AddShape(position.into(), rotation.into(), &shape.0, user_data, index)
         }
     }
 

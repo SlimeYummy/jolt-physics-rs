@@ -57,7 +57,7 @@ pub(crate) mod ffi {
 
         type XPhysicsSystem;
         unsafe fn CreatePhysicSystem(
-            clean_up: fn (zelf: Pin<&mut XPhysicsSystem>),
+            clean_up: fn(zelf: Pin<&mut XPhysicsSystem>),
             bpli: *const BroadPhaseLayerInterface,
             obplf: *const ObjectVsBroadPhaseLayerFilter,
             olpf: *const ObjectLayerPairFilter,
@@ -450,10 +450,9 @@ unsafe impl ExternType for SubShapeIDPair {
 // Global Init
 //
 
-static JOLT_INITED: AtomicBool = AtomicBool::new(false);
-
 #[inline]
 pub fn global_initialize() {
+    static JOLT_INITED: AtomicBool = AtomicBool::new(false);
     if JOLT_INITED
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_ok()
@@ -535,10 +534,7 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
             let raw_system = NonNull::new_unchecked(Pin::new_unchecked(x_system.as_mut()).GetPhysicsSystem());
 
             PhysicsSystem {
-                inner: Box::new(PhysicsSystemInner {
-                    x_system,
-                    raw_system,
-                }),
+                inner: Box::new(PhysicsSystemInner { x_system, raw_system }),
                 cl_phantom: PhantomData,
                 bal_phantom: PhantomData,
             }
