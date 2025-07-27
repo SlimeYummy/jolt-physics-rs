@@ -23,8 +23,6 @@ pub use vtable::*;
 
 #[cfg(all(windows, feature = "debug-renderer"))]
 pub mod debug;
-#[cfg(all(windows, feature = "debug-renderer"))]
-pub mod keys;
 
 #[cfg(test)]
 mod test_callback;
