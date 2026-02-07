@@ -1,8 +1,8 @@
 ## Description
 
-This repo is a partial wrapper for JoltPhysics physics engine.
+This repo is a partial single thread wrapper for JoltPhysics physics engine.
 
-**Please notice**. Currently, this is not a completely wrapper for JoltPhysics.
+**Please notice**. Currently, this is not a completely wrapper for JoltPhysics, and it only supports single-threading.
 
 I create this repo beacuse I can't find any usable rust wrapper for JoltPhysics. But JoltPhysics is a full functional physics engine. I have no time to wrapper all APIs. So I only provide the API I need. For the above reasons, this repo will not be published to crates.io.
 
