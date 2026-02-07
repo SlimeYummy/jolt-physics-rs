@@ -573,7 +573,9 @@ impl IndexedTriangle {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), rkyv(derive(Debug)))]
 pub struct BodyID(pub u32);
 const_assert_eq!(mem::size_of::<BodyID>(), 4);
 
@@ -615,8 +617,14 @@ impl From<BodyID> for u32 {
     }
 }
 
+impl fmt::Debug for BodyID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BodyID(0x{:X})", self.0)
+    }
+}
+
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubShapeID(pub u32);
 const_assert_eq!(mem::size_of::<SubShapeID>(), 4);
 
@@ -650,6 +658,12 @@ impl From<SubShapeID> for u32 {
     #[inline]
     fn from(id: SubShapeID) -> u32 {
         id.0
+    }
+}
+
+impl fmt::Debug for SubShapeID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SubShapeID(0x{:X})", self.0)
     }
 }
 
@@ -779,8 +793,20 @@ impl<T: JMutTarget> From<JMut<T>> for JRef<T> {
 #[repr(C)]
 #[derive(Clone)]
 pub struct StaticArray<T, const N: usize> {
-    pub size: usize,
+    pub size: u32,
     pub elements: [T; N],
+}
+
+impl<T, const N: usize> StaticArray<T, N> {
+    #[inline]
+    pub fn as_slice(&self) -> &[T] {
+        &self.elements[0..(self.size as usize)]
+    }
+
+    #[inline]
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        &mut self.elements[0..(self.size as usize)]
+    }
 }
 
 impl<T: PartialEq, const N: usize> PartialEq for StaticArray<T, N> {
@@ -795,14 +821,14 @@ impl<T, const N: usize> Deref for StaticArray<T, N> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.elements[0..self.size]
+        self.as_slice()
     }
 }
 
 impl<T, const N: usize> DerefMut for StaticArray<T, N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.elements[0..self.size]
+        self.as_mut_slice()
     }
 }
 
@@ -810,7 +836,7 @@ impl<T: fmt::Debug, const N: usize> fmt::Debug for StaticArray<T, N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("StaticArray")
             .field("size", &self.size)
-            .field("elements", &&self.elements[0..self.size])
+            .field("elements", &self.as_slice())
             .finish()
     }
 }

@@ -39,6 +39,7 @@ pub(crate) mod ffi {
         fn IsDynamic(self: &Body) -> bool;
         fn CanBeKinematicOrDynamic(self: &Body) -> bool;
         fn SetIsSensor(self: Pin<&mut Body>, inIsSensor: bool);
+        fn IsSensor(self: &Body) -> bool;
         fn SetCollideKinematicVsNonDynamic(self: Pin<&mut Body>, inCollide: bool);
         fn GetCollideKinematicVsNonDynamic(self: &Body) -> bool;
         fn SetUseManifoldReduction(self: Pin<&mut Body>, inUseReduction: bool);
@@ -385,6 +386,11 @@ impl Body {
     #[inline]
     pub fn set_is_sensor(&mut self, is_sensor: bool) {
         self.as_mut().SetIsSensor(is_sensor);
+    }
+
+    #[inline]
+    pub fn is_sensor(&self) -> bool {
+        self.as_ref().IsSensor()
     }
 
     #[inline]
