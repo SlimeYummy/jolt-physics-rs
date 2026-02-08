@@ -264,7 +264,13 @@ impl ContactListener for TestContactListener {
         ValidateResult::RejectContact
     }
 
-    fn on_contact_added(&mut self, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &ContactSettings) {
+    fn on_contact_added(
+        &mut self,
+        body1: &Body,
+        body2: &Body,
+        manifold: &ContactManifold,
+        settings: &mut ContactSettings,
+    ) {
         assert_eq!(self.str, "TestContactListener - test");
         assert_eq!(body1.get_id().0, 0x800000);
         assert_eq!(body2.get_id().0, 0x800001);
@@ -279,7 +285,7 @@ impl ContactListener for TestContactListener {
         body1: &Body,
         body2: &Body,
         manifold: &ContactManifold,
-        settings: &ContactSettings,
+        settings: &mut ContactSettings,
     ) {
         assert_eq!(self.str, "TestContactListener - test");
         assert_eq!(body1.get_id().0, 0x800000);
