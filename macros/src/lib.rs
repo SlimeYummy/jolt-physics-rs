@@ -284,22 +284,23 @@ pub fn vdata(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
 
     let vdata_name = input.ident.clone();
+    let generics = input.generics.clone();
     let static_name = Ident::new(&format!("{}_VTABLE", vdata_name), vtable_type.span());
 
     let result = quote!(
         #input
 
-        unsafe impl jolt_physics_rs::vtable::VData<#vtable_type> for #vdata_name {}
+        unsafe impl #generics jolt_physics_rs::vtable::VData<#vtable_type> for #vdata_name #generics {}
 
         #[allow(non_upper_case_globals)]
         static #static_name: #vtable_type = #vtable_type::build_vtable::<#vdata_name>();
 
-        impl #vdata_name {
-            pub const fn new_vpair(vdata: #vdata_name) -> jolt_physics_rs::vtable::VPair<#vdata_name, #vtable_type> {
+        impl #generics #vdata_name #generics {
+            pub const fn new_vpair(vdata: #vdata_name #generics) -> jolt_physics_rs::vtable::VPair<#vdata_name #generics, #vtable_type> {
                 unsafe { jolt_physics_rs::vtable::VPair::new(&#static_name, vdata) }
             }
 
-            pub fn new_vbox(vdata: #vdata_name) -> jolt_physics_rs::vtable::VBox<#vdata_name, #vtable_type> {
+            pub fn new_vbox(vdata: #vdata_name #generics) -> jolt_physics_rs::vtable::VBox<#vdata_name #generics, #vtable_type> {
                 std::boxed::Box::new(unsafe { jolt_physics_rs::vtable::VPair::new(&#static_name, vdata) })
             }
         }

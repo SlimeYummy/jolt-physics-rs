@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::missing_safety_doc)]
-#![allow(unexpected_cfgs)] // TODO: Upgrade rkyv to 0.8
+#![allow(unexpected_cfgs)]
 
 pub mod base;
 pub mod body;

@@ -8,6 +8,9 @@ pub enum JoltError {
     TooLessSubShape,
     #[error("Create body")]
     CreateBody,
+
+    #[error("Engine update ({0})")]
+    EngineUpdate(u32),
 }
 
 pub type JoltResult<T> = Result<T, JoltError>;

@@ -1147,7 +1147,7 @@ pub fn create_static_compound_shape(settings: &StaticCompoundShapeSettings) -> J
 pub fn create_static_compound_shape_mut(
     settings: &StaticCompoundShapeSettings,
 ) -> JoltResult<JMut<StaticCompoundShape>> {
-    if settings.sub_shapes.len() < 2 {
+    if settings.sub_shapes.len() < 1 {
         return Err(JoltError::TooLessSubShape);
     }
     unsafe {
@@ -1173,7 +1173,7 @@ pub fn create_mutable_compound_shape(
 pub fn create_mutable_compound_shape_mut(
     settings: &MutableCompoundShapeSettings,
 ) -> JoltResult<JMut<MutableCompoundShape>> {
-    if settings.sub_shapes.len() < 2 {
+    if settings.sub_shapes.len() < 1 {
         return Err(JoltError::TooLessSubShape);
     }
     unsafe {
