@@ -14,7 +14,7 @@
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/TempAllocator.h>
-#include <Jolt/Core/JobSystemThreadPool.h>
+#include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/FPException.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
@@ -222,7 +222,7 @@ public:
 class XPhysicsSystem: public RefTarget<XPhysicsSystem> {
 private:
 	TempAllocatorImpl _allocator;
-	JobSystemThreadPool _jobSys;
+	JobSystemSingleThreaded _jobSys;
 	PhysicsSystem _phySys;
 	rust::Fn<void (XPhysicsSystem&)> _rustCleanUp;
 	const BroadPhaseLayerInterface* _bpli;
@@ -239,7 +239,7 @@ public:
 	);
 	~XPhysicsSystem();
 	PhysicsSystem& PhySys() { return this->_phySys; }
-	JobSystemThreadPool& JobSys() { return this->_jobSys; }
+	JobSystemSingleThreaded& JobSys() { return this->_jobSys; }
 	TempAllocatorImpl& Allocator() { return this->_allocator; }
 	BodyInterface& BodyItf(bool lock) { return lock ? this->_phySys.GetBodyInterface() : this->_phySys.GetBodyInterfaceNoLock(); }
 
@@ -249,7 +249,7 @@ public:
 	const BroadPhaseLayerInterface* GetBroadPhaseLayerInterface() const { return _bpli; }
 	const ObjectVsBroadPhaseLayerFilter* GetObjectVsBroadPhaseLayerFilter() const { return _obplf; }
 	const ObjectLayerPairFilter* GetObjectLayerPairFilter() const { return _olpf; }
-	uint32 Update(float delta);
+	uint32 Update(float delta, uint32 step);
 	void GetBodies(rust::Vec<BodyID>& bodies) const;
 	void GetActiveBodies(EBodyType bodyType, rust::Vec<BodyID>& bodies) const;
 	RENDERER_ONLY(void AddRenderable(XDebugRenderable* renderable) { _renderables.insert(renderable); })

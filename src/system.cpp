@@ -57,7 +57,7 @@ XPhysicsSystem::XPhysicsSystem(
 	const ObjectLayerPairFilter* olpf
 ):
 	_allocator(TempAllocatorImpl(10 * 1024 * 1024)),
-	_jobSys(JobSystemThreadPool(cMaxPhysicsJobs, cMaxPhysicsBarriers, 2)),
+	_jobSys(JobSystemSingleThreaded(cMaxPhysicsJobs)),
 	_phySys(PhysicsSystem()),
 	_rustCleanUp(rustCleanUp),
 	_bpli(bpli),
@@ -84,8 +84,8 @@ XBodyInterface* XPhysicsSystem::GetBodyInterface(bool lock) {
 	return reinterpret_cast<XBodyInterface*>(bodyItf);
 }
 
-uint32 XPhysicsSystem::Update(float delta) {
-	return (uint32)this->_phySys.Update(delta, 1, &this->Allocator(), &this->JobSys());
+uint32 XPhysicsSystem::Update(float delta, uint32 step) {
+	return (uint32)this->_phySys.Update(delta, (int)step, &this->Allocator(), &this->JobSys());
 }
 
 void XPhysicsSystem::GetBodies(rust::Vec<BodyID>& bodies) const {

@@ -70,7 +70,7 @@ pub(crate) mod ffi {
         unsafe fn GetBroadPhaseLayerInterface(self: &XPhysicsSystem) -> *const BroadPhaseLayerInterface;
         unsafe fn GetObjectVsBroadPhaseLayerFilter(self: &XPhysicsSystem) -> *const ObjectVsBroadPhaseLayerFilter;
         unsafe fn GetObjectLayerPairFilter(self: &XPhysicsSystem) -> *const ObjectLayerPairFilter;
-        fn Update(self: Pin<&mut XPhysicsSystem>, delta: f32) -> u32;
+        fn Update(self: Pin<&mut XPhysicsSystem>, delta: f32, step: u32) -> u32;
         fn GetBodies(self: &XPhysicsSystem, bodies: &mut Vec<BodyID>);
         fn GetActiveBodies(self: &XPhysicsSystem, body_type: BodyType, bodies: &mut Vec<BodyID>);
 
@@ -432,11 +432,11 @@ impl Default for ContactSettings {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubShapeIDPair {
     pub body1_id: BodyID,
-    pub body2_id: BodyID,
     pub sub_shape_id1: SubShapeID,
+    pub body2_id: BodyID,
     pub sub_shape_id2: SubShapeID,
 }
 const_assert_eq!(mem::size_of::<SubShapeIDPair>(), 16);
@@ -646,8 +646,19 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
         unsafe {
             let current = self.as_raw_ref().GetBodyActivationListener() as *const u8;
             match current.is_null() {
-                true => None,
                 false => Some(&*(current as *const _)),
+                true => None,
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_body_activation_listener_mut(&mut self) -> Option<&mut VPair<BAL, BodyActivationListenerVTable>> {
+        unsafe {
+            let current = self.as_raw_ref().GetBodyActivationListener() as *mut u8;
+            match current.is_null() {
+                false => Some(&mut *(current as *mut _)),
+                true => None,
             }
         }
     }
@@ -673,8 +684,19 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
         unsafe {
             let current = self.as_raw_ref().GetContactListener() as *const u8;
             match current.is_null() {
-                true => None,
                 false => Some(&*(current as *const _)),
+                true => None,
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_contact_listener_mut(&mut self) -> Option<&mut VPair<CL, ContactListenerVTable>> {
+        unsafe {
+            let current = self.as_raw_ref().GetContactListener() as *mut u8;
+            match current.is_null() {
+                false => Some(&mut *(current as *mut _)),
+                true => None,
             }
         }
     }
@@ -736,8 +758,53 @@ impl<CL: ContactListener, BAL: BodyActivationListener> PhysicsSystem<CL, BAL> {
     }
 
     #[inline]
-    pub fn update(&mut self, delta: f32) -> u32 {
-        self.as_x_mut().Update(delta)
+    pub fn update(&mut self, delta: f32, step: u32) -> JoltResult<()> {
+        match self.as_x_mut().Update(delta, step) {
+            0 => Ok(()),
+            err => Err(JoltError::EngineUpdate(err)),
+        }
+    }
+
+    #[inline]
+    pub fn update_with_listeners<CL2: ContactListener, BAL2: BodyActivationListener>(
+        &mut self,
+        delta: f32,
+        step: u32,
+        contact_listener: Option<&mut VPair<CL2, ContactListenerVTable>>,
+        body_activation_listener: Option<&mut VPair<BAL2, BodyActivationListenerVTable>>,
+    ) -> JoltResult<()> {
+        let old_body_activation_listener;
+        let old_contact_listener;
+        unsafe {
+            old_body_activation_listener = self.as_raw_ref().GetBodyActivationListener();
+            old_contact_listener = self.as_raw_ref().GetContactListener();
+
+            if let Some(listener) = body_activation_listener {
+                self.as_raw_mut()
+                    .SetBodyActivationListener(listener as *mut _ as *mut ffi::BodyActivationListener);
+            } else {
+                self.as_raw_mut().SetBodyActivationListener(ptr::null_mut());
+            }
+            if let Some(listener) = contact_listener {
+                self.as_raw_mut()
+                    .SetContactListener(listener as *mut _ as *mut ffi::ContactListener);
+            } else {
+                self.as_raw_mut().SetContactListener(ptr::null_mut());
+            }
+        }
+
+        let res = match self.as_x_mut().Update(delta, step) {
+            0 => Ok(()),
+            err => Err(JoltError::EngineUpdate(err)),
+        };
+
+        unsafe {
+            self.as_raw_mut()
+                .SetBodyActivationListener(old_body_activation_listener);
+            self.as_raw_mut().SetContactListener(old_contact_listener);
+        }
+
+        res
     }
 
     #[inline]
@@ -1280,8 +1347,8 @@ pub struct ContactListenerVTable {
         collision_result: &CollideShapeResult,
     ) -> ValidateResult,
     pub on_contact_added:
-        extern "C" fn(*mut u8, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &ContactSettings),
+        extern "C" fn(*mut u8, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &mut ContactSettings),
     pub on_contact_persisted:
-        extern "C" fn(*mut u8, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &ContactSettings),
+        extern "C" fn(*mut u8, body1: &Body, body2: &Body, manifold: &ContactManifold, settings: &mut ContactSettings),
     pub on_contact_removed: extern "C" fn(*mut u8, sub_shape_pair: &SubShapeIDPair),
 }
