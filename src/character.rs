@@ -226,14 +226,15 @@ pub type BackFaceMode = ffi::BackFaceMode;
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct CharacterSettings {
-    up: Vec3A,
-    supporting_volume: Plane,
-    max_slope_angle: f32,
-    shape: Option<JRef<Shape>>,
-    layer: ObjectLayer,
-    mass: f32,
-    friction: f32,
-    gravity_factor: f32,
+    pub up: Vec3A,
+    pub supporting_volume: Plane,
+    pub max_slope_angle: f32,
+    pub enhanced_internal_edge_removal: bool,
+    pub shape: Option<JRef<Shape>>,
+    pub layer: ObjectLayer,
+    pub mass: f32,
+    pub friction: f32,
+    pub gravity_factor: f32,
 }
 const_assert_eq!(mem::size_of::<CharacterSettings>(), 64);
 
@@ -248,6 +249,7 @@ impl Default for CharacterSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
+            enhanced_internal_edge_removal: false,
             shape: None,
             layer: 0,
             mass: 80.0,
@@ -270,23 +272,24 @@ impl CharacterSettings {
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct CharacterVirtualSettings {
-    up: Vec3A,
-    supporting_volume: Plane,
-    max_slope_angle: f32,
-    shape: Option<JRef<Shape>>,
-    mass: f32,
-    max_strength: f32,
-    shape_offset: Vec3A,
-    back_face_mode: BackFaceMode,
-    predictive_contact_distance: f32,
-    max_collision_iterations: u32,
-    max_constraint_iterations: u32,
-    min_time_remaining: f32,
-    collision_tolerance: f32,
-    character_padding: f32,
-    max_num_hits: u32,
-    hit_reduction_cos_max_angle: f32,
-    penetration_recovery_speed: f32,
+    pub up: Vec3A,
+    pub supporting_volume: Plane,
+    pub max_slope_angle: f32,
+    pub enhanced_internal_edge_removal: bool,
+    pub shape: Option<JRef<Shape>>,
+    pub mass: f32,
+    pub max_strength: f32,
+    pub shape_offset: Vec3A,
+    pub back_face_mode: BackFaceMode,
+    pub predictive_contact_distance: f32,
+    pub max_collision_iterations: u32,
+    pub max_constraint_iterations: u32,
+    pub min_time_remaining: f32,
+    pub collision_tolerance: f32,
+    pub character_padding: f32,
+    pub max_num_hits: u32,
+    pub hit_reduction_cos_max_angle: f32,
+    pub penetration_recovery_speed: f32,
 }
 const_assert_eq!(mem::size_of::<CharacterVirtualSettings>(), 128);
 
@@ -301,6 +304,7 @@ impl Default for CharacterVirtualSettings {
             up: Vec3A::Y,
             supporting_volume: Plane::new(Vec3::Y, -1.0e10),
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
+            enhanced_internal_edge_removal: false,
             shape: None,
             mass: 70.0,
             max_strength: 100.0,

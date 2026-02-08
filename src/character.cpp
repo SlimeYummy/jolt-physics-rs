@@ -35,8 +35,9 @@ struct XCharacterSettings {
 	Vec3 up;
 	Plane supportingVolume;
 	float maxSlopeAngle;
+	bool enhancedInternalEdgeRemoval;
 	RefConst<Shape> shape;
-	uint16_t layer;
+	ObjectLayer layer;
 	float mass;
 	float friction;
 	float gravityFactor;
@@ -54,6 +55,7 @@ XCharacter* CreateCharacter(
 	settings.mUp = st.up;
 	settings.mSupportingVolume = st.supportingVolume;
 	settings.mMaxSlopeAngle = st.maxSlopeAngle;
+	settings.mEnhancedInternalEdgeRemoval = st.enhancedInternalEdgeRemoval;
 	settings.mShape = st.shape;
 	settings.mLayer = st.layer;
 	settings.mMass = st.mass;
@@ -208,6 +210,7 @@ struct XCharacterVirtualSettings {
 	Vec3 up;
 	Plane supportingVolume;
 	float maxSlopeAngle;
+	bool enhancedInternalEdgeRemoval;
 	RefConst<Shape> shape;
 	float mass;
 	float maxStrength;
@@ -236,6 +239,7 @@ XCharacterVirtual* CreateCharacterVirtual(
 	settings.mUp = st.up;
 	settings.mSupportingVolume = st.supportingVolume;
 	settings.mMaxSlopeAngle = st.maxSlopeAngle;
+	settings.mEnhancedInternalEdgeRemoval = st.enhancedInternalEdgeRemoval;
 	settings.mShape = st.shape;
 	settings.mMass = st.mass;
 	settings.mMaxStrength = st.maxStrength;
