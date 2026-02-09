@@ -14,6 +14,7 @@ struct JoltDemo {
     mutable_object: Option<(JMut<MutableCompoundShape>, BodyID)>,
     cv_desired_velocity: Vec3A,
     cv_player_body_id: BodyID,
+    contact_listener: VBox<ContactListenerImpl, ContactListenerVTable>,
 }
 
 impl DebugApp for JoltDemo {
@@ -50,7 +51,7 @@ impl DebugApp for JoltDemo {
 
 impl JoltDemo {
     pub fn new() -> Arc<Mutex<dyn DebugApp>> {
-        let system = PhysicsSystem::<(), ()>::new(
+        let system = PhysicsSystem::new(
             BroadPhaseLayerInterfaceImpl::new_vbox(BroadPhaseLayerInterfaceImpl),
             ObjectVsBroadPhaseLayerFilterImpl::new_vbox(ObjectVsBroadPhaseLayerFilterImpl),
             ObjectLayerPairFilterImpl::new_vbox(ObjectLayerPairFilterImpl),
@@ -62,6 +63,7 @@ impl JoltDemo {
             mutable_object: None,
             cv_desired_velocity: Vec3A::ZERO,
             cv_player_body_id: BodyID::INVALID,
+            contact_listener: ContactListenerImpl::new_vbox(ContactListenerImpl::default()),
         };
 
         app.create_dyn_cube().unwrap();
@@ -198,7 +200,9 @@ impl JoltDemo {
 
         self.update_dyn_mutable_compound();
 
-        self.system.update(1.0 / FPS);
+        self.system
+            .update_with_listeners::<_, ()>(1.0 / FPS, 1, Some(self.contact_listener.as_mut()), None)
+            .unwrap();
     }
 
     fn create_ground(&mut self) -> JoltResult<BodyID> {
@@ -554,12 +558,7 @@ impl CharacterContactListener for CharacterContactListenerImpl {
         }
     }
 
-    fn on_contact_removed(
-        &mut self,
-        _character: &CharacterVirtual,
-        _body2: &BodyID,
-        _subshape2: &SubShapeID,
-    ) {}
+    fn on_contact_removed(&mut self, _character: &CharacterVirtual, _body2: &BodyID, _subshape2: &SubShapeID) {}
 
     fn on_character_contact_added(
         &mut self,
@@ -594,7 +593,8 @@ impl CharacterContactListener for CharacterContactListenerImpl {
         _character: &CharacterVirtual,
         _other_character: &CharacterVirtual,
         _subshape2: &SubShapeID,
-    ) {}
+    ) {
+    }
 
     fn on_contact_solve(
         &mut self,
@@ -630,6 +630,55 @@ impl CharacterContactListener for CharacterContactListenerImpl {
         _character_velocity: JVec3,
         _new_character_velocity: &mut Vec3A,
     ) {
+    }
+}
+
+#[vdata(ContactListenerVTable)]
+#[derive(Default)]
+pub struct ContactListenerImpl {
+    pub pairs: Vec<SubShapeIDPair>,
+}
+
+impl ContactListener for ContactListenerImpl {
+    fn on_contact_validate(
+        &mut self,
+        _body1: &Body,
+        _body2: &Body,
+        _base_offset: JVec3,
+        _collision_result: &CollideShapeResult,
+    ) -> ValidateResult {
+        ValidateResult::AcceptAllContactsForThisBodyPair
+    }
+
+    fn on_contact_added(
+        &mut self,
+        body1: &Body,
+        body2: &Body,
+        manifold: &ContactManifold,
+        _settings: &mut ContactSettings,
+    ) {
+        let pair = SubShapeIDPair {
+            body1_id: body1.get_id(),
+            body2_id: body2.get_id(),
+            sub_shape_id1: manifold.sub_shape_id1,
+            sub_shape_id2: manifold.sub_shape_id2,
+        };
+        self.pairs.push(pair);
+        println!("on_contact_added {} | {:?}", self.pairs.len(), pair);
+    }
+
+    fn on_contact_persisted(
+        &mut self,
+        _body1: &Body,
+        _body2: &Body,
+        _manifold: &ContactManifold,
+        _settings: &mut ContactSettings,
+    ) {
+    }
+
+    fn on_contact_removed(&mut self, pair: &SubShapeIDPair) {
+        self.pairs.retain(|p| *p != *pair);
+        println!("on_contact_removed {} | {:?}", self.pairs.len(), pair);
     }
 }
 
