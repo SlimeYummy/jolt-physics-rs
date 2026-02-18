@@ -41,8 +41,9 @@ struct XCharacterSettings {
 	float mass;
 	float friction;
 	float gravityFactor;
+	EAllowedDOFs allowedDOFs;
 };
-static_assert(sizeof(XCharacterSettings) == 64, "XCharacterSettings size");
+static_assert(sizeof(XCharacterSettings) == 80, "XCharacterSettings size");
 
 XCharacter* CreateCharacter(
 	XPhysicsSystem* system,
@@ -61,6 +62,7 @@ XCharacter* CreateCharacter(
 	settings.mMass = st.mass;
 	settings.mFriction = st.friction;
 	settings.mGravityFactor = st.gravityFactor;
+	settings.mAllowedDOFs = st.allowedDOFs;
 	Ref<XCharacter> character = Ref(new XCharacter(Ref(system), &settings, position, rotation, userData));
 	return LeakRefT<XCharacter>(character);
 }
@@ -212,6 +214,7 @@ struct XCharacterVirtualSettings {
 	float maxSlopeAngle;
 	bool enhancedInternalEdgeRemoval;
 	RefConst<Shape> shape;
+	CharacterID mID;
 	float mass;
 	float maxStrength;
 	Vec3 shapeOffset;
@@ -225,8 +228,11 @@ struct XCharacterVirtualSettings {
 	uint32_t maxNumHits;
 	float hitReductionCosMaxAngle;
 	float penetrationRecoverySpeed;
+	RefConst<Shape> innerBodyShape;
+	BodyID innerBodyIDOverride;
+	ObjectLayer innerBodyLayer;
 };
-static_assert(sizeof(XCharacterVirtualSettings) == 128, "XCharacterVirtualSettings size");
+static_assert(sizeof(XCharacterVirtualSettings) == 144, "XCharacterVirtualSettings size");
 
 XCharacterVirtual* CreateCharacterVirtual(
 	rust::Fn<void (XCharacterVirtual&)> rustCleanUp,
@@ -241,6 +247,7 @@ XCharacterVirtual* CreateCharacterVirtual(
 	settings.mMaxSlopeAngle = st.maxSlopeAngle;
 	settings.mEnhancedInternalEdgeRemoval = st.enhancedInternalEdgeRemoval;
 	settings.mShape = st.shape;
+	settings.mID = st.mID.IsInvalid() ? settings.mID : st.mID;
 	settings.mMass = st.mass;
 	settings.mMaxStrength = st.maxStrength;
 	settings.mShapeOffset = st.shapeOffset;
@@ -254,6 +261,9 @@ XCharacterVirtual* CreateCharacterVirtual(
 	settings.mMaxNumHits = st.maxNumHits;
 	settings.mHitReductionCosMaxAngle = st.hitReductionCosMaxAngle;
 	settings.mPenetrationRecoverySpeed = st.penetrationRecoverySpeed;
+	settings.mInnerBodyShape = st.innerBodyShape;
+	settings.mInnerBodyIDOverride = st.innerBodyIDOverride;
+	settings.mInnerBodyLayer = st.innerBodyLayer;
 	Ref<XCharacterVirtual> character = Ref(new XCharacterVirtual(rustCleanUp, Ref(system), &settings, position, rotation));
 	return LeakRefT<XCharacterVirtual>(character);
 }

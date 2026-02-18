@@ -8,12 +8,11 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::{mem, ptr};
 
-use crate::base::{BodyID, JMut, JQuat, JRef, JRefTarget, JVec3, ObjectLayer, Plane, SubShapeID};
+use crate::base::{AllowedDOFs, BodyID, JMut, JQuat, JRef, JRefTarget, JVec3, ObjectLayer, Plane, SubShapeID, CharacterID, JMutTarget};
 use crate::body::Body;
 use crate::shape::{PhysicsMaterial, Shape};
 use crate::system::{BodyActivationListener, ContactListener, PhysicsSystem};
 use crate::vtable::{VBox, VPair};
-use crate::JMutTarget;
 
 #[cxx::bridge()]
 pub(crate) mod ffi {
@@ -235,8 +234,9 @@ pub struct CharacterSettings {
     pub mass: f32,
     pub friction: f32,
     pub gravity_factor: f32,
+    pub allowed_dofs: AllowedDOFs,
 }
-const_assert_eq!(mem::size_of::<CharacterSettings>(), 64);
+const_assert_eq!(mem::size_of::<CharacterSettings>(), 80);
 
 unsafe impl ExternType for CharacterSettings {
     type Id = type_id!("XCharacterSettings");
@@ -255,6 +255,7 @@ impl Default for CharacterSettings {
             mass: 80.0,
             friction: 0.2,
             gravity_factor: 1.0,
+            allowed_dofs: AllowedDOFs::TranslationX | AllowedDOFs::TranslationY | AllowedDOFs::TranslationZ,
         }
     }
 }
@@ -277,6 +278,7 @@ pub struct CharacterVirtualSettings {
     pub max_slope_angle: f32,
     pub enhanced_internal_edge_removal: bool,
     pub shape: Option<JRef<Shape>>,
+    pub character_id: CharacterID,
     pub mass: f32,
     pub max_strength: f32,
     pub shape_offset: Vec3A,
@@ -290,8 +292,11 @@ pub struct CharacterVirtualSettings {
     pub max_num_hits: u32,
     pub hit_reduction_cos_max_angle: f32,
     pub penetration_recovery_speed: f32,
+    pub inner_body_shape: Option<JRef<Shape>>,
+    pub inner_body_id_override: BodyID,
+    pub inner_body_layer: ObjectLayer,
 }
-const_assert_eq!(mem::size_of::<CharacterVirtualSettings>(), 128);
+const_assert_eq!(mem::size_of::<CharacterVirtualSettings>(), 144);
 
 unsafe impl ExternType for CharacterVirtualSettings {
     type Id = type_id!("XCharacterVirtualSettings");
@@ -306,6 +311,7 @@ impl Default for CharacterVirtualSettings {
             max_slope_angle: 50.0 / 180.0 * std::f32::consts::PI,
             enhanced_internal_edge_removal: false,
             shape: None,
+            character_id: CharacterID::INVALID,
             mass: 70.0,
             max_strength: 100.0,
             shape_offset: Vec3A::ZERO,
@@ -319,6 +325,9 @@ impl Default for CharacterVirtualSettings {
             max_num_hits: 256,
             hit_reduction_cos_max_angle: 0.999,
             penetration_recovery_speed: 1.0,
+            inner_body_shape: None,
+            inner_body_id_override: BodyID::INVALID,
+            inner_body_layer: 0,
         }
     }
 }
