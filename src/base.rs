@@ -105,7 +105,7 @@ pub(crate) mod ffi {
     }
 
     #[repr(u8)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, BitAnd, BitOr, BitXor)]
     enum AllowedDOFs {
         None = 0b000000,
         All = 0b111111,
@@ -160,6 +160,7 @@ pub(crate) mod ffi {
     impl Vec<IndexedTriangle> {}
     impl Vec<BodyID> {}
     impl Vec<SubShapeID> {}
+    impl Vec<CharacterID> {}
 
     unsafe extern "C++" {
         include!("rust/cxx.h");
@@ -174,6 +175,7 @@ pub(crate) mod ffi {
         type OverrideMassProperties;
         type Activation;
         type CanSleep;
+        type ValidateResult;
 
         type Vec3 = crate::base::JVec3;
         type Vec4 = crate::base::JVec4;
@@ -186,6 +188,7 @@ pub(crate) mod ffi {
         type IndexedTriangle = crate::base::IndexedTriangle;
         type BodyID = crate::base::BodyID;
         type SubShapeID = crate::base::SubShapeID;
+        type CharacterID = crate::base::CharacterID;
     }
 }
 
@@ -196,6 +199,8 @@ pub type MotionType = ffi::MotionType;
 pub type MotionQuality = ffi::MotionQuality;
 pub type AllowedDOFs = ffi::AllowedDOFs;
 pub type OverrideMassProperties = ffi::OverrideMassProperties;
+pub type Activation = ffi::Activation;
+pub type CanSleep = ffi::CanSleep;
 pub type ValidateResult = ffi::ValidateResult;
 
 impl From<bool> for ffi::Activation {
@@ -624,9 +629,69 @@ impl fmt::Debug for BodyID {
 }
 
 #[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), rkyv(derive(Debug)))]
+pub struct CharacterID(pub u32);
+const_assert_eq!(mem::size_of::<CharacterID>(), 4);
+
+unsafe impl ExternType for CharacterID {
+    type Id = type_id!("CharacterID");
+    type Kind = kind::Trivial;
+}
+
+impl CharacterID {
+    pub const INVALID: CharacterID = CharacterID(0xFFFF_FFFF);
+
+    #[inline]
+    pub fn new(id: u32) -> CharacterID {
+        CharacterID(id)
+    }
+
+    #[inline]
+    pub fn is_valid(&self) -> bool {
+        *self != Self::INVALID
+    }
+
+    #[inline]
+    pub fn is_invalid(&self) -> bool {
+        *self == Self::INVALID
+    }
+}
+
+impl Default for CharacterID {
+    #[inline]
+    fn default() -> CharacterID {
+        CharacterID::INVALID
+    }
+}
+
+impl From<u32> for CharacterID {
+    #[inline]
+    fn from(id: u32) -> CharacterID {
+        CharacterID(id)
+    }
+}
+
+impl From<CharacterID> for u32 {
+    #[inline]
+    fn from(id: CharacterID) -> u32 {
+        id.0
+    }
+}
+
+impl fmt::Debug for CharacterID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CharacterID(0x{:X})", self.0)
+    }
+}
+
+
+#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubShapeID(pub u32);
 const_assert_eq!(mem::size_of::<SubShapeID>(), 4);
+
 
 unsafe impl ExternType for SubShapeID {
     type Id = type_id!("SubShapeID");

@@ -100,6 +100,7 @@ static_assert(sizeof(IndexedTriangle) == 20, "IndexedTriangle size");
 
 static_assert(sizeof(BodyID) == 4, "BodyID size");
 static_assert(sizeof(SubShapeID) == 4, "SubShapeID size");
+static_assert(sizeof(CharacterID) == 4, "CharacterID size");
 
 static_assert(sizeof(Ref<int>) == sizeof(size_t), "RsRef size");
 
