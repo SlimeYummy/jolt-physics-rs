@@ -1413,7 +1413,7 @@ unsafe impl JRefTarget for StaticCompoundShape {
 
     #[inline]
     unsafe fn make_ref(raw: &Self::JRaw) -> &Self {
-        unsafe { mem::transmute::<&Self::JRaw, &Self>(raw) }
+        unsafe { mem::transmute::<Self::JRaw, &Self>(*raw) }
     }
 
     #[inline]

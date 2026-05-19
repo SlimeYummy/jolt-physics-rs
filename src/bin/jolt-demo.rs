@@ -604,7 +604,7 @@ impl CharacterContactListener for CharacterContactListenerImpl {
         _contact_position: JVec3,
         contact_normal: JVec3,
         contact_velocity: JVec3,
-        _material: &PhysicsMaterial,
+        _material: Option<&PhysicsMaterial>,
         _character_velocity: JVec3,
         new_character_velocity: &mut Vec3A,
     ) {
@@ -626,7 +626,7 @@ impl CharacterContactListener for CharacterContactListenerImpl {
         _contact_position: JVec3,
         _contact_normal: JVec3,
         _contact_velocity: JVec3,
-        _material: &PhysicsMaterial,
+        _material: Option<&PhysicsMaterial>,
         _character_velocity: JVec3,
         _new_character_velocity: &mut Vec3A,
     ) {

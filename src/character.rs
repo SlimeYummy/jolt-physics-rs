@@ -8,7 +8,9 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::{mem, ptr};
 
-use crate::base::{AllowedDOFs, BodyID, JMut, JQuat, JRef, JRefTarget, JVec3, ObjectLayer, Plane, SubShapeID, CharacterID, JMutTarget};
+use crate::base::{
+    AllowedDOFs, BodyID, CharacterID, JMut, JMutTarget, JQuat, JRef, JRefTarget, JVec3, ObjectLayer, Plane, SubShapeID,
+};
 use crate::body::Body;
 use crate::shape::{PhysicsMaterial, Shape};
 use crate::system::{BodyActivationListener, ContactListener, PhysicsSystem};
@@ -534,8 +536,15 @@ impl Character {
     }
 
     #[inline]
-    pub fn get_shape(&self) -> &Shape {
-        unsafe { &*Shape::cast_ptr(self.as_ref().GetShape()) }
+    pub fn get_shape(&self) -> Option<&Shape> {
+        unsafe {
+            let shape = self.as_ref().GetShape();
+            if !shape.is_null() {
+                Some(&*Shape::cast_ptr(shape))
+            } else {
+                None
+            }
+        }
     }
 
     #[inline]
@@ -564,8 +573,15 @@ impl Character {
     }
 
     #[inline]
-    pub fn get_ground_material(&self) -> &PhysicsMaterial {
-        unsafe { &*PhysicsMaterial::cast_ptr(self.as_ref().GetGroundMaterial()) }
+    pub fn get_ground_material(&self) -> Option<&PhysicsMaterial> {
+        unsafe {
+            let material = self.as_ref().GetGroundMaterial();
+            if !material.is_null() {
+                Some(&*PhysicsMaterial::cast_ptr(material))
+            } else {
+                None
+            }
+        }
     }
 
     #[inline]
@@ -823,8 +839,8 @@ impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
     }
 
     #[inline]
-    pub fn get_shape(&self) -> &Shape {
-        unsafe { &*Shape::cast_ptr(self.as_ref().GetShape()) }
+    pub fn get_shape(&self) -> Option<&Shape> {
+        unsafe { NonNull::new(self.as_ref().GetShape() as *mut Shape).map(|shape| shape.as_ref()) }
     }
 
     #[inline]
@@ -853,8 +869,9 @@ impl<CCL: CharacterContactListener> CharacterVirtual<CCL> {
     }
 
     #[inline]
-    pub fn get_ground_material(&self) -> &PhysicsMaterial {
-        unsafe { &*PhysicsMaterial::cast_ptr(self.as_ref().GetGroundMaterial()) }
+    pub fn get_ground_material(&self) -> Option<&PhysicsMaterial> {
+        NonNull::new(self.as_ref().GetGroundMaterial() as *mut PhysicsMaterial)
+            .map(|material| unsafe { material.as_ref() })
     }
 
     #[inline]
@@ -1198,7 +1215,7 @@ pub struct CharacterContactListenerVTable {
         contact_position: JVec3,
         contact_normal: JVec3,
         contact_velocity: JVec3,
-        material: &PhysicsMaterial,
+        material: Option<&PhysicsMaterial>,
         character_velocity: JVec3,
         new_character_velocity: &mut Vec3A,
     ),
@@ -1210,7 +1227,7 @@ pub struct CharacterContactListenerVTable {
         contact_position: JVec3,
         contact_normal: JVec3,
         contact_velocity: JVec3,
-        material: &PhysicsMaterial,
+        material: Option<&PhysicsMaterial>,
         character_velocity: JVec3,
         new_character_velocity: &mut Vec3A,
     ),
