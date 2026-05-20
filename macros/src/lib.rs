@@ -12,12 +12,9 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let repr = extract_attr_raw(&input.attrs, "repr");
     if repr != "C" {
-        return Error::new(
-            proc_macro2::Span::call_site(),
-            "Miss `#[repr(C)]` for structure",
-        )
-        .to_compile_error()
-        .into();
+        return Error::new(proc_macro2::Span::call_site(), "Miss `#[repr(C)]` for structure")
+            .to_compile_error()
+            .into();
     }
 
     let fields = match &mut input.fields {
@@ -34,12 +31,9 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let vtable_name = input.ident.to_string();
     if !vtable_name.ends_with("VTable") {
-        return Error::new(
-            input.ident.span(),
-            "The structure does not ends in 'VTable'",
-        )
-        .to_compile_error()
-        .into();
+        return Error::new(input.ident.span(), "The structure does not ends in 'VTable'")
+            .to_compile_error()
+            .into();
     }
 
     let trait_name = Ident::new(&vtable_name[..vtable_name.len() - 6], input.ident.span());
@@ -49,13 +43,7 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
         attrs: input
             .attrs
             .iter()
-            .filter(|a| {
-                a.path()
-                    .get_ident()
-                    .as_ref()
-                    .map(|i| *i == "doc")
-                    .unwrap_or(false)
-            })
+            .filter(|a| a.path().get_ident().as_ref().map(|i| *i == "doc").unwrap_or(false))
             .cloned()
             .collect(),
         vis: Visibility::Public(Default::default()),
@@ -138,12 +126,9 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
             if input_idx == 0 {
                 let (ok, mutable) = match_first_param(&param.ty);
                 if !ok {
-                    return Error::new(
-                        param.ty.span(),
-                        "First parameter must be `*const u8` or `*mut u8`",
-                    )
-                    .to_compile_error()
-                    .into();
+                    return Error::new(param.ty.span(), "First parameter must be `*const u8` or `*mut u8`")
+                        .to_compile_error()
+                        .into();
                 }
 
                 if ident == "drop" && !mutable {
@@ -169,9 +154,7 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
         // Add extern "C" if it isn't there
         if let Some(a) = &func_ty.abi {
             if !a.name.as_ref().map(|s| s.value() == "C").unwrap_or(false) {
-                return Error::new(a.span(), "invalid ABI")
-                    .to_compile_error()
-                    .into();
+                return Error::new(a.span(), "invalid ABI").to_compile_error().into();
             }
         } else {
             func_ty.abi.clone_from(&sig_extern.abi);
@@ -222,7 +205,7 @@ pub fn vtable(attr: TokenStream, item: TokenStream) -> TokenStream {
             },
         );
     }
-    
+
     let mut impl_empty = None;
     if allow_empty {
         impl_empty = Some(quote!(

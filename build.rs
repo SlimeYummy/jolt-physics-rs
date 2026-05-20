@@ -2,9 +2,11 @@ use std::path::Path;
 use std::{env, fs};
 
 fn main() {
-    // let is_debug = env::var("PROFILE").map(|p| p == "debug").unwrap_or(true);
     let is_windows = env::var_os("CARGO_CFG_WINDOWS").is_some();
     let is_unix = env::var_os("CARGO_CFG_UNIX").is_some();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    let is_x86_target = matches!(target_arch.as_str(), "x86" | "x86_64");
+    let is_arm_target = matches!(target_arch.as_str(), "arm" | "aarch64");
     let is_clang = env::var("CC")
         .map(|cc| cc == "clang" || cc == "clang-cl")
         .unwrap_or(false);
@@ -15,7 +17,6 @@ fn main() {
 
     let mut rs_file = vec![
         "src/base.rs",
-        "src/layer.rs",
         "src/shape.rs",
         "src/body.rs",
         "src/system.rs",
@@ -58,12 +59,23 @@ fn main() {
         .define("RUST_CXX_NO_EXCEPTIONS", None)
         .define("JPH_DISABLE_CUSTOM_ALLOCATOR", "1")
         .define("JPH_OBJECT_LAYER_BITS", "32")
-        .define("NDEBUG", "1")
-        .define("JPH_USE_SSE4_1", "1")
-        .define("JPH_USE_SSE4_2", "1")
-        .define("JPH_USE_LZCNT", "1")
-        .define("JPH_USE_TZCNT", "1");
+        .define("NDEBUG", "1");
     // .define("JPH_USE_F16C", "1")
+
+    if is_deterministic {
+        cxx.define("JPH_CROSS_PLATFORM_DETERMINISTIC", "1");
+    }
+
+    if is_x86_target {
+        cxx.define("JPH_USE_SSE4_1", "1")
+            .define("JPH_USE_SSE4_2", "1")
+            .define("JPH_USE_LZCNT", "1")
+            .define("JPH_USE_TZCNT", "1");
+    }
+
+    if is_arm_target {
+        cxx.define("JPH_USE_NEON", "1");
+    }
 
     if is_profile {
         cxx.define("JPH_PROFILE_ENABLED", "1");
@@ -107,21 +119,11 @@ fn main() {
             .flag_if_supported("/fp:except-")
             .flag_if_supported("/Zc:inline")
             .flag_if_supported("/GR-")
-            .flag_if_supported("/wd4577")
-            .flag_if_supported("/arch:SSE2")
-            .flag_if_supported("/arch:SSE4.2");
+            .flag_if_supported("/wd4577");
 
-        // if is_debug {
-        //     cxx.flag_if_supported("/GS")
-        //         .flag_if_supported("/Od")
-        //         .flag_if_supported("/Ob0")
-        //         .flag_if_supported("/RTC1");
-        // } else {
-        //     cxx.flag_if_supported("/GS-")
-        //         .flag_if_supported("/O2")
-        //         .flag_if_supported("/Oi")
-        //         .flag_if_supported("/Ot");
-        // }
+        if target_arch == "x86" {
+            cxx.flag_if_supported("/arch:SSE2");
+        }
 
         if is_deterministic {
             cxx.flag_if_supported("/fp:precise");
@@ -146,21 +148,27 @@ fn main() {
             .flag_if_supported("-fno-rtti")
             .flag_if_supported("-fno-exceptions")
             .flag_if_supported("-Wno-stringop-overflow")
-            .flag_if_supported("-mbmi")
-            .flag_if_supported("-mbmi")
-            .flag_if_supported("-mbmi")
-            .flag_if_supported("-mbmi")
-            .flag_if_supported("-mbmi")
-            .flag_if_supported("-mbmi")
-            .flag_if_supported("-mpopcnt")
-            .flag_if_supported("-mlzcnt")
-            .flag_if_supported("-msse2")
-            .flag_if_supported("-msse4.1")
-            .flag_if_supported("-msse4.2")
-            .flag_if_supported("-mno-avx2")
-            .flag_if_supported("-mno-avx512")
             .flag_if_supported("-flto=thin");
         // .flag_if_supported("-mf16c")
+
+        if is_x86_target {
+            cxx.flag_if_supported("-mbmi")
+                .flag_if_supported("-mpopcnt")
+                .flag_if_supported("-mlzcnt")
+                .flag_if_supported("-msse2")
+                .flag_if_supported("-msse4.1")
+                .flag_if_supported("-msse4.2")
+                .flag_if_supported("-mno-avx2")
+                .flag_if_supported("-mno-avx512");
+        }
+
+        if target_arch == "arm" {
+            cxx.flag_if_supported("-mfpu=neon");
+        }
+
+        if is_unix && is_x86_target {
+            cxx.flag_if_supported("-mfpmath=sse");
+        }
 
         if is_deterministic {
             cxx.flag_if_supported("-ffp-model=precise")
