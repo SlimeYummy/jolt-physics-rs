@@ -135,7 +135,6 @@ uint32 RefCountRef(const T* rs_ptr) {
 class XPhysicsSystem;
 
 #include "jolt-physics-rs/src/base.rs.h"
-#include "jolt-physics-rs/src/layer.rs.h"
 
 //
 // shape
