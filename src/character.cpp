@@ -28,7 +28,9 @@ XCharacter::~XCharacter() {
 }
 
 #if defined(JPH_DEBUG_RENDERER)
-void XCharacter::Render(DebugRenderer* render) const {}
+void XCharacter::Render(DebugRenderer* render) const {
+	render->DrawCoordinateSystem(this->GetWorldTransform());
+}
 #endif
 
 struct XCharacterSettings {
@@ -185,10 +187,11 @@ bool XCharacterVirtual::SetShape(ObjectLayer chara_layer, const Shape* shape, fl
 }
 
 #if defined(JPH_DEBUG_RENDERER)
-void XCharacterVirtual::Render(DebugRenderer* debugRenderer) const {
+void XCharacterVirtual::Render(DebugRenderer* render) const {
 	const CharacterVirtual* chara = dynamic_cast<const CharacterVirtual*>(this);
 	Mat44 com = chara->GetCenterOfMassTransform();
-	chara->GetShape()->Draw(debugRenderer, com, Vec3::sReplicate(1.0f), Color::sGreen, false, true);
+	chara->GetShape()->Draw(render, com, Vec3::sReplicate(1.0f), Color::sGreen, false, true);
+	render->DrawCoordinateSystem(this->GetWorldTransform());
 }
 #endif
 

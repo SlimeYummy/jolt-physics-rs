@@ -686,12 +686,10 @@ impl fmt::Debug for CharacterID {
     }
 }
 
-
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubShapeID(pub u32);
 const_assert_eq!(mem::size_of::<SubShapeID>(), 4);
-
 
 unsafe impl ExternType for SubShapeID {
     type Id = type_id!("SubShapeID");

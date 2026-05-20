@@ -417,16 +417,16 @@ impl CharacterContactListener for TestCclListener {
 
     fn on_contact_persisted(
         &mut self,
-        character: &CharacterVirtual,
-        body2: &BodyID,
-        subshape2: &SubShapeID,
-        contact_position: JVec3,
-        contact_normal: JVec3,
-        settings: &mut CharacterContactSettings,
+        _character: &CharacterVirtual,
+        _body2: &BodyID,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        _settings: &mut CharacterContactSettings,
     ) {
     }
 
-    fn on_contact_removed(&mut self, character: &CharacterVirtual, body2: &BodyID, subshape2: &SubShapeID) {}
+    fn on_contact_removed(&mut self, _character: &CharacterVirtual, _body2: &BodyID, _subshape2: &SubShapeID) {}
 
     fn on_character_contact_added(
         &mut self,
@@ -452,20 +452,20 @@ impl CharacterContactListener for TestCclListener {
 
     fn on_character_contact_persisted(
         &mut self,
-        character: &CharacterVirtual,
-        other_character: &CharacterVirtual,
-        subshape2: &SubShapeID,
-        contact_position: JVec3,
-        contact_normal: JVec3,
-        settings: &mut CharacterContactSettings,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
+        _contact_position: JVec3,
+        _contact_normal: JVec3,
+        _settings: &mut CharacterContactSettings,
     ) {
     }
 
     fn on_character_contact_removed(
         &mut self,
-        character: &CharacterVirtual,
-        other_character: &CharacterVirtual,
-        subshape2: &SubShapeID,
+        _character: &CharacterVirtual,
+        _other_character: &CharacterVirtual,
+        _subshape2: &SubShapeID,
     ) {
     }
 
@@ -477,7 +477,7 @@ impl CharacterContactListener for TestCclListener {
         contact_position: JVec3,
         contact_normal: JVec3,
         contact_velocity: JVec3,
-        _material: &PhysicsMaterial,
+        material: Option<&PhysicsMaterial>,
         character_velocity: JVec3,
         new_character_velocity: &mut Vec3A,
     ) {
@@ -489,7 +489,7 @@ impl CharacterContactListener for TestCclListener {
         assert_eq!(contact_position, Vec3A::new(0.1, 0.1, 0.1));
         assert_eq!(contact_normal, Vec3A::new(0.2, 0.2, 0.2));
         assert_eq!(contact_velocity, Vec3A::new(0.3, 0.3, 0.3));
-        // assert_eq!(material as *const _, std::ptr::null());
+        assert_eq!(material.is_none(), true);
         assert_eq!(character_velocity, Vec3A::new(0.4, 0.4, 0.4));
         assert_eq!(*new_character_velocity, Vec3A::new(0.0, 0.0, 0.0));
         *new_character_velocity = Vec3A::new(9.8, 8.7, 7.6);
@@ -504,7 +504,7 @@ impl CharacterContactListener for TestCclListener {
         contact_position: JVec3,
         contact_normal: JVec3,
         contact_velocity: JVec3,
-        _material: &PhysicsMaterial,
+        material: Option<&PhysicsMaterial>,
         character_velocity: JVec3,
         new_character_velocity: &mut Vec3A,
     ) {
@@ -516,7 +516,7 @@ impl CharacterContactListener for TestCclListener {
         assert_eq!(contact_position, Vec3A::new(0.9, 0.9, 0.9));
         assert_eq!(contact_normal, Vec3A::new(0.8, 0.8, 0.8));
         assert_eq!(contact_velocity, Vec3A::new(0.7, 0.7, 0.7));
-        // assert_eq!(material as *const _, std::ptr::null());
+        assert_eq!(material.is_none(), true);
         assert_eq!(character_velocity, Vec3A::new(0.6, 0.6, 0.6));
         assert_eq!(*new_character_velocity, Vec3A::new(9.9, 9.9, 9.9));
         *new_character_velocity = Vec3A::new(1.2, 2.3, 3.4);

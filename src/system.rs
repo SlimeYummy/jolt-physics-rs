@@ -450,9 +450,10 @@ unsafe impl ExternType for SubShapeIDPair {
 // Global Init
 //
 
+static JOLT_INITED: AtomicBool = AtomicBool::new(false);
+
 #[inline]
 pub fn global_initialize() {
-    static JOLT_INITED: AtomicBool = AtomicBool::new(false);
     if JOLT_INITED
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_ok()
@@ -464,6 +465,7 @@ pub fn global_initialize() {
 #[inline]
 pub fn global_finalize() {
     ffi::GlobalFinalize();
+    JOLT_INITED.store(false, Ordering::SeqCst);
 }
 
 //
@@ -1267,7 +1269,7 @@ unsafe impl JRefTarget for BodyInterface {
 
     #[inline]
     fn name() -> &'static str {
-        "Character"
+        "BodyInterface"
     }
 
     #[inline]
